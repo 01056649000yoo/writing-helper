@@ -57,8 +57,16 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
               <h1 className="text-3xl font-bold text-gray-800">{room.title}</h1>
               <p className="text-base text-gray-500 mt-1">주제: {room.topic}</p>
               <div className="flex gap-2 mt-3 flex-wrap">
-                <span className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg font-medium">{room.subject_type}</span>
-                <span className="text-sm bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium">{room.grade_level}</span>
+                {room.subject_type && room.subject_type !== "null" && (
+                  <span className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg font-medium">
+                    {room.subject_type}
+                  </span>
+                )}
+                {room.grade_level && room.grade_level !== "null" && (
+                  <span className="text-sm bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium">
+                    {gradeLabel(room.grade_level)}
+                  </span>
+                )}
                 {room.expires_at && room.is_active && (
                   <ExpiryBadge expiresAt={room.expires_at} />
                 )}
@@ -128,4 +136,13 @@ function getLocalNetworkIp(): string | null {
     }
   }
   return null;
+}
+
+function gradeLabel(grade: string) {
+  const map: Record<string, string> = {
+    "저학년": "🌱 저학년 (1~2학년)",
+    "중학년": "🌿 중학년 (3~4학년)",
+    "고학년": "🌳 고학년 (5~6학년)",
+  };
+  return map[grade] ?? grade;
 }
