@@ -10,7 +10,7 @@ function isPublicPath(pathname: string) {
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (isPublicPath(pathname) || pathname === "/api/queue") {
+  if (isPublicPath(pathname) || pathname === "/api/queue" || pathname === "/api/github-deploy") {
     return NextResponse.next();
   }
 

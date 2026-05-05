@@ -38,6 +38,9 @@ export default function LoginPage() {
           계정이 없으신가요?{" "}
           <Link href="/signup" className="text-indigo-500 font-medium hover:underline">회원가입</Link>
         </p>
+        <p className="text-center text-xs text-gray-400 mt-4">
+          build check: writing-helper ed815d0
+        </p>
       </div>
     </div>
   );

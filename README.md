@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Development
 
-## Getting Started
-
-First, run the development server:
+개발 서버 실행:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 `http://localhost:3000`으로 확인할 수 있습니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production On Mac Mini
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+이 프로젝트는 Vercel 대신 맥미니 로컬 호스팅 기준으로 운영할 수 있습니다.
 
-## Learn More
+운영 실행:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run build
+npm run start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+상시 실행 권장:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pm2 start ecosystem.config.cjs
+```
 
-## Deploy on Vercel
+리버스 프록시 예시는 [Caddyfile.example](/Users/seunghyeonmaegmini/writing-helper/Caddyfile.example:1), 운영 문서는 [docs/mac-mini-hosting.md](/Users/seunghyeonmaegmini/writing-helper/docs/mac-mini-hosting.md:1)에 정리되어 있습니다.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+권장 포트 분리:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 개발: `3000`
+- 운영: `3000`
+
+## GitHub Auto Deploy
+
+GitHub webhook으로 맥미니 서버를 자동 동기화할 수 있습니다.
+
+- 엔드포인트: `/api/github-deploy`
+- 대상 이벤트: `push`
+- 대상 브랜치: `main`
+- 서명 방식: `x-hub-signature-256`
+
+필수 환경 변수:
+
+```bash
+GITHUB_WEBHOOK_SECRET=...
+GITHUB_WEBHOOK_REPO=01056649000yoo/writing-helper
+GITHUB_WEBHOOK_REF=refs/heads/main
+```
+
+웹훅이 들어오면 [scripts/deploy-from-github.sh](/Users/seunghyeonmaegmini/writing-helper/scripts/deploy-from-github.sh:1)가 실행되어 아래 순서로 반영됩니다.
+
+1. `git pull --ff-only origin main`
+2. `npm install`
+3. `npm run build`
+4. `npx pm2 restart writing-helper --update-env`
+
+로그 파일:
+
+- [logs/deploy-webhook.log](/Users/seunghyeonmaegmini/writing-helper/logs/deploy-webhook.log:1)
+
+## Notes
+
+- Next.js 16 기준 Node 서버 배포는 `npm run build` + `npm run start` 구조를 사용합니다.
+- 운영에서는 `npm run dev`가 아니라 `pm2`로 `start` 프로세스를 유지하는 방식을 권장합니다.

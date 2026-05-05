@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "host:start": "pm2 start ecosystem.config.cjs",
+    "host:restart": "pm2 restart writing-helper",
+    "host:stop": "pm2 stop writing-helper",
+    "host:logs": "pm2 logs writing-helper"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
@@ -14,6 +18,7 @@
     "@types/qrcode": "^1.5.6",
     "next": "16.2.3",
     "openai": "^6.34.0",
+    "pm2": "^7.0.1",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"
