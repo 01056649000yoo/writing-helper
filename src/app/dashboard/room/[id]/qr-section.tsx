@@ -91,21 +91,21 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
           onClick={() => setExpanded(false)}
         >
           <div
-            className="bg-white rounded-[48px] shadow-2xl p-12 flex flex-col items-center gap-8 max-w-5xl w-full"
+            className="bg-white rounded-[48px] shadow-2xl p-12 flex flex-col items-center gap-8 max-w-4xl w-full"
             onClick={e => e.stopPropagation()}
           >
             <div className="text-center">
               <h2 className="text-4xl font-black text-gray-900 tracking-tight">📱 QR 코드를 스캔하세요</h2>
-              <p className="text-lg text-gray-500 mt-3">교실 뒤쪽에서도 한눈에 보일 수 있는 특대 사이즈입니다.</p>
+              <p className="text-lg text-gray-500 mt-3">교실 뒤쪽에서도 한눈에 보일 수 있는 크기입니다.</p>
             </div>
             
             {qrLarge && (
               <div className="bg-white p-10 rounded-[40px] border-8 border-indigo-50 shadow-2xl">
-                <img src={qrLarge} alt="QR 코드 확대" className="w-full max-w-3xl h-auto drop-shadow-md" />
+                <img src={qrLarge} alt="QR 코드 확대" className="w-full max-w-2xl h-auto drop-shadow-md" />
               </div>
             )}
             
-            <div className="w-full max-w-3xl space-y-6">
+            <div className="w-full max-w-2xl space-y-6">
               <p className="text-sm text-gray-400 text-center break-all font-mono bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 {primaryUrl}
               </p>
