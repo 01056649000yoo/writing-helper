@@ -396,3 +396,81 @@ error: Your local changes to the following files would be overwritten by merge:
 Please commit your changes or stash them before you merge.
 Aborting
 Updating e649bb3..f8e5dac
+[2026-05-06 00:20:17] webhook deploy started
+[2026-05-06 00:20:17] pulling latest main
+Already on 'main'
+M	logs/deploy-webhook.log
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[2026-05-06 00:20:18] installing dependencies
+
+up to date, audited 470 packages in 2s
+
+151 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-06 00:20:19] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+▲ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.4s
+  Running TypeScript ...
+  Finished TypeScript in 3.2s ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/13) ...
+  Generating static pages using 9 workers (3/13) 
+  Generating static pages using 9 workers (6/13) 
+  Generating static pages using 9 workers (9/13) 
+✓ Generating static pages using 9 workers (13/13) in 253ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/github-deploy
+├ ƒ /api/queue
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/class/[id]
+├ ○ /dashboard/class/new
+├ ƒ /dashboard/room/[id]
+├ ƒ /dashboard/room/[id]/result/[sessionId]
+├ ○ /dashboard/room/new
+├ ○ /dashboard/settings
+├ ○ /login
+├ ƒ /room/[id]
+├ ƒ /room/[id]/activity
+├ ƒ /room/[id]/result
+├ ƒ /room/[id]/waiting
+├ ƒ /s/[code]
+├ ƒ /share/[sessionId]
+└ ○ /signup
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+[2026-05-06 00:20:28] restarting pm2 app
+[PM2] Applying action restartProcessId on app [writing-helper](ids: [ 0 ])
+[PM2] [writing-helper](0) ✓
+┌────┬───────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name              │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ writing-helper    │ default     │ N/A     │ fork    │ 35649    │ 0s     │ 59   │ online    │ 0%       │ 1.5mb    │ seunghy… │ disabled │
+└────┴───────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[2026-05-06 00:20:29] webhook deploy finished

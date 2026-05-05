@@ -33,7 +33,9 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-5xl mx-auto pt-8 pb-16 space-y-6">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="text-indigo-500 text-base hover:underline">← 대시보드로</Link>
+          <Link href={room.class_id ? `/dashboard/class/${room.class_id}` : "/dashboard"} className="text-indigo-500 text-base hover:underline">
+            ← {room.class_id ? "학급으로" : "대시보드로"}
+          </Link>
           {room.is_active && (
             <form action={async () => { "use server"; await closeRoom(id); }}>
               <button type="submit" className="text-base text-red-500 border border-red-200 px-5 py-2.5 rounded-xl hover:bg-red-50">
