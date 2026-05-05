@@ -110,6 +110,13 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-10 pt-10 border-t border-gray-50 text-center">
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-6 flex items-start gap-3 text-left">
+                <span className="text-amber-500 text-lg">💡</span>
+                <p className="text-sm text-amber-700 leading-relaxed font-medium">
+                  <strong>끄적끄적아지트</strong>와는 별개의 시스템입니다.<br />
+                  이용을 위해 <strong>새로운 회원가입</strong>이 필요합니다.
+                </p>
+              </div>
               <p className="text-gray-500">
                 아직 계정이 없으신가요?{" "}
                 <Link href="/signup" className="text-indigo-600 font-bold hover:underline underline-offset-4 ml-1">회원가입</Link>
