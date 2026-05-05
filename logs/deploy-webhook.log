@@ -1,0 +1,398 @@
+[2026-05-05 22:26:46] webhook deploy started
+[2026-05-05 22:26:46] pulling latest main
+Already on 'main'
+M	README.md
+M	package-lock.json
+M	package.json
+M	src/app/login/page.tsx
+M	src/proxy.ts
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[2026-05-05 22:26:47] installing dependencies
+
+removed 314 packages, and audited 156 packages in 2s
+
+17 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-05 22:26:49] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+▲ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./src/app/globals.css
+Error evaluating Node.js code
+Error: Cannot find module '@tailwindcss/postcss'
+Require stack:
+- /Users/seunghyeonmaegmini/writing-helper/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js
+- /Users/seunghyeonmaegmini/writing-helper/.next/build/chunks/[turbopack]_runtime.js
+- /Users/seunghyeonmaegmini/writing-helper/.next/build/postcss.js
+    [at Module._resolveFilename (node:internal/modules/cjs/loader:1455:15)]
+    [at defaultResolveImpl (node:internal/modules/cjs/loader:1065:19)]
+    [at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1070:22)]
+    [at Module._load (node:internal/modules/cjs/loader:1241:25)]
+    [at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)]
+    [at Module.require (node:internal/modules/cjs/loader:1555:12)]
+    [at require (node:internal/modules/helpers:152:16)]
+    at require (turbopack:///[turbopack-node]/transforms/postcss.ts:49:25) [/Users/seunghyeonmaegmini/writing-helper/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:134:33]
+    [at <anonymous>]
+    at map (turbopack:///[turbopack-node]/transforms/postcss.ts:43:33) [/Users/seunghyeonmaegmini/writing-helper/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:129:35]
+
+Import trace:
+  Client Component Browser:
+    ./src/app/globals.css [Client Component Browser]
+    ./src/app/layout.tsx [Server Component]
+
+
+    at require (turbopack:///[turbopack-node]/transforms/postcss.ts:49:25) [/Users/seunghyeonmaegmini/writing-helper/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:134:33])
+    at map (turbopack:///[turbopack-node]/transforms/postcss.ts:43:33) [/Users/seunghyeonmaegmini/writing-helper/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:129:35])
+[2026-05-05 22:29:14] webhook deploy started
+[2026-05-05 22:29:14] pulling latest main
+Already on 'main'
+M	README.md
+M	package-lock.json
+M	package.json
+M	src/app/login/page.tsx
+M	src/proxy.ts
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[2026-05-05 22:29:15] installing dependencies
+
+up to date, audited 470 packages in 2s
+
+151 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-05 22:29:17] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+▲ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.9s
+  Running TypeScript ...
+  Finished TypeScript in 3.9s ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/13) ...
+  Generating static pages using 9 workers (3/13) 
+  Generating static pages using 9 workers (6/13) 
+  Generating static pages using 9 workers (9/13) 
+✓ Generating static pages using 9 workers (13/13) in 221ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/github-deploy
+├ ƒ /api/queue
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/class/[id]
+├ ○ /dashboard/class/new
+├ ƒ /dashboard/room/[id]
+├ ƒ /dashboard/room/[id]/result/[sessionId]
+├ ○ /dashboard/room/new
+├ ○ /dashboard/settings
+├ ○ /login
+├ ƒ /room/[id]
+├ ƒ /room/[id]/activity
+├ ƒ /room/[id]/result
+├ ƒ /room/[id]/waiting
+├ ƒ /s/[code]
+├ ƒ /share/[sessionId]
+└ ○ /signup
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+[2026-05-05 22:29:27] restarting pm2 app
+[PM2] Applying action restartProcessId on app [writing-helper](ids: [ 0 ])
+[PM2] [writing-helper](0) ✓
+┌────┬───────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name              │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ writing-helper    │ default     │ N/A     │ fork    │ 8559     │ 0s     │ 36   │ online    │ 0%       │ 1.7mb    │ seunghy… │ disabled │
+└────┴───────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[2026-05-05 22:29:28] webhook deploy finished
+[2026-05-05 22:30:34] webhook deploy started
+[2026-05-05 22:30:34] pulling latest main
+Already on 'main'
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[2026-05-05 22:30:35] installing dependencies
+
+up to date, audited 470 packages in 2s
+
+151 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-05 22:30:37] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+▲ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.9s
+  Running TypeScript ...
+  Finished TypeScript in 4.2s ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/13) ...
+  Generating static pages using 9 workers (3/13) 
+  Generating static pages using 9 workers (6/13) 
+  Generating static pages using 9 workers (9/13) 
+✓ Generating static pages using 9 workers (13/13) in 212ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/github-deploy
+├ ƒ /api/queue
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/class/[id]
+├ ○ /dashboard/class/new
+├ ƒ /dashboard/room/[id]
+├ ƒ /dashboard/room/[id]/result/[sessionId]
+├ ○ /dashboard/room/new
+├ ○ /dashboard/settings
+├ ○ /login
+├ ƒ /room/[id]
+├ ƒ /room/[id]/activity
+├ ƒ /room/[id]/result
+├ ƒ /room/[id]/waiting
+├ ƒ /s/[code]
+├ ƒ /share/[sessionId]
+└ ○ /signup
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+[2026-05-05 22:30:46] restarting pm2 app
+[PM2] Applying action restartProcessId on app [writing-helper](ids: [ 0 ])
+[PM2] [writing-helper](0) ✓
+┌────┬───────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name              │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ writing-helper    │ default     │ N/A     │ fork    │ 10477    │ 0s     │ 37   │ online    │ 0%       │ 1.7mb    │ seunghy… │ disabled │
+└────┴───────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[2026-05-05 22:30:47] webhook deploy finished
+[2026-05-05 22:54:11] webhook deploy started
+[2026-05-05 22:54:11] pulling latest main
+Already on 'main'
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+   8070d91..d04d882  main       -> origin/main
+Updating 8070d91..d04d882
+Fast-forward
+ src/app/dashboard/manual-modal.tsx | 2 +-
+ src/app/dashboard/page.tsx         | 2 +-
+ src/app/layout.tsx                 | 2 +-
+ src/app/login/page.tsx             | 2 +-
+ src/app/room/[id]/page.tsx         | 2 +-
+ src/app/signup/page.tsx            | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
+[2026-05-05 22:54:11] installing dependencies
+
+up to date, audited 470 packages in 2s
+
+151 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-05 22:54:13] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+▲ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.2s
+  Running TypeScript ...
+  Finished TypeScript in 4.0s ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/13) ...
+  Generating static pages using 9 workers (3/13) 
+  Generating static pages using 9 workers (6/13) 
+  Generating static pages using 9 workers (9/13) 
+✓ Generating static pages using 9 workers (13/13) in 210ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/github-deploy
+├ ƒ /api/queue
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/class/[id]
+├ ○ /dashboard/class/new
+├ ƒ /dashboard/room/[id]
+├ ƒ /dashboard/room/[id]/result/[sessionId]
+├ ○ /dashboard/room/new
+├ ○ /dashboard/settings
+├ ○ /login
+├ ƒ /room/[id]
+├ ƒ /room/[id]/activity
+├ ƒ /room/[id]/result
+├ ƒ /room/[id]/waiting
+├ ƒ /s/[code]
+├ ƒ /share/[sessionId]
+└ ○ /signup
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+[2026-05-05 22:54:24] restarting pm2 app
+[PM2] Applying action restartProcessId on app [writing-helper](ids: [ 0 ])
+[PM2] [writing-helper](0) ✓
+┌────┬───────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name              │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ writing-helper    │ default     │ N/A     │ fork    │ 19561    │ 0s     │ 38   │ online    │ 0%       │ 1.5mb    │ seunghy… │ disabled │
+└────┴───────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[2026-05-05 22:54:25] webhook deploy finished
+[2026-05-05 23:54:33] webhook deploy started
+[2026-05-05 23:54:33] pulling latest main
+Already on 'main'
+M	src/app/login/page.tsx
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+   d04d882..372d38f  main       -> origin/main
+error: Your local changes to the following files would be overwritten by merge:
+	src/app/login/page.tsx
+Please commit your changes or stash them before you merge.
+Aborting
+Updating d04d882..372d38f
+[2026-05-06 00:01:54] webhook deploy started
+[2026-05-06 00:01:55] pulling latest main
+Already on 'main'
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[2026-05-06 00:01:55] installing dependencies
+
+up to date, audited 470 packages in 4s
+
+151 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-06 00:01:59] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+⨯ Another next build process is already running.
+
+  This could be:
+  - A next build still in progress
+  - A previous build that didn't exit cleanly
+
+  Suggestion: Wait for the build to complete.
+[2026-05-06 00:05:39] webhook deploy started
+[2026-05-06 00:05:39] pulling latest main
+Already on 'main'
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[2026-05-06 00:05:39] installing dependencies
+
+up to date, audited 470 packages in 2s
+
+151 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-06 00:05:41] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+⨯ Another next build process is already running.
+
+  This could be:
+  - A next build still in progress
+  - A previous build that didn't exit cleanly
+
+  Suggestion: Wait for the build to complete.
+[2026-05-06 00:14:44] webhook deploy started
+[2026-05-06 00:14:44] pulling latest main
+Already on 'main'
+M	src/app/login/page.tsx
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+   e649bb3..f8e5dac  main       -> origin/main
+error: Your local changes to the following files would be overwritten by merge:
+	src/app/login/page.tsx
+Please commit your changes or stash them before you merge.
+Aborting
+Updating e649bb3..f8e5dac

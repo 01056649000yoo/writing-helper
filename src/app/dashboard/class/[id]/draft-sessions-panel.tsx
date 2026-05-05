@@ -44,9 +44,9 @@ export function DraftSessionsPanel({ classId }: { classId: string }) {
         {drafts.map((draft) => (
           <div key={draft.storageKey} className="relative bg-white rounded-2xl p-6 shadow-sm border border-amber-100">
             <Link href={`/dashboard/room/new?class_id=${classId}&activity_type=${draft.activityType}`} className="block">
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2 mb-3">
                 <span className="text-2xl">{ACTIVITY_EMOJI[draft.activityType]}</span>
-                <span className="text-sm bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium">초안</span>
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">초안</span>
               </div>
               <h3 className="font-bold text-gray-800 text-base">
                 {draft.topic || ACTIVITY_LABEL[draft.activityType]}
@@ -63,31 +63,46 @@ export function DraftSessionsPanel({ classId }: { classId: string }) {
                   : "저장 시각 정보 없음"}
               </p>
             </Link>
-            <div className="absolute top-3 right-3 flex items-center gap-2">
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
               {confirmingDeleteKey === draft.storageKey ? (
                 <>
                   <button
                     type="button"
-                    onClick={() => setConfirmingDeleteKey(null)}
-                    className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-200"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setConfirmingDeleteKey(null);
+                    }}
+                    className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-200 transition-colors"
                   >
                     취소
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteDraft(draft.storageKey)}
-                    className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-100"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeleteDraft(draft.storageKey);
+                    }}
+                    className="rounded-lg bg-red-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-600 shadow-sm transition-colors"
                   >
-                    삭제 확인
+                    삭제
                   </button>
                 </>
               ) : (
                 <button
                   type="button"
-                  onClick={() => setConfirmingDeleteKey(draft.storageKey)}
-                  className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setConfirmingDeleteKey(draft.storageKey);
+                  }}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="삭제"
                 >
-                  삭제
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
                 </button>
               )}
             </div>
