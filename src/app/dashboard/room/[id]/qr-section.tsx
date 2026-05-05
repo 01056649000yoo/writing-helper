@@ -13,7 +13,7 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
   useEffect(() => {
     QRCode.toDataURL(primaryUrl, { width: 240, margin: 2, color: { dark: "#3730a3", light: "#ffffff" } })
       .then(setQrSmall);
-    QRCode.toDataURL(primaryUrl, { width: 1024, margin: 3, color: { dark: "#3730a3", light: "#ffffff" } })
+    QRCode.toDataURL(primaryUrl, { width: 1500, margin: 3, color: { dark: "#3730a3", light: "#ffffff" } })
       .then(setQrLarge);
   }, [primaryUrl]);
 
@@ -87,33 +87,33 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
       {/* 확대 모달 */}
       {expanded && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-6"
           onClick={() => setExpanded(false)}
         >
           <div
-            className="bg-white rounded-[40px] shadow-2xl p-10 flex flex-col items-center gap-6 max-w-2xl w-full"
+            className="bg-white rounded-[48px] shadow-2xl p-12 flex flex-col items-center gap-8 max-w-5xl w-full"
             onClick={e => e.stopPropagation()}
           >
             <div className="text-center">
-              <h2 className="text-2xl font-black text-gray-800">📱 QR 코드 스캔하기</h2>
-              <p className="text-sm text-gray-500 mt-1">학생들이 멀리서도 잘 보이도록 크게 띄웠습니다.</p>
+              <h2 className="text-4xl font-black text-gray-900 tracking-tight">📱 QR 코드를 스캔하세요</h2>
+              <p className="text-lg text-gray-500 mt-3">교실 뒤쪽에서도 한눈에 보일 수 있는 특대 사이즈입니다.</p>
             </div>
             
             {qrLarge && (
-              <div className="bg-white p-6 rounded-3xl border-4 border-indigo-50 shadow-inner">
-                <img src={qrLarge} alt="QR 코드 확대" className="w-full max-w-lg h-auto" />
+              <div className="bg-white p-10 rounded-[40px] border-8 border-indigo-50 shadow-2xl">
+                <img src={qrLarge} alt="QR 코드 확대" className="w-full max-w-3xl h-auto drop-shadow-md" />
               </div>
             )}
             
-            <div className="w-full space-y-4">
-              <p className="text-xs text-gray-400 text-center break-all font-mono bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <div className="w-full max-w-3xl space-y-6">
+              <p className="text-sm text-gray-400 text-center break-all font-mono bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 {primaryUrl}
               </p>
               <button
                 onClick={() => setExpanded(false)}
-                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-lg hover:bg-black transition-all shadow-lg active:scale-95"
+                className="w-full py-5 bg-indigo-600 text-white rounded-[24px] font-black text-2xl hover:bg-indigo-700 transition-all shadow-xl active:scale-95"
               >
-                닫기
+                확대 창 닫기
               </button>
             </div>
           </div>
