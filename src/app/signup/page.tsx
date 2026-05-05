@@ -46,7 +46,7 @@ export default function SignupPage() {
         <div className="text-center mb-10">
           <div className="text-6xl mb-4">✏️</div>
           <h1 className="text-3xl font-bold text-gray-800">교사 회원가입</h1>
-          <p className="text-base text-gray-500 mt-2">끄적끄적아지트 길잡이</p>
+          <p className="text-base text-gray-500 mt-2">아지트 글쓰기 연구소</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>

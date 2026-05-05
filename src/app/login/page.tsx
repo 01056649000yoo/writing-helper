@@ -12,7 +12,7 @@ export default function LoginPage() {
       <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-lg">
         <div className="text-center mb-10">
           <div className="text-6xl mb-4">✏️</div>
-          <h1 className="text-3xl font-bold text-gray-800">끄적끄적아지트 길잡이</h1>
+          <h1 className="text-3xl font-bold text-gray-800">아지트 글쓰기 연구소</h1>
           <p className="text-base text-gray-500 mt-2">교사 로그인</p>
         </div>
         <form action={formAction} className="space-y-5">

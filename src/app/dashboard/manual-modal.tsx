@@ -110,7 +110,7 @@ export function ManualModal() {
             <div className="sticky top-0 bg-white rounded-t-3xl border-b border-gray-100 px-8 pt-7 pb-5 flex items-start justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-gray-800">📖 사용 메뉴얼</h2>
-                <p className="text-base text-gray-500 mt-1">끄적끄적아지트 길잡이 사용법</p>
+                <p className="text-base text-gray-500 mt-1">아지트 글쓰기 연구소 사용법</p>
               </div>
               <button
                 type="button"

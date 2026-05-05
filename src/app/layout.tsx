@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "끄적끄적아지트 길잡이",
+  title: "아지트 글쓰기 연구소",
   description: "초등학생 글쓰기 개요 도우미",
 };
 

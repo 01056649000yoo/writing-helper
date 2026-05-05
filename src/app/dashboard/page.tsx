@@ -19,7 +19,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-4">
             <span className="text-3xl">✏️</span>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">끄적끄적아지트 길잡이</h1>
+              <h1 className="text-xl font-bold text-gray-800">아지트 글쓰기 연구소</h1>
               <p className="text-base text-gray-500">{profile?.name} 선생님</p>
             </div>
           </div>

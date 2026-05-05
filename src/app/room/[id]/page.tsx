@@ -17,7 +17,7 @@ type EntryMeta = {
 const ENTRY_META: Record<ActivityType, EntryMeta> = {
   outline_builder: {
     emoji: "✏️",
-    title: "끄적끄적아지트",
+    title: "아지트 글쓰기 연구소",
     subtitle: "내 번호와 이름을 입력하고 글 개요 만들기를 시작해요",
     helper: "질문에 차근차근 답하면 내 글의 뼈대를 만들 수 있어요.",
     buttonLabel: "개요 만들기 시작",
