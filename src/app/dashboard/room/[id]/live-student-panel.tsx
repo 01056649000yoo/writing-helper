@@ -15,6 +15,7 @@ type Session = {
 };
 
 function levelLabel(level: string) {
+  if (!level || level === "null") return "";
   return { low: "도움 필요", mid: "보통", high: "잘 써요" }[level] ?? level;
 }
 function levelStyle(level: string) {

@@ -57,12 +57,12 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
               <h1 className="text-3xl font-bold text-gray-800">{room.title}</h1>
               <p className="text-base text-gray-500 mt-1">주제: {room.topic}</p>
               <div className="flex gap-2 mt-3 flex-wrap">
-                {room.subject_type && room.subject_type !== "null" && (
+                {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
                   <span className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg font-medium">
                     {room.subject_type}
                   </span>
                 )}
-                {room.grade_level && room.grade_level !== "null" && (
+                {room.grade_level && String(room.grade_level) !== "null" && String(room.grade_level).trim() !== "" && (
                   <span className="text-sm bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium">
                     {gradeLabel(room.grade_level)}
                   </span>

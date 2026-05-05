@@ -77,7 +77,9 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                     <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
                     <p className="text-sm text-gray-500 mt-1">주제: {room.topic}</p>
                     <div className="flex gap-2 mt-2.5">
-                      <span className="text-sm bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded">{room.subject_type}</span>
+                      {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
+                        <span className="text-sm bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded">{room.subject_type}</span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
                   </Link>

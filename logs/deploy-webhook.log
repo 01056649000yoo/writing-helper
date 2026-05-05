@@ -507,3 +507,36 @@ Run `npm audit` for details.
   - A previous build that didn't exit cleanly
 
   Suggestion: Wait for the build to complete.
+[2026-05-06 00:29:24] webhook deploy started
+[2026-05-06 00:29:24] pulling latest main
+Already on 'main'
+M	logs/deploy-webhook.log
+Your branch is up to date with 'origin/main'.
+From https://github.com/01056649000yoo/writing-helper
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[2026-05-06 00:29:25] installing dependencies
+
+up to date, audited 470 packages in 3s
+
+151 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[2026-05-06 00:29:28] building app
+
+> writing-helper@0.1.0 build
+> next build
+
+⨯ Another next build process is already running.
+
+  This could be:
+  - A next build still in progress
+  - A previous build that didn't exit cleanly
+
+  Suggestion: Wait for the build to complete.
