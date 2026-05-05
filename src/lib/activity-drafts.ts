@@ -1,0 +1,115 @@
+import type { ActivityType } from "@/features/activities/types";
+
+export const DRAFT_STORAGE_PREFIX = "writing-helper:activity-draft:v1";
+
+type StoredDraft<T> = {
+  data: T;
+  savedAt: number;
+};
+
+export type ActivityDraftSummary = {
+  storageKey: string;
+  classId: string;
+  activityType: ActivityType;
+  topic: string;
+  topicDescription: string;
+  savedAt: number | null;
+};
+
+export function buildDraftStorageKey(classId: string, activityType: ActivityType) {
+  return `${DRAFT_STORAGE_PREFIX}:${classId || "no-class"}:${activityType}`;
+}
+
+export function clearActivityDraft(storageKey: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(storageKey);
+}
+
+export function persistActivityDraft<T>(storageKey: string, draft: T) {
+  if (typeof window === "undefined") return;
+  const payload: StoredDraft<T> = {
+    data: draft,
+    savedAt: Date.now(),
+  };
+  window.localStorage.setItem(storageKey, JSON.stringify(payload));
+}
+
+export function readActivityDraft<T>(storageKey: string, initialState: T): { draft: T; savedAt: number | null } {
+  if (typeof window === "undefined") {
+    return { draft: initialState, savedAt: null };
+  }
+
+  const raw = window.localStorage.getItem(storageKey);
+  if (!raw) {
+    return { draft: initialState, savedAt: null };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (isStoredDraft<T>(parsed)) {
+      return {
+        draft: { ...initialState, ...parsed.data },
+        savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : null,
+      };
+    }
+
+    if (isRecord(parsed)) {
+      return {
+        draft: { ...initialState, ...parsed },
+        savedAt: null,
+      };
+    }
+  } catch {
+    return { draft: initialState, savedAt: null };
+  }
+
+  return { draft: initialState, savedAt: null };
+}
+
+export function listActivityDraftsForClass(classId: string): ActivityDraftSummary[] {
+  if (typeof window === "undefined") return [];
+
+  const drafts: ActivityDraftSummary[] = [];
+  const prefix = `${DRAFT_STORAGE_PREFIX}:${classId || "no-class"}:`;
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key || !key.startsWith(prefix)) continue;
+
+    const raw = window.localStorage.getItem(key);
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      const activityType = key.slice(prefix.length) as ActivityType;
+      const payload = isStoredDraft<Record<string, unknown>>(parsed)
+        ? parsed
+        : isRecord(parsed)
+          ? { data: parsed, savedAt: null }
+          : null;
+
+      if (!payload) continue;
+
+      drafts.push({
+        storageKey: key,
+        classId,
+        activityType,
+        topic: typeof payload.data.topic === "string" ? payload.data.topic : "",
+        topicDescription: typeof payload.data.topic_description === "string" ? payload.data.topic_description : "",
+        savedAt: typeof payload.savedAt === "number" ? payload.savedAt : null,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return drafts.sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStoredDraft<T>(value: unknown): value is StoredDraft<T> {
+  return isRecord(value) && "data" in value;
+}

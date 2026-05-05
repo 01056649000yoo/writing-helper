@@ -1,0 +1,1292 @@
+"use client";
+
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { createRoom, generateQuestionsPreview } from "@/app/actions/room-actions";
+import { getQuestionCardSettings } from "@/app/actions/settings-actions";
+import { activityDefinitions, getActivityDefinition } from "@/features/activities/registry";
+import type { ActivityType, QuestionCardSet } from "@/features/activities/types";
+import {
+  buildDraftStorageKey,
+  clearActivityDraft,
+  persistActivityDraft,
+  readActivityDraft,
+} from "@/lib/activity-drafts";
+import type { QuestionSets, Question } from "@/types";
+
+const SUBJECT_TYPES = [
+  "생활문", "일기", "편지", "독서감상문", "기행문",
+  "관찰기록문", "이야기 글", "설명하는 글", "주장하는 글",
+  "소개하는 글", "동시", "보고서",
+] as const;
+
+type Step = "form" | "generating" | "preview" | "saving";
+type Level = "low" | "mid" | "high";
+
+type OutlineBuilderDraft = {
+  topic: string;
+  topic_description: string;
+  subject_type: string;
+  grade_level: string;
+  outline_depth: string;
+  duration_hours: string;
+};
+
+type QuestionGeneratorDraft = {
+  topic: string;
+  topic_description: string;
+  duration_hours: string;
+  max_selections: string;
+  guidance: string;
+  require_reason: boolean;
+  allow_custom_question: boolean;
+  selectedCardSetIds: string[];
+};
+
+type QuestionVotingDraft = {
+  topic: string;
+  topic_description: string;
+  duration_hours: string;
+  max_selections: string;
+  candidates: string;
+  require_reason: boolean;
+};
+
+const DRAFT_SAVE_INTERVAL_MS = 5000;
+
+const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary: string }> = {
+  outline_builder: {
+    emoji: "📝",
+    tone: "from-indigo-50 via-white to-blue-50",
+    summary: "질문에 답하면서 글의 흐름을 잡고, AI가 개요를 정리해주는 활동",
+  },
+  question_generator: {
+    emoji: "❓",
+    tone: "from-emerald-50 via-white to-teal-50",
+    summary: "질문 카드를 고른 뒤 오늘 주제에 맞는 질문으로 바꿔보는 활동",
+  },
+  question_voting: {
+    emoji: "🗳️",
+    tone: "from-amber-50 via-white to-orange-50",
+    summary: "질문 후보 중에서 가장 좋은 질문을 고르고 이유를 나누는 활동",
+  },
+};
+
+function QuestionCard({
+  q,
+  index,
+  onChange,
+  onRemove,
+}: {
+  q: Question;
+  index: number;
+  onChange: (updated: Question) => void;
+  onRemove: () => void;
+}) {
+  const hasChoices = q.type === "card" || q.type === "card+input";
+
+  return (
+    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+          Q{index + 1}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-gray-400 hover:text-red-400 text-lg leading-none"
+          title="질문 삭제"
+        >
+          ×
+        </button>
+      </div>
+
+      <textarea
+        value={q.question}
+        onChange={(e) => onChange({ ...q, question: e.target.value })}
+        rows={2}
+        className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        placeholder="질문 내용"
+      />
+
+      <div className="flex gap-2 items-center flex-wrap">
+        <span className="text-xs text-gray-500">형식:</span>
+        {(["card", "input", "card+input"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange({ ...q, type: t })}
+            className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
+              q.type === t
+                ? "bg-indigo-500 text-white border-indigo-500"
+                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+            }`}
+          >
+            {t === "card" ? "🃏 카드 선택" : t === "input" ? "✏️ 직접 입력" : "🃏✏️ 카드+입력"}
+          </button>
+        ))}
+      </div>
+
+      {hasChoices && (
+        <div className="space-y-1">
+          <span className="text-xs text-gray-500">선택지 (한 줄에 하나씩):</span>
+          <textarea
+            value={(q.choices ?? []).join("\n")}
+            onChange={(e) =>
+              onChange({
+                ...q,
+                choices: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
+              })
+            }
+            rows={Math.max(10, (q.choices?.length ?? 0) + 1)}
+            className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            placeholder={"보기 1\n보기 2\n보기 3"}
+          />
+        </div>
+      )}
+
+      <input
+        type="text"
+        value={q.hint ?? ""}
+        onChange={(e) => onChange({ ...q, hint: e.target.value })}
+        className="w-full text-xs px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        placeholder="힌트 (선택사항)"
+      />
+    </div>
+  );
+}
+
+function LevelEditor({
+  level,
+  questions,
+  onChange,
+}: {
+  level: Level;
+  questions: Question[];
+  onChange: (qs: Question[]) => void;
+}) {
+  function updateQ(i: number, updated: Question) {
+    const next = [...questions];
+    next[i] = updated;
+    onChange(next);
+  }
+
+  function removeQ(i: number) {
+    onChange(questions.filter((_, idx) => idx !== i));
+  }
+
+  function addQ() {
+    onChange([
+      ...questions,
+      {
+        step: questions.length + 1,
+        question: "",
+        type: level === "high" ? "input" : level === "mid" ? "card+input" : "card",
+        choices: level !== "high" ? ["", ""] : undefined,
+      },
+    ]);
+  }
+
+  return (
+    <div className="space-y-3">
+      {questions.map((q, i) => (
+        <QuestionCard
+          key={i}
+          q={q}
+          index={i}
+          onChange={(updated) => updateQ(i, updated)}
+          onRemove={() => removeQ(i)}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={addQ}
+        className="w-full py-2 border-2 border-dashed border-indigo-200 rounded-xl text-sm text-indigo-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+      >
+        + 질문 추가
+      </button>
+    </div>
+  );
+}
+
+function ActivitySelectionScreen({ classId }: { classId: string }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+      <div className="max-w-5xl mx-auto pt-8 pb-16">
+        <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="text-indigo-500 text-sm hover:underline">
+          ← {classId ? "학급으로" : "대시보드로"}
+        </Link>
+
+        <div className="mt-6 bg-white rounded-[32px] shadow-xl border border-white/70 overflow-hidden">
+          <div className="px-8 py-8 bg-gradient-to-r from-slate-50 via-white to-indigo-50 border-b border-gray-100">
+            <p className="text-sm font-semibold text-indigo-600">Step 1</p>
+            <h1 className="mt-2 text-3xl font-bold text-gray-800">어떤 활동을 시작할까요?</h1>
+            <p className="mt-2 text-base text-gray-500">
+              활동을 먼저 고르면, 각 활동에 맞는 별도 설정 화면이 열립니다.
+            </p>
+          </div>
+
+          <div className="p-6 sm:p-8 grid gap-4 md:grid-cols-3">
+            {activityDefinitions.map((activity) => {
+              const meta = ACTIVITY_META[activity.id];
+              return (
+                <Link
+                  key={activity.id}
+                  href={`/dashboard/room/new?class_id=${classId}&activity_type=${activity.id}`}
+                  className={`rounded-3xl border border-gray-200 bg-gradient-to-br ${meta.tone} p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-200`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-4xl">{meta.emoji}</span>
+                    <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-500 shadow-sm">
+                      플러그인
+                    </span>
+                  </div>
+                  <h2 className="mt-5 text-xl font-bold text-gray-800">{activity.label}</h2>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{meta.summary}</p>
+                  <div className="mt-5 flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-400">{activity.description}</span>
+                    <span className="text-sm font-semibold text-indigo-600">선택하기 →</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PageShell({
+  classId,
+  activityType,
+  children,
+}: {
+  classId: string;
+  activityType: ActivityType;
+  children: React.ReactNode;
+}) {
+  const activity = getActivityDefinition(activityType);
+  const meta = ACTIVITY_META[activityType];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+      <div className="max-w-4xl mx-auto pt-8 pb-16">
+        <div className="flex items-center justify-between gap-4">
+          <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="text-indigo-500 text-sm hover:underline">
+            ← {classId ? "학급으로" : "대시보드로"}
+          </Link>
+          <Link href={`/dashboard/room/new?class_id=${classId}`} className="text-sm text-gray-400 hover:text-gray-600 hover:underline">
+            활동 다시 고르기
+          </Link>
+        </div>
+
+        <div className="mt-4 bg-white rounded-[32px] shadow-xl overflow-hidden">
+          <div className={`px-8 py-8 bg-gradient-to-r ${meta.tone} border-b border-gray-100`}>
+            <div className="flex items-start gap-4">
+              <span className="text-5xl">{meta.emoji}</span>
+              <div>
+                <p className="text-sm font-semibold text-indigo-600">선택한 활동</p>
+                <h1 className="mt-1 text-3xl font-bold text-gray-800">{activity.label}</h1>
+                <p className="mt-2 text-base text-gray-600">{meta.summary}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 sm:p-8">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DraftSection({
+  title,
+  description,
+  onSave,
+  lastSavedAt,
+}: {
+  title: string;
+  description: string;
+  onSave: () => void;
+  lastSavedAt: number | null;
+}) {
+  return (
+    <div className="rounded-3xl border border-gray-200 bg-gray-50/70 px-5 py-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-indigo-600">설정 저장</p>
+          <h3 className="mt-1 text-lg font-bold text-gray-800">{title}</h3>
+          <p className="mt-1 text-sm text-gray-500">{description}</p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={onSave}
+            className="rounded-xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
+          >
+            현재 설정 저장
+          </button>
+          <p className="text-xs font-medium text-indigo-600">
+            {lastSavedAt
+              ? `마지막 저장: ${new Date(lastSavedAt).toLocaleTimeString("ko-KR")}`
+              : "아직 저장 전"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OutlineBuilderSetup({ classId }: { classId: string }) {
+  const [step, setStep] = useState<Step>("form");
+  const [error, setError] = useState("");
+  const [activeLevel, setActiveLevel] = useState<Level>("low");
+  const initialDraft = useMemo<OutlineBuilderDraft>(() => ({
+    topic: "",
+    topic_description: "",
+    subject_type: "생활문",
+    grade_level: "중학년",
+    outline_depth: "simple",
+    duration_hours: "4",
+  }), []);
+  const [draft, setDraft] = useActivityDraft<OutlineBuilderDraft>(
+    buildDraftStorageKey(classId, "outline_builder"),
+    initialDraft
+  );
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [formFields, setFormFields] = useState<{
+    topic: string;
+    topic_description: string;
+    subject_type: string;
+    grade_level: string;
+    outline_depth: string;
+    duration_hours: string;
+  } | null>(null);
+  const [questionSets, setQuestionSets] = useState<QuestionSets | null>(null);
+
+  async function handleGenerate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    setStep("generating");
+
+    const fd = new FormData(e.currentTarget);
+    setFormFields({
+      topic: draft.topic,
+      topic_description: draft.topic_description,
+      subject_type: draft.subject_type,
+      grade_level: draft.grade_level,
+      outline_depth: draft.outline_depth,
+      duration_hours: draft.duration_hours,
+    });
+
+    const result = await generateQuestionsPreview(fd);
+    if (result.error) {
+      setError(result.error);
+      setStep("form");
+      return;
+    }
+
+    setQuestionSets(result.questionSets!);
+    setStep("preview");
+  }
+
+  async function handleCreateRoom() {
+    if (!formFields || !questionSets) return;
+
+    setError("");
+    setStep("saving");
+
+    const fd = new FormData();
+    fd.set("class_id", classId);
+    fd.set("activity_type", "outline_builder");
+    fd.set("topic", formFields.topic);
+    fd.set("topic_description", formFields.topic_description);
+    fd.set("subject_type", formFields.subject_type);
+    fd.set("grade_level", formFields.grade_level);
+    fd.set("outline_depth", formFields.outline_depth);
+    fd.set("duration_hours", formFields.duration_hours);
+    fd.set("question_sets_json", JSON.stringify(questionSets));
+
+    const result = await createRoom(fd);
+    if (result?.error) {
+      setError(result.error);
+      setStep("preview");
+      return;
+    }
+    clearActivityDraft(buildDraftStorageKey(classId, "outline_builder"));
+  }
+
+  const updateLevel = useCallback((level: Level, qs: Question[]) => {
+    setQuestionSets((prev) => (prev ? { ...prev, [level]: { questions: qs } } : prev));
+  }, []);
+
+  function handleSaveDraftNow() {
+    persistActivityDraft(buildDraftStorageKey(classId, "outline_builder"), draft);
+    setLastSavedAt(Date.now());
+  }
+
+  const levelMeta: Record<Level, { label: string; emoji: string; color: string }> = {
+    low: { label: "어려운 학생", emoji: "🐢", color: "text-green-600 border-green-400 bg-green-50" },
+    mid: { label: "보통 학생", emoji: "🐇", color: "text-blue-600 border-blue-400 bg-blue-50" },
+    high: { label: "잘 쓰는 학생", emoji: "🦅", color: "text-purple-600 border-purple-400 bg-purple-50" },
+  };
+
+  if (step === "preview" || step === "saving") {
+    return (
+      <>
+        <div className="flex items-center gap-2 mb-6 text-sm">
+          <StepBadge done>활동 설정</StepBadge>
+          <StepDivider active />
+          <StepBadge active>문항 검토</StepBadge>
+          <StepDivider />
+          <StepBadge>활동 시작</StepBadge>
+        </div>
+
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-800">📋 AI가 만든 문항 검토하기</h2>
+          <p className="mt-2 text-sm text-gray-500">학생 수준별로 문항을 확인하고 수정한 뒤 활동을 시작하세요.</p>
+        </div>
+
+        <div className="flex gap-2 mb-4 border-b border-gray-200 pb-2 overflow-x-auto">
+          {(["low", "mid", "high"] as Level[]).map((lv) => {
+            const meta = levelMeta[lv];
+            const count = questionSets?.[lv].questions.length ?? 0;
+            return (
+              <button
+                key={lv}
+                type="button"
+                onClick={() => setActiveLevel(lv)}
+                className={`flex items-center gap-1 px-4 py-2 rounded-xl text-base font-medium border-2 transition-colors whitespace-nowrap ${
+                  activeLevel === lv ? meta.color : "text-gray-500 border-transparent hover:bg-gray-50"
+                }`}
+              >
+                {meta.emoji} {meta.label}
+                <span className="ml-1 text-xs opacity-70">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={`text-xs px-3 py-2 rounded-xl mb-4 ${
+          activeLevel === "low" ? "bg-green-50 text-green-700" :
+          activeLevel === "mid" ? "bg-blue-50 text-blue-700" :
+          "bg-purple-50 text-purple-700"
+        }`}>
+          {activeLevel === "low" && "🐢 글쓰기가 어려운 학생 — 카드 선택 위주, 매우 구체적인 보기"}
+          {activeLevel === "mid" && "🐇 보통 수준의 학생 — 카드 선택 + 직접 입력 병행"}
+          {activeLevel === "high" && "🦅 글쓰기를 잘 하는 학생 — 직접 입력 위주, 깊이 있는 사고"}
+        </div>
+
+        {questionSets && (
+          <LevelEditor
+            level={activeLevel}
+            questions={questionSets[activeLevel].questions}
+            onChange={(qs) => updateLevel(activeLevel, qs)}
+          />
+        )}
+
+        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl mt-4">{error}</p>}
+
+        {step === "saving" && (
+          <div className="bg-indigo-50 rounded-xl p-4 text-center mt-4">
+            <div className="text-2xl mb-2 animate-spin inline-block">⚙️</div>
+            <p className="text-indigo-700 font-medium text-base">활동을 시작하고 있어요...</p>
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-6">
+          <button
+            type="button"
+            onClick={() => setStep("form")}
+            disabled={step === "saving"}
+            className="flex-1 py-4 border-2 border-gray-200 text-gray-600 rounded-xl font-medium text-base hover:border-gray-300 disabled:opacity-50 transition-colors"
+          >
+            ← 설정으로 돌아가기
+          </button>
+          <button
+            type="button"
+            onClick={handleCreateRoom}
+            disabled={step === "saving"}
+            className="flex-1 py-4 bg-indigo-500 text-white rounded-xl font-bold text-base hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+          >
+            {step === "saving" ? "시작 중..." : "🚀 활동 시작하기"}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <StepBadge active>활동 설정</StepBadge>
+        <StepDivider />
+        <StepBadge>문항 검토</StepBadge>
+        <StepDivider />
+        <StepBadge>활동 시작</StepBadge>
+      </div>
+
+      <div className="mb-6">
+        <DraftSection
+          title="글 개요 짜기 설정 저장"
+          description="이 활동 기획 중인 내용을 이 브라우저에 저장해 두고, 다시 돌아와 이어서 수정할 수 있어요."
+          onSave={handleSaveDraftNow}
+          lastSavedAt={lastSavedAt}
+        />
+      </div>
+
+      <form onSubmit={handleGenerate} className="space-y-6">
+        <input type="hidden" name="class_id" value={classId} />
+        <input type="hidden" name="activity_type" value="outline_builder" />
+
+        <TopicFields
+          values={{
+            topic: draft.topic,
+            topic_description: draft.topic_description,
+          }}
+          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+          hint="설명을 자세히 적을수록 AI가 더 알맞은 글 개요 질문을 만들어줍니다."
+          placeholder="예) 지난 주 금요일 학교 뒷산으로 봄 소풍을 다녀왔어요. 친구들과 도시락을 나눠먹고 계곡에서 물놀이를 했습니다."
+        />
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-3">글의 종류</label>
+          <div className="grid grid-cols-3 gap-2">
+            {SUBJECT_TYPES.map((type) => (
+              <label
+                key={type}
+                className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
+              >
+                <input
+                  type="radio"
+                  name="subject_type"
+                  value={type}
+                  checked={draft.subject_type === type}
+                  onChange={() => setDraft((prev) => ({ ...prev, subject_type: type }))}
+                  className="text-indigo-500 shrink-0"
+                />
+                <span className="text-base text-gray-700">{subjectLabel(type)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-3">대상 학년</label>
+          <div className="grid grid-cols-3 gap-2">
+            {(["저학년", "중학년", "고학년"] as const).map((grade) => (
+              <label
+                key={grade}
+                className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
+              >
+                <input
+                  type="radio"
+                  name="grade_level"
+                  value={grade}
+                  checked={draft.grade_level === grade}
+                  onChange={() => setDraft((prev) => ({ ...prev, grade_level: grade }))}
+                  className="text-indigo-500 shrink-0"
+                />
+                <span className="text-base text-gray-700">{gradeLabel(grade)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-3">개요 구조</label>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { value: "simple", label: "간단히", desc: "처음·중간·끝", emoji: "📄" },
+              { value: "medium", label: "중간", desc: "처음·중간1·중간2·끝", emoji: "📝" },
+              { value: "detailed", label: "자세히", desc: "처음·중간1·2·3·끝", emoji: "📋" },
+            ] as const).map((opt) => (
+              <label
+                key={opt.value}
+                className="flex flex-col border border-gray-200 rounded-xl p-3 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="outline_depth"
+                    value={opt.value}
+                    checked={draft.outline_depth === opt.value}
+                    onChange={() => setDraft((prev) => ({ ...prev, outline_depth: opt.value }))}
+                    className="text-indigo-500 shrink-0"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{opt.emoji} {opt.label}</span>
+                </div>
+                <span className="text-xs text-gray-400 mt-1 pl-5">{opt.desc}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <DurationField
+          value={draft.duration_hours}
+          onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
+        />
+
+        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
+
+        {step === "generating" && (
+          <div className="bg-indigo-50 rounded-xl p-4 text-center">
+            <div className="text-2xl mb-2 animate-spin inline-block">⚙️</div>
+            <p className="text-indigo-700 font-medium text-base">AI가 문항을 만들고 있어요...</p>
+            <p className="text-base text-indigo-500 mt-1">약 10~20초 소요됩니다</p>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={step === "generating"}
+          className="w-full py-4 bg-indigo-500 text-white rounded-xl font-bold text-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+        >
+          {step === "generating" ? "문항 생성 중..." : "✨ AI 문항 생성하기"}
+        </button>
+      </form>
+    </>
+  );
+}
+
+function QuestionGeneratorSetup({ classId }: { classId: string }) {
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
+  const [loadingCardSets, setLoadingCardSets] = useState(true);
+  const [previewCardSet, setPreviewCardSet] = useState<QuestionCardSet | null>(null);
+  const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
+    topic: "",
+    topic_description: "",
+    duration_hours: "4",
+    max_selections: "1",
+    guidance: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
+    require_reason: true,
+    allow_custom_question: false,
+    selectedCardSetIds: [],
+  }), []);
+  const [draft, setDraft] = useActivityDraft<QuestionGeneratorDraft>(
+    buildDraftStorageKey(classId, "question_generator"),
+    initialDraft
+  );
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    getQuestionCardSettings().then((result) => {
+      if (!active) return;
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setAvailableCardSets(result.cardSets);
+        setDraft((prev) => {
+          const fallbackIds = result.cardSets.map((cardSet) => cardSet.id);
+          return {
+            ...prev,
+            selectedCardSetIds: prev.selectedCardSetIds.length > 0 ? prev.selectedCardSetIds : fallbackIds,
+          };
+        });
+      }
+      setLoadingCardSets(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function toggleCardSet(cardSetId: string) {
+    setDraft((prev) => ({
+      ...prev,
+      selectedCardSetIds: prev.selectedCardSetIds.includes(cardSetId)
+        ? prev.selectedCardSetIds.filter((id) => id !== cardSetId)
+        : [...prev.selectedCardSetIds, cardSetId],
+    }));
+  }
+
+  function handleSaveDraftNow() {
+    persistActivityDraft(buildDraftStorageKey(classId, "question_generator"), draft);
+    setLastSavedAt(Date.now());
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (draft.selectedCardSetIds.length === 0) {
+      setError("질문 카드 묶음을 1개 이상 선택해주세요.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const fd = new FormData(e.currentTarget);
+    fd.set("class_id", classId);
+    fd.set("activity_type", "question_generator");
+    draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
+    const result = await createRoom(fd);
+    if (result?.error) {
+      setError(result.error);
+      setSaving(false);
+      return;
+    }
+    clearActivityDraft(buildDraftStorageKey(classId, "question_generator"));
+  }
+
+  return (
+    <>
+      <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 mb-6 text-sm text-emerald-800">
+        학생들이 마음에 드는 질문 카드를 고르고, 그 질문을 오늘 주제에 맞게 새롭게 바꾸는 활동입니다.
+      </div>
+
+      <div className="mb-6">
+        <DraftSection
+          title="질문 카드 활동 설정 저장"
+          description="활동 주제, 카드 선택, 안내 문구를 저장해 두고 이 화면으로 돌아오면 이어서 수정할 수 있어요."
+          onSave={handleSaveDraftNow}
+          lastSavedAt={lastSavedAt}
+        />
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <TopicFields
+          values={{
+            topic: draft.topic,
+            topic_description: draft.topic_description,
+          }}
+          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+          hint="어떤 글이나 그림, 이야기와 연결해 질문을 바꿔볼지 적어두면 학생들이 주제와 더 잘 연결할 수 있습니다."
+          placeholder="예) 오늘 읽은 이야기 속 주인공과 장면을 떠올리며, 질문 카드를 주제에 맞는 질문으로 바꿔 봅니다."
+        />
+
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-base font-medium text-gray-700">질문 카드 묶음 선택</label>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400">{draft.selectedCardSetIds.length}개 선택됨</span>
+              <Link
+                href="/dashboard/settings"
+                className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+              >
+                질문 카드 설정 →
+              </Link>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {availableCardSets.map((cardSet) => {
+              const selected = draft.selectedCardSetIds.includes(cardSet.id);
+              return (
+                <div
+                  key={cardSet.id}
+                  className={`rounded-2xl border p-4 text-left transition-colors ${
+                    selected
+                      ? "border-emerald-400 bg-emerald-50"
+                      : "border-gray-200 bg-white hover:border-emerald-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-gray-800">[{cardSet.label}] 카드</p>
+                      <p className="text-sm text-gray-500 mt-1">{cardSet.description}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      selected ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {selected ? "선택됨" : "선택"}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-400 leading-5">
+                    예시: {cardSet.prompts[0]}
+                  </p>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewCardSet(cardSet)}
+                      className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+                    >
+                      질문 미리보기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleCardSet(cardSet.id)}
+                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                        selected
+                          ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {selected ? "선택 해제" : "이 묶음 선택"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!loadingCardSets && availableCardSets.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
+              <p className="text-sm text-gray-500">저장된 질문 카드 묶음이 없어요.</p>
+              <Link href="/dashboard/settings" className="mt-2 inline-block text-sm font-semibold text-emerald-600 hover:underline">
+                설정에서 질문 카드 묶음 만들기 →
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {previewCardSet && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+            <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-2xl max-h-[85vh] overflow-hidden">
+              <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-600">질문 카드 미리보기</p>
+                  <h3 className="mt-1 text-2xl font-bold text-gray-800">[{previewCardSet.label}] 카드</h3>
+                  <p className="mt-2 text-sm text-gray-500">{previewCardSet.description}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewCardSet(null)}
+                  className="rounded-full bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-200"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
+                <div className="space-y-3">
+                  {previewCardSet.prompts.map((prompt, index) => (
+                    <div key={`${previewCardSet.id}-${index}`} className="rounded-2xl bg-emerald-50/70 px-4 py-4">
+                      <p className="text-xs font-semibold text-emerald-700">질문 카드 {index + 1}</p>
+                      <p className="mt-2 text-sm leading-6 text-gray-800">{prompt}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 px-6 py-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPreviewCardSet(null)}
+                  className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
+                >
+                  확인했어요
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">학생당 고를 카드 수</label>
+            <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+              {[1, 2, 3, 4].map((count) => (
+                <label
+                  key={count}
+                  className="flex items-center justify-center gap-2 border border-gray-200 rounded-xl px-3 py-3 cursor-pointer has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50"
+                >
+                  <input
+                    type="radio"
+                    name="max_selections"
+                    value={count}
+                    checked={draft.max_selections === String(count)}
+                    onChange={() => setDraft((prev) => ({ ...prev, max_selections: String(count) }))}
+                    className="text-emerald-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{count}개</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">활동 운영 시간</label>
+            <DurationField
+              value={draft.duration_hours}
+              onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-2">질문 바꾸기 안내</label>
+          <textarea
+            name="guidance"
+            rows={4}
+            value={draft.guidance}
+            onChange={(event) => setDraft((prev) => ({ ...prev, guidance: event.target.value }))}
+            className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
+          />
+        </div>
+
+        <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50/70">
+          <input
+            type="checkbox"
+            name="require_reason"
+            checked={draft.require_reason}
+            onChange={(event) => setDraft((prev) => ({ ...prev, require_reason: event.target.checked }))}
+            className="text-emerald-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gray-800">왜 이렇게 바꿨는지 함께 적기</p>
+            <p className="text-xs text-gray-400 mt-1">질문을 고친 이유를 짧게 적게 합니다.</p>
+          </div>
+        </label>
+
+        <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50/70">
+          <input
+            type="checkbox"
+            name="allow_custom_question"
+            checked={draft.allow_custom_question}
+            onChange={(event) => setDraft((prev) => ({ ...prev, allow_custom_question: event.target.checked }))}
+            className="text-emerald-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gray-800">카드 외에 새 질문 직접 쓰기 허용</p>
+            <p className="text-xs text-gray-400 mt-1">필요하면 학생이 아예 새로운 질문을 추가로 만들 수 있습니다.</p>
+          </div>
+        </label>
+
+        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={saving || loadingCardSets || availableCardSets.length === 0}
+          className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+        >
+          {loadingCardSets ? "질문 카드 불러오는 중..." : saving ? "시작 중..." : "🚀 질문 카드 활동 시작"}
+        </button>
+      </form>
+    </>
+  );
+}
+
+function QuestionVotingSetup({ classId }: { classId: string }) {
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const initialDraft = useMemo<QuestionVotingDraft>(() => ({
+    topic: "",
+    topic_description: "",
+    duration_hours: "4",
+    max_selections: "1",
+    candidates: "",
+    require_reason: true,
+  }), []);
+  const [draft, setDraft] = useActivityDraft<QuestionVotingDraft>(
+    buildDraftStorageKey(classId, "question_voting"),
+    initialDraft
+  );
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+  function handleSaveDraftNow() {
+    persistActivityDraft(buildDraftStorageKey(classId, "question_voting"), draft);
+    setLastSavedAt(Date.now());
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    const fd = new FormData(e.currentTarget);
+    fd.set("class_id", classId);
+    fd.set("activity_type", "question_voting");
+    const result = await createRoom(fd);
+    if (result?.error) {
+      setError(result.error);
+      setSaving(false);
+      return;
+    }
+    clearActivityDraft(buildDraftStorageKey(classId, "question_voting"));
+  }
+
+  return (
+    <>
+      <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 mb-6 text-sm text-amber-800">
+        학생들이 질문 후보를 읽고, 가장 좋은 질문을 선택하며 이유까지 나누는 토의형 활동입니다.
+      </div>
+
+      <div className="mb-6">
+        <DraftSection
+          title="좋은 질문 고르기 설정 저장"
+          description="질문 후보와 선택 조건을 저장해 두고, 이 활동 화면으로 돌아오면 그대로 이어서 수정할 수 있어요."
+          onSave={handleSaveDraftNow}
+          lastSavedAt={lastSavedAt}
+        />
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <TopicFields
+          values={{
+            topic: draft.topic,
+            topic_description: draft.topic_description,
+          }}
+          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+          hint="어떤 관점으로 좋은 질문을 고를지 함께 안내하면 활동 목표가 더 분명해집니다."
+          placeholder="예) 친구들의 생각을 가장 넓혀주는 질문을 골라 봅시다."
+        />
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-2">질문 후보</label>
+          <textarea
+            name="candidates"
+            rows={7}
+            required
+            value={draft.candidates}
+            onChange={(event) => setDraft((prev) => ({ ...prev, candidates: event.target.value }))}
+            className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+            placeholder={"질문 후보를 한 줄에 하나씩 입력하세요.\n예)\n주인공은 왜 그런 선택을 했을까?\n이 장면이 우리에게 주는 의미는 무엇일까?"}
+          />
+          <p className="text-xs text-gray-400 mt-2">한 줄에 하나씩 입력하면 학생들이 선택지 형태로 보게 됩니다.</p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">학생당 선택 개수</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((count) => (
+                <label
+                  key={count}
+                  className="flex items-center justify-center gap-2 border border-gray-200 rounded-xl px-3 py-3 cursor-pointer has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50"
+                >
+                  <input
+                    type="radio"
+                    name="max_selections"
+                    value={count}
+                    checked={draft.max_selections === String(count)}
+                    onChange={() => setDraft((prev) => ({ ...prev, max_selections: String(count) }))}
+                    className="text-amber-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{count}개</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">활동 운영 시간</label>
+            <DurationField
+              value={draft.duration_hours}
+              onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
+            />
+          </div>
+        </div>
+
+        <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-amber-300 has-[:checked]:bg-amber-50/70">
+          <input
+            type="checkbox"
+            name="require_reason"
+            checked={draft.require_reason}
+            onChange={(event) => setDraft((prev) => ({ ...prev, require_reason: event.target.checked }))}
+            className="text-amber-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gray-800">선택 이유 함께 적기</p>
+            <p className="text-xs text-gray-400 mt-1">왜 그 질문이 좋은지 짧게 생각을 남기게 합니다.</p>
+          </div>
+        </label>
+
+        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full py-4 bg-amber-500 text-white rounded-xl font-bold text-lg hover:bg-amber-600 disabled:opacity-50 transition-colors"
+        >
+          {saving ? "시작 중..." : "🚀 좋은 질문 고르기 활동 시작"}
+        </button>
+      </form>
+    </>
+  );
+}
+
+function TopicFields({
+  values,
+  onChange,
+  hint,
+  placeholder,
+}: {
+  values: {
+    topic: string;
+    topic_description: string;
+  };
+  onChange: (patch: { topic?: string; topic_description?: string }) => void;
+  hint: string;
+  placeholder: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-base font-medium text-gray-700 mb-2">활동 주제</label>
+        <input
+          name="topic"
+          required
+          value={values.topic}
+          onChange={(event) => onChange({ topic: event.target.value })}
+          placeholder="예) 소풍, 이야기 속 선택, 오늘 배운 점"
+          className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        />
+      </div>
+      <div>
+        <label className="block text-base font-medium text-gray-700 mb-1">
+          주제 부연 설명
+          <span className="ml-2 text-sm font-normal text-gray-400">(선택)</span>
+        </label>
+        <textarea
+          name="topic_description"
+          rows={3}
+          value={values.topic_description}
+          onChange={(event) => onChange({ topic_description: event.target.value })}
+          placeholder={placeholder}
+          className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+        <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <span className="text-amber-500 text-base shrink-0 mt-0.5">💡</span>
+          <p className="text-sm text-amber-700 leading-relaxed">{hint}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DurationField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (durationHours: string) => void;
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          { value: "4", label: "4시간", desc: "오전/오후" },
+          { value: "8", label: "8시간", desc: "하루 수업" },
+          { value: "24", label: "1일", desc: "하루 동안" },
+          { value: "48", label: "2일", desc: "이틀 동안" },
+        ].map((opt) => (
+          <label
+            key={opt.value}
+            className="flex min-h-[112px] flex-col items-center justify-between border border-gray-200 rounded-xl px-3 py-4 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50 text-center"
+          >
+            <input
+              type="radio"
+              name="duration_hours"
+              value={opt.value}
+              checked={value === opt.value}
+              onChange={() => onChange(opt.value)}
+              className="text-indigo-500 shrink-0"
+            />
+            <div className="flex flex-col items-center">
+              <span className="text-base font-semibold text-gray-700 leading-none">{opt.label}</span>
+              <span className="mt-2 text-xs text-gray-400">{opt.desc}</span>
+            </div>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-gray-400 mt-2">⏰ 시간이 지나면 새 학생 접속이 차단됩니다. 교사가 직접 종료도 가능해요.</p>
+    </div>
+  );
+}
+
+function StepBadge({
+  children,
+  active = false,
+  done = false,
+}: {
+  children: React.ReactNode;
+  active?: boolean;
+  done?: boolean;
+}) {
+  const base = "rounded-full px-3 py-1.5 text-sm font-medium";
+  if (done) return <span className={`${base} bg-indigo-100 text-indigo-600`}>{children}</span>;
+  if (active) return <span className={`${base} bg-indigo-500 text-white`}>{children}</span>;
+  return <span className={`${base} bg-gray-100 text-gray-400`}>{children}</span>;
+}
+
+function StepDivider({ active = false }: { active?: boolean }) {
+  return <div className={`h-px flex-1 ${active ? "bg-indigo-400" : "bg-gray-300"}`} />;
+}
+
+function NewRoomForm() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get("class_id") ?? "";
+  const activityType = useMemo(() => parseActivityType(searchParams.get("activity_type")), [searchParams]);
+
+  if (!activityType) {
+    return <ActivitySelectionScreen classId={classId} />;
+  }
+
+  return (
+    <PageShell classId={classId} activityType={activityType}>
+      {activityType === "outline_builder" && <OutlineBuilderSetup classId={classId} />}
+      {activityType === "question_generator" && <QuestionGeneratorSetup classId={classId} />}
+      {activityType === "question_voting" && <QuestionVotingSetup classId={classId} />}
+    </PageShell>
+  );
+}
+
+export default function NewRoomPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">로딩 중...</div>}>
+      <NewRoomForm />
+    </Suspense>
+  );
+}
+
+function useActivityDraft<T>(storageKey: string, initialState: T) {
+  const [draft, setDraft] = useState<T>(initialState);
+
+  useEffect(() => {
+    const { draft: nextDraft } = readActivityDraft(storageKey, initialState);
+    setDraft(nextDraft);
+  }, [initialState, storageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const saveDraft = () => {
+      persistActivityDraft(storageKey, draft);
+    };
+
+    const intervalId = window.setInterval(saveDraft, DRAFT_SAVE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+      saveDraft();
+    };
+  }, [draft, storageKey]);
+
+  return [draft, setDraft] as const;
+}
+
+function parseActivityType(value: string | null): ActivityType | null {
+  if (value === "outline_builder" || value === "question_generator" || value === "question_voting") {
+    return value;
+  }
+  return null;
+}
+
+function subjectLabel(type: string) {
+  const map: Record<string, string> = {
+    "생활문": "📖 생활문",
+    "일기": "📓 일기",
+    "편지": "✉️ 편지",
+    "독서감상문": "📚 독서감상문",
+    "기행문": "🗺️ 기행문",
+    "관찰기록문": "🔬 관찰기록문",
+    "이야기 글": "🌈 이야기 글",
+    "설명하는 글": "🔍 설명하는 글",
+    "주장하는 글": "💬 주장하는 글",
+    "소개하는 글": "🙋 소개하는 글",
+    "동시": "🎵 동시",
+    "보고서": "📋 보고서",
+  };
+  return map[type] ?? type;
+}
+
+function gradeLabel(grade: string) {
+  const map: Record<string, string> = {
+    "저학년": "🌱 저학년",
+    "중학년": "🌿 중학년",
+    "고학년": "🌳 고학년",
+  };
+  return map[grade] ?? grade;
+}
