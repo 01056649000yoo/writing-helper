@@ -8,90 +8,134 @@ export default function LoginPage() {
   const [state, formAction, pending] = useActionState(signIn, null);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center py-16 px-6">
-      {/* 로그인 카드 */}
-      <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-lg mb-20">
-        <div className="text-center mb-10">
-          <div className="text-6xl mb-4">✏️</div>
-          <h1 className="text-3xl font-bold text-gray-800">아지트 글쓰기 연구소</h1>
-          <p className="text-base text-gray-500 mt-2">교사 로그인</p>
-        </div>
-        <form action={formAction} className="space-y-5">
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">이메일</label>
-            <input name="email" type="email" required autoComplete="email"
-              className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              placeholder="teacher@school.kr" />
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-white flex items-center justify-center p-4 md:p-10">
+      <div className="w-full max-w-6xl bg-white rounded-[2.5rem] md:rounded-[3.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] overflow-hidden flex flex-col md:flex-row min-h-[600px] md:min-h-[750px]">
+        
+        {/* 왼쪽 섹션: 브랜드 및 특징 소개 */}
+        <div className="w-full md:w-5/12 bg-indigo-600 p-10 md:p-16 text-white flex flex-col relative overflow-hidden">
+          {/* 배경 장식 요소 */}
+          <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-50" />
+          <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-blue-400 rounded-full blur-3xl opacity-30" />
+          
+          <div className="relative z-10">
+            <div className="text-5xl md:text-6xl mb-8">✏️</div>
+            <h1 className="text-3xl md:text-4xl font-bold leading-tight mb-4">
+              아지트<br />글쓰기 연구소
+            </h1>
+            <p className="text-indigo-100 text-lg md:text-xl font-medium opacity-90 leading-relaxed">
+              아이들의 생각이 쑥쑥 자라나는<br />
+              지능형 글쓰기 도우미 플랫폼
+            </p>
           </div>
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">비밀번호</label>
-            <input name="password" type="password" required autoComplete="current-password"
-              className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              placeholder="비밀번호 입력" />
+          
+          <div className="mt-12 md:mt-auto relative z-10 space-y-8">
+            <MiniFeatureCard 
+              emoji="🔍" 
+              title="글감 찾기" 
+              desc="AI와 대화하며 나만의 주제 발견" 
+            />
+            <MiniFeatureCard 
+              emoji="✍️" 
+              title="질문 만들기" 
+              desc="글의 뼈대를 세우는 핵심 질문 제안" 
+            />
+            <MiniFeatureCard 
+              emoji="✅" 
+              title="질문 고르기" 
+              desc="친구들의 좋은 질문에 투표하기" 
+            />
+            <MiniFeatureCard 
+              emoji="📱" 
+              title="한줄 모아" 
+              desc="실시간 생각 공유와 모아보기" 
+            />
           </div>
-          {state?.error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{state.error}</p>}
-          <button type="submit" disabled={pending}
-            className="w-full py-4 bg-indigo-500 text-white rounded-xl font-semibold text-base hover:bg-indigo-600 disabled:opacity-50 transition-colors">
-            {pending ? "로그인 중..." : "로그인"}
-          </button>
-        </form>
-        <p className="text-center text-base text-gray-500 mt-7">
-          계정이 없으신가요?{" "}
-          <Link href="/signup" className="text-indigo-500 font-medium hover:underline">회원가입</Link>
-        </p>
-        <p className="text-center text-xs text-gray-400 mt-4">
-          v2.0.0
-        </p>
-      </div>
-
-      {/* 서비스 소개 섹션 */}
-      <div className="w-full max-w-4xl">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold text-gray-800">아지트 글쓰기 연구소와 함께라면</h2>
-          <p className="text-lg text-gray-500 mt-3">아이들의 생각이 쑥쑥 자라나는 4가지 핵심 활동</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FeatureCard
-            emoji="🔍"
-            title="글감 찾기"
-            description="AI와 대화하며 나만의 특별하고 구체적인 글쓰기 주제를 발견해요."
-            color="bg-blue-50 text-blue-600"
-          />
-          <FeatureCard
-            emoji="✍️"
-            title="질문 만들기"
-            description="글의 뼈대를 세우는 핵심 질문들을 AI가 제안해 글쓰기를 도와줍니다."
-            color="bg-indigo-50 text-indigo-600"
-          />
-          <FeatureCard
-            emoji="✅"
-            title="질문 고르기"
-            description="친구들이 만든 좋은 질문을 함께 읽고 투표하며 생각을 넓혀요."
-            color="bg-emerald-50 text-emerald-600"
-          />
-          <FeatureCard
-            emoji="📱"
-            title="한줄 모아"
-            description="우리 반 친구들의 멋진 생각과 답변을 실시간으로 한곳에서 모아봐요."
-            color="bg-purple-50 text-purple-600"
-          />
+        {/* 오른쪽 섹션: 로그인 폼 */}
+        <div className="w-full md:w-7/12 p-10 md:p-20 flex flex-col justify-center bg-white">
+          <div className="max-w-md mx-auto w-full">
+            <div className="mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 mb-3">반갑습니다!</h2>
+              <p className="text-lg text-gray-500">교사 계정으로 로그인하여 시작하세요.</p>
+            </div>
+
+            <form action={formAction} className="space-y-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 ml-1">이메일</label>
+                <input 
+                  name="email" 
+                  type="email" 
+                  required 
+                  autoComplete="email"
+                  className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-500 transition-all placeholder:text-gray-400"
+                  placeholder="teacher@school.kr" 
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center px-1">
+                  <label className="block text-sm font-semibold text-gray-700">비밀번호</label>
+                  <Link href="#" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">비밀번호 찾기</Link>
+                </div>
+                <input 
+                  name="password" 
+                  type="password" 
+                  required 
+                  autoComplete="current-password"
+                  className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-500 transition-all placeholder:text-gray-400"
+                  placeholder="비밀번호 입력" 
+                />
+              </div>
+
+              {state?.error && (
+                <div className="flex items-center gap-3 text-red-500 text-sm bg-red-50 p-4 rounded-2xl border border-red-100 animate-in fade-in slide-in-from-top-2">
+                  <span className="text-lg">⚠️</span>
+                  {state.error}
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={pending}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 transition-all shadow-lg shadow-indigo-200"
+              >
+                {pending ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    로그인 중...
+                  </div>
+                ) : "로그인"}
+              </button>
+            </form>
+
+            <div className="mt-10 pt-10 border-t border-gray-50 text-center">
+              <p className="text-gray-500">
+                아직 계정이 없으신가요?{" "}
+                <Link href="/signup" className="text-indigo-600 font-bold hover:underline underline-offset-4 ml-1">회원가입</Link>
+              </p>
+            </div>
+            
+            <p className="text-center text-xs text-gray-300 mt-8 font-medium">
+              v2.1.0 • AZIT WRITING LAB
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function FeatureCard({ emoji, title, description, color }: { emoji: string; title: string; description: string; color: string }) {
+function MiniFeatureCard({ emoji, title, desc }: { emoji: string; title: string; desc: string }) {
   return (
-    <div className="bg-white rounded-3xl p-8 shadow-sm border border-white/50 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
-      <div className={`w-14 h-14 rounded-2xl ${color} flex items-center justify-center text-3xl mb-5 shadow-inner`}>
+    <div className="flex items-start gap-5 group cursor-default">
+      <div className="w-12 h-12 shrink-0 bg-white/10 rounded-xl flex items-center justify-center text-2xl group-hover:bg-white/20 group-hover:scale-110 transition-all duration-300">
         {emoji}
       </div>
-      <h3 className="text-xl font-bold text-gray-800 mb-3">{title}</h3>
-      <p className="text-base text-gray-500 leading-relaxed">
-        {description}
-      </p>
+      <div>
+        <h3 className="text-lg font-bold text-white mb-1">{title}</h3>
+        <p className="text-sm text-indigo-100 opacity-80 leading-snug">{desc}</p>
+      </div>
     </div>
   );
 }
