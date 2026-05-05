@@ -31,13 +31,13 @@ export default function LoginPage() {
           <div className="mt-12 md:mt-auto relative z-10 space-y-8">
             <MiniFeatureCard 
               emoji="🔍" 
-              title="글감 찾기" 
-              desc="AI와 대화하며 나만의 주제 발견" 
+              title="글의 뼈대 만들기" 
+              desc="AI 질문을 활용하여 탄탄한 개요 작성" 
             />
             <MiniFeatureCard 
               emoji="✍️" 
-              title="질문 만들기" 
-              desc="글의 뼈대를 세우는 핵심 질문 제안" 
+              title="질문 카드 만들기" 
+              desc="마음에 드는 카드를 골라 나만의 질문 생성" 
             />
             <MiniFeatureCard 
               emoji="✅" 
