@@ -473,8 +473,9 @@ export async function submitQuestionGenerator(
     id: typeof selection.id === "string" && selection.id.trim()
       ? selection.id.trim()
       : `selection-${index + 1}`,
+    method: selection.method === "direct" ? "direct" : "card_remix",
     cardSetId: selection.cardSetId === "custom" ? "custom" : String(selection.cardSetId ?? "").trim(),
-    cardSetLabel: String(selection.cardSetLabel ?? "").trim() || "질문 카드",
+    cardSetLabel: String(selection.cardSetLabel ?? "").trim() || (selection.method === "direct" ? "직접 질문 만들기" : "질문 카드"),
     originalPrompt: typeof selection.originalPrompt === "string" && selection.originalPrompt.trim()
       ? selection.originalPrompt.trim()
       : null,
@@ -517,8 +518,9 @@ function normalizeQuestionGeneratorSubmission(value: unknown): QuestionGenerator
       id: typeof selection.id === "string" && selection.id.trim()
         ? selection.id.trim()
         : `selection-${index + 1}`,
+      method: normalizeQuestionMethod(selection.method),
       cardSetId: normalizeCardSetId(selection.cardSetId),
-      cardSetLabel: String(selection.cardSetLabel ?? "").trim() || "질문 카드",
+      cardSetLabel: String(selection.cardSetLabel ?? "").trim() || (selection.method === "direct" ? "직접 질문 만들기" : "질문 카드"),
       originalPrompt: typeof selection.originalPrompt === "string" && selection.originalPrompt.trim()
         ? selection.originalPrompt.trim()
         : null,
@@ -535,4 +537,8 @@ function normalizeQuestionGeneratorSubmission(value: unknown): QuestionGenerator
 function normalizeCardSetId(value: unknown): string | "custom" {
   if (value === "custom") return "custom";
   return typeof value === "string" && value.trim() ? value.trim() : "custom";
+}
+
+function normalizeQuestionMethod(value: unknown): QuestionGeneratorSubmission["selections"][number]["method"] {
+  return value === "direct" ? "direct" : "card_remix";
 }

@@ -14,8 +14,8 @@ export const questionGeneratorDefinition: ActivityDefinition<
   QuestionGeneratorRoomResult
 > = {
   id: "question_generator",
-  label: "질문 카드로 질문 바꾸기",
-  description: "질문 카드 중 하나를 골라 주제에 맞는 나만의 질문으로 바꿔보는 활동입니다.",
+  label: "질문 만들기",
+  description: "직접 질문을 만들거나 질문 카드를 참고해 주제에 맞는 나만의 질문을 만드는 활동입니다.",
   category: "questioning",
   version: 1,
   usesAi: false,
@@ -24,7 +24,7 @@ export const questionGeneratorDefinition: ActivityDefinition<
     enabledCardSetIds: QUESTION_CARD_SETS.map((set) => set.id),
     cardSets: QUESTION_CARD_SETS,
     maxSelections: 1,
-    guidance: "마음에 드는 질문 카드를 골라 오늘 주제에 어울리게 바꿔 봅시다.",
+    guidance: "직접 질문을 만들거나 질문 카드를 골라 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
     requireReason: true,
     allowCustomQuestion: false,
   }),
@@ -35,7 +35,7 @@ export const questionGeneratorDefinition: ActivityDefinition<
     const enabledCardSetIds = normalizeCardSetIds(raw.enabledCardSetIds, allowedIds);
     const guidance = typeof raw.guidance === "string" && raw.guidance.trim()
       ? raw.guidance.trim()
-      : "마음에 드는 질문 카드를 골라 오늘 주제에 어울리게 바꿔 봅시다.";
+      : "직접 질문을 만들거나 질문 카드를 골라 오늘 주제에 어울리게 질문을 바꿔 봅시다.";
 
     return {
       ok: true,

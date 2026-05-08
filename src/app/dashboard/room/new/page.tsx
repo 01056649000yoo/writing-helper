@@ -64,7 +64,7 @@ const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary
   question_generator: {
     emoji: "❓",
     tone: "from-emerald-50 via-white to-teal-50",
-    summary: "질문 카드를 고른 뒤 오늘 주제에 맞는 질문으로 바꿔보는 활동",
+    summary: "직접 질문을 만들거나 질문 카드를 참고해 오늘 주제에 맞는 질문을 만드는 활동",
   },
   question_voting: {
     emoji: "🗳️",
@@ -736,12 +736,12 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   return (
     <>
       <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 mb-6 text-sm text-emerald-800">
-        학생들이 마음에 드는 질문 카드를 고르고, 그 질문을 오늘 주제에 맞게 새롭게 바꾸는 활동입니다.
+        학생이 먼저 직접 질문을 만들지, 질문 카드를 참고해 바꿔볼지 스스로 고른 뒤 자기 수준에 맞게 참여하는 활동입니다.
       </div>
 
       <div className="mb-6">
         <DraftSection
-          title="질문 카드 활동 설정 저장"
+          title="질문 만들기 활동 설정 저장"
           description="활동 주제, 카드 선택, 안내 문구를 저장해 두고 이 화면으로 돌아오면 이어서 수정할 수 있어요."
           onSave={handleSaveDraftNow}
           lastSavedAt={lastSavedAt}
@@ -755,8 +755,8 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             topic_description: draft.topic_description,
           }}
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          hint="어떤 글이나 그림, 이야기와 연결해 질문을 바꿔볼지 적어두면 학생들이 주제와 더 잘 연결할 수 있습니다."
-          placeholder="예) 오늘 읽은 이야기 속 주인공과 장면을 떠올리며, 질문 카드를 주제에 맞는 질문으로 바꿔 봅니다."
+          hint="어떤 글이나 그림, 이야기와 연결해 질문을 만들지 적어두면 학생들이 주제와 더 잘 연결할 수 있습니다."
+          placeholder="예) 오늘 읽은 이야기 속 주인공과 장면을 떠올리며, 직접 질문을 만들거나 질문 카드를 주제에 맞게 바꿔 봅니다."
         />
 
         <div>

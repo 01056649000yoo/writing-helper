@@ -109,7 +109,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
             <h1 className="text-2xl font-bold text-gray-800">질문 완성!</h1>
             <p className="text-gray-500 mt-1 text-sm">
               <strong className="text-sky-600">{studentName}</strong>의{" "}
-              <strong>{topic}</strong> 질문 카드 활동
+              <strong>{topic}</strong> 질문 만들기 활동
             </p>
           </div>
 
@@ -121,6 +121,9 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                     질문 {index + 1}
                   </p>
                   <h2 className="text-lg font-bold text-gray-800 mt-1">{selection.cardSetLabel}</h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {selection.method === "direct" ? "직접 질문 만들기" : "질문 카드로 바꾸기"}
+                  </p>
                 </div>
                 <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
                   내 질문

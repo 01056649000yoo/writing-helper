@@ -21,6 +21,7 @@ type Step =
   | "level"
   | "questions"
   | "question_intro"
+  | "question_path"
   | "question_set"
   | "question_prompt"
   | "question_rewrite"
@@ -29,6 +30,7 @@ type Step =
   | "submitting";
 
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
+type QuestionBuildMode = "direct" | "card_remix";
 
 export default function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -52,6 +54,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [remixedQuestion, setRemixedQuestion] = useState("");
   const [reason, setReason] = useState("");
   const [questionSelections, setQuestionSelections] = useState<QuestionSelection[]>([]);
+  const [questionBuildMode, setQuestionBuildMode] = useState<QuestionBuildMode | null>(null);
 
   const enabledCardSets = useMemo(() => {
     const allowedIds = new Set(activityConfig?.enabledCardSetIds ?? []);
@@ -190,9 +193,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
     const selection: QuestionSelection = {
       id: `selection-${questionSelections.length + 1}`,
-      cardSetId: selectedCardSet?.id ?? "custom",
-      cardSetLabel: selectedCardSet?.label ?? "직접 만든 질문",
-      originalPrompt: selectedPrompt,
+      method: questionBuildMode ?? "card_remix",
+      cardSetId: questionBuildMode === "direct" ? "custom" : selectedCardSet?.id ?? "custom",
+      cardSetLabel:
+        questionBuildMode === "direct"
+          ? "직접 질문 만들기"
+          : selectedCardSet?.label ?? "질문 카드",
+      originalPrompt: questionBuildMode === "direct" ? null : selectedPrompt,
       remixedQuestion: normalizedQuestion,
       reason: reason.trim() || undefined,
     };
@@ -203,7 +210,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
     if (nextSelections.length < maxSelections) {
       resetQuestionBuilder();
-      setStep("question_set");
+      setStep("question_path");
       return;
     }
 
@@ -219,6 +226,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   }
 
   function resetQuestionBuilder() {
+    setQuestionBuildMode(null);
     setSelectedCardSetId(null);
     setSelectedPrompt(null);
     setRemixedQuestion("");
@@ -231,12 +239,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center">
             <div className="text-6xl mb-4">🃏</div>
-            <h1 className="text-2xl font-bold text-gray-800">질문 카드로 질문 바꾸기</h1>
+            <h1 className="text-2xl font-bold text-gray-800">질문 만들기</h1>
             <p className="mt-3 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700">
               오늘 주제: <strong>{topic}</strong>
             </p>
             <p className="text-sm text-gray-500 leading-relaxed mt-4">
-              {activityConfig?.guidance ?? "마음에 드는 질문 카드를 고르고, 오늘 주제에 어울리게 질문을 바꿔봐요."}
+              {activityConfig?.guidance ?? "직접 질문을 만들거나 질문 카드를 골라 오늘 주제에 어울리게 질문을 바꿔봐요."}
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-left text-sm">
               <div className="rounded-2xl bg-gray-50 p-4">
@@ -249,11 +257,80 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
             <button
-              onClick={() => setStep("question_set")}
+              onClick={() => setStep("question_path")}
               className="w-full mt-6 py-4 bg-sky-500 text-white rounded-2xl font-bold text-lg hover:bg-sky-600 transition-colors"
             >
-              질문 카드 고르기
+              질문 만들기 시작
             </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (step === "question_path") {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
+          <div className="max-w-3xl mx-auto py-8">
+            <div className="bg-white rounded-3xl shadow-xl p-6 mb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-sky-600 font-semibold">질문 만드는 방법 고르기</p>
+                  <h1 className="text-2xl font-bold text-gray-800 mt-1">{topic}</h1>
+                  <p className="text-sm text-gray-500 mt-2">
+                    내 수준에 맞게 질문을 직접 만들거나, 질문 카드를 참고해서 바꿔볼 수 있어요.
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                  {questionSelections.length} / {maxSelections}개 완료
+                </div>
+              </div>
+            </div>
+
+            {questionSelections.length > 0 && (
+              <div className="bg-white rounded-3xl shadow-xl p-5 mb-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">지금까지 만든 질문</p>
+                <div className="space-y-2">
+                  {questionSelections.map((selection) => (
+                    <div key={selection.id} className="rounded-2xl bg-sky-50 px-4 py-3">
+                      <p className="text-xs font-semibold text-sky-700">{selection.cardSetLabel}</p>
+                      <p className="text-sm text-gray-800 mt-1">{selection.remixedQuestion}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <button
+                onClick={() => {
+                  setQuestionBuildMode("direct");
+                  setSelectedCardSetId(null);
+                  setSelectedPrompt(null);
+                  setStep("question_rewrite");
+                }}
+                className="rounded-3xl bg-white p-6 shadow-xl text-left hover:-translate-y-0.5 hover:shadow-2xl transition-all"
+              >
+                <div className="text-4xl">✍️</div>
+                <h2 className="mt-4 text-xl font-bold text-gray-800">직접 질문 만들기</h2>
+                <p className="mt-3 text-sm text-gray-500 leading-relaxed">
+                  스스로 질문을 잘 만들 수 있다면 바로 오늘 주제에 맞는 질문을 써봐요.
+                </p>
+              </button>
+
+              <button
+                onClick={() => {
+                  setQuestionBuildMode("card_remix");
+                  setStep("question_set");
+                }}
+                className="rounded-3xl bg-white p-6 shadow-xl text-left hover:-translate-y-0.5 hover:shadow-2xl transition-all"
+              >
+                <div className="text-4xl">🃏</div>
+                <h2 className="mt-4 text-xl font-bold text-gray-800">질문 카드로 바꾸기</h2>
+                <p className="mt-3 text-sm text-gray-500 leading-relaxed">
+                  질문 만들기가 어렵다면 마음에 드는 질문 카드를 골라 주제에 맞게 바꿔봐요.
+                </p>
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -291,6 +368,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 </div>
               </div>
             )}
+
+            <div className="mb-4">
+              <button
+                onClick={() => setStep("question_path")}
+                className="text-sm text-sky-600 hover:text-sky-700"
+              >
+                ← 질문 만드는 방법 다시 고르기
+              </button>
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               {enabledCardSets.map((cardSet) => (
@@ -354,6 +440,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               {allowCustomQuestion && (
                 <button
                   onClick={() => {
+                    setQuestionBuildMode("direct");
                     setSelectedPrompt(null);
                     setStep("question_rewrite");
                   }}
@@ -370,13 +457,14 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     }
 
     if (step === "question_rewrite") {
-      const cardLabel = selectedCardSet?.label ?? "직접 만든 질문";
+      const isDirectMode = questionBuildMode === "direct";
+      const cardLabel = isDirectMode ? "직접 질문 만들기" : selectedCardSet?.label ?? "질문 카드";
 
       return (
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-2xl">
             <button
-              onClick={() => setStep(selectedPrompt ? "question_prompt" : "question_set")}
+              onClick={() => setStep(isDirectMode ? "question_path" : selectedPrompt ? "question_prompt" : "question_set")}
               className="text-sm text-sky-600 hover:text-sky-700"
             >
               ← 다시 고르기
@@ -396,20 +484,28 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               ) : (
                 <div className="rounded-2xl bg-gray-50 px-4 py-4">
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    카드 아이디어를 참고해서 오늘 주제에 맞는 새로운 질문을 직접 만들어요.
+                    {isDirectMode
+                      ? "오늘 주제에 맞는 질문을 스스로 생각해서 직접 만들어요."
+                      : "카드 아이디어를 참고해서 오늘 주제에 맞는 새로운 질문을 직접 만들어요."}
                   </p>
                 </div>
               )}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  오늘 주제에 맞게 바꾼 질문
+                  {isDirectMode ? "오늘 주제에 맞는 내가 만든 질문" : "오늘 주제에 맞게 바꾼 질문"}
                 </label>
                 <textarea
                   value={remixedQuestion}
                   onChange={(event) => setRemixedQuestion(event.target.value)}
                   rows={4}
-                  placeholder={selectedPrompt ? "예: 소풍을 다녀온 뒤 나는 친구에게 어떤 말을 가장 듣고 싶었을까?" : "오늘 주제에 맞는 나만의 질문을 써봐요."}
+                  placeholder={
+                    isDirectMode
+                      ? "예: 소풍을 다녀온 뒤 내 마음이 가장 오래 머문 장면은 무엇이었을까?"
+                      : selectedPrompt
+                        ? "예: 소풍을 다녀온 뒤 나는 친구에게 어떤 말을 가장 듣고 싶었을까?"
+                        : "오늘 주제에 맞는 나만의 질문을 써봐요."
+                  }
                   className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-sky-400 resize-none"
                 />
               </div>
@@ -655,7 +751,7 @@ function normalizeQuestionGeneratorConfig(value: unknown): QuestionGeneratorConf
     maxSelections: normalizeSelectionCount(raw.maxSelections),
     guidance: typeof raw.guidance === "string" && raw.guidance.trim()
       ? raw.guidance.trim()
-      : "마음에 드는 질문 카드를 고르고, 오늘 주제에 어울리게 질문을 바꿔봐요.",
+      : "직접 질문을 만들거나 질문 카드를 고르고, 오늘 주제에 어울리게 질문을 바꿔봐요.",
     requireReason: raw.requireReason !== false,
     allowCustomQuestion: Boolean(raw.allowCustomQuestion),
   };

@@ -11,7 +11,7 @@ import {
 
 const ACTIVITY_LABEL: Record<ActivityType, string> = {
   outline_builder: "글 개요 짜기",
-  question_generator: "질문 카드로 질문 바꾸기",
+  question_generator: "질문 만들기",
   question_voting: "좋은 질문 고르기",
 };
 

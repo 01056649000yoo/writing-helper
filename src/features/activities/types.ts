@@ -75,6 +75,7 @@ export type StudentQuestion = {
 export type QuestionGeneratorSubmission = {
   selections: Array<{
     id: string;
+    method: "direct" | "card_remix";
     cardSetId: string | "custom";
     cardSetLabel: string;
     originalPrompt: string | null;
