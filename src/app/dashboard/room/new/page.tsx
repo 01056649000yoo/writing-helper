@@ -397,6 +397,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
 
     setError("");
     setStep("saving");
+    const storageKey = buildDraftStorageKey(classId, "outline_builder");
 
     const fd = new FormData();
     fd.set("class_id", classId);
@@ -409,13 +410,15 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("duration_hours", formFields.duration_hours);
     fd.set("question_sets_json", JSON.stringify(questionSets));
 
+    clearActivityDraft(storageKey);
     const result = await createRoom(fd);
     if (result?.error) {
+      persistActivityDraft(storageKey, draft);
+      setLastSavedAt(Date.now());
       setError(result.error);
       setStep("preview");
       return;
     }
-    clearActivityDraft(buildDraftStorageKey(classId, "outline_builder"));
   }
 
   const updateLevel = useCallback((level: Level, qs: Question[]) => {
@@ -720,17 +723,20 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     }
     setSaving(true);
     setError("");
+    const storageKey = buildDraftStorageKey(classId, "question_generator");
     const fd = new FormData(e.currentTarget);
     fd.set("class_id", classId);
     fd.set("activity_type", "question_generator");
     draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
+    clearActivityDraft(storageKey);
     const result = await createRoom(fd);
     if (result?.error) {
+      persistActivityDraft(storageKey, draft);
+      setLastSavedAt(Date.now());
       setError(result.error);
       setSaving(false);
       return;
     }
-    clearActivityDraft(buildDraftStorageKey(classId, "question_generator"));
   }
 
   return (
@@ -988,16 +994,19 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     e.preventDefault();
     setSaving(true);
     setError("");
+    const storageKey = buildDraftStorageKey(classId, "question_voting");
     const fd = new FormData(e.currentTarget);
     fd.set("class_id", classId);
     fd.set("activity_type", "question_voting");
+    clearActivityDraft(storageKey);
     const result = await createRoom(fd);
     if (result?.error) {
+      persistActivityDraft(storageKey, draft);
+      setLastSavedAt(Date.now());
       setError(result.error);
       setSaving(false);
       return;
     }
-    clearActivityDraft(buildDraftStorageKey(classId, "question_voting"));
   }
 
   return (
