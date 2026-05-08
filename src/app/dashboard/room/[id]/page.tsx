@@ -19,6 +19,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
 
   const headersList = await headers();
   const rawHost = headersList.get("host") ?? "localhost:3002";
+  const forwardedProto = headersList.get("x-forwarded-proto");
   const isLocalhost = rawHost.startsWith("localhost") || rawHost.startsWith("127.0.0.1");
   let host = rawHost;
   if (isLocalhost) {
@@ -26,8 +27,9 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
     const networkIp = getLocalNetworkIp();
     host = networkIp ? `${networkIp}:${port}` : rawHost;
   }
-  const sessionJoinUrl = `http://${host}/room/${id}`;
-  const shortUrl = room.short_code ? `http://${host}/s/${room.short_code}` : null;
+  const protocol = isLocalhost ? "http" : forwardedProto || "https";
+  const sessionJoinUrl = `${protocol}://${host}/room/${id}`;
+  const shortUrl = room.short_code ? `${protocol}://${host}/s/${room.short_code}` : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">

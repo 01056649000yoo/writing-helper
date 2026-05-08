@@ -6,68 +6,109 @@ import { verifyStudent } from "@/app/actions/student-actions";
 
 type ActivityType = "outline_builder" | "question_generator" | "question_voting";
 
-type EntryMeta = {
-  emoji: string;
-  title: string;
-  subtitle: string;
-  helper: string;
-  buttonLabel: string;
-  shellClassName: string;
-  topicClassName: string;
-  buttonClassName: string;
-  inputFocusClassName: string;
-};
-
-const ENTRY_META: Record<ActivityType, EntryMeta> = {
-  outline_builder: {
-    emoji: "✏️",
-    title: "아지트 글쓰기 연구소",
-    subtitle: "내 번호와 이름을 입력하고 글 개요 만들기를 시작해요",
-    helper: "질문에 차근차근 답하면 내 글의 뼈대를 만들 수 있어요.",
-    buttonLabel: "개요 만들기 시작",
-    shellClassName: "from-yellow-50 to-orange-100",
-    topicClassName: "bg-orange-50 text-orange-700",
-    buttonClassName: "bg-orange-400 hover:bg-orange-500",
-    inputFocusClassName: "focus:border-orange-400",
-  },
-  question_generator: {
-    emoji: "❓",
-    title: "질문 만들기 놀이터",
-    subtitle: "내 번호와 이름을 입력하고 나에게 맞는 방법으로 질문을 만들어요",
-    helper: "직접 질문을 만들 수도 있고, 질문 카드의 도움을 받아 바꿔볼 수도 있어요.",
-    buttonLabel: "질문 만들러 가기",
-    shellClassName: "from-sky-50 to-cyan-100",
-    topicClassName: "bg-sky-50 text-sky-700",
-    buttonClassName: "bg-sky-500 hover:bg-sky-600",
-    inputFocusClassName: "focus:border-sky-400",
-  },
-  question_voting: {
-    emoji: "🗳️",
-    title: "좋은 질문 고르기",
-    subtitle: "내 번호와 이름을 입력하고 가장 좋은 질문을 골라요",
-    helper: "친구들이 만든 질문을 읽고 가장 생각해보고 싶은 질문을 선택해요.",
-    buttonLabel: "질문 고르러 가기",
-    shellClassName: "from-violet-50 to-indigo-100",
-    topicClassName: "bg-violet-50 text-violet-700",
-    buttonClassName: "bg-violet-500 hover:bg-violet-600",
-    inputFocusClassName: "focus:border-violet-400",
-  },
+type EntryShellProps = {
+  roomId: string;
+  topic: string;
 };
 
 export function RoomEntryClient({
   roomId,
   activityType,
   topic,
-}: {
-  roomId: string;
+}: EntryShellProps & {
   activityType: ActivityType;
-  topic: string;
+}) {
+  if (activityType === "question_generator") {
+    return <QuestionGeneratorEntry roomId={roomId} topic={topic} />;
+  }
+
+  if (activityType === "question_voting") {
+    return <QuestionVotingEntry roomId={roomId} topic={topic} />;
+  }
+
+  return <OutlineBuilderEntry roomId={roomId} topic={topic} />;
+}
+
+function OutlineBuilderEntry({ roomId, topic }: EntryShellProps) {
+  return (
+    <EntryShell
+      roomId={roomId}
+      topic={topic}
+      shellClassName="from-yellow-50 to-orange-100"
+      topicClassName="bg-orange-50 text-orange-700"
+      buttonClassName="bg-orange-400 hover:bg-orange-500"
+      inputFocusClassName="focus:border-orange-400"
+      emoji="✏️"
+      title="아지트 글쓰기 연구소"
+      subtitle="내 번호와 이름을 입력하고 글 개요 만들기를 시작해요"
+      helper="질문에 차근차근 답하면 내 글의 뼈대를 만들 수 있어요."
+      buttonLabel="개요 만들기 시작"
+    />
+  );
+}
+
+function QuestionGeneratorEntry({ roomId, topic }: EntryShellProps) {
+  return (
+    <EntryShell
+      roomId={roomId}
+      topic={topic}
+      shellClassName="from-sky-50 to-cyan-100"
+      topicClassName="bg-sky-50 text-sky-700"
+      buttonClassName="bg-sky-500 hover:bg-sky-600"
+      inputFocusClassName="focus:border-sky-400"
+      emoji="❓"
+      title="질문 만들기 놀이터"
+      subtitle="내 번호와 이름을 입력하고 나에게 맞는 방법으로 질문을 만들어요"
+      helper="직접 질문을 만들 수도 있고, 질문 카드의 도움을 받아 바꿔볼 수도 있어요."
+      buttonLabel="질문 만들러 가기"
+    />
+  );
+}
+
+function QuestionVotingEntry({ roomId, topic }: EntryShellProps) {
+  return (
+    <EntryShell
+      roomId={roomId}
+      topic={topic}
+      shellClassName="from-violet-50 to-indigo-100"
+      topicClassName="bg-violet-50 text-violet-700"
+      buttonClassName="bg-violet-500 hover:bg-violet-600"
+      inputFocusClassName="focus:border-violet-400"
+      emoji="🗳️"
+      title="좋은 질문 고르기"
+      subtitle="내 번호와 이름을 입력하고 가장 좋은 질문을 골라요"
+      helper="친구들이 만든 질문을 읽고 가장 생각해보고 싶은 질문을 선택해요."
+      buttonLabel="질문 고르러 가기"
+    />
+  );
+}
+
+function EntryShell({
+  roomId,
+  topic,
+  shellClassName,
+  topicClassName,
+  buttonClassName,
+  inputFocusClassName,
+  emoji,
+  title,
+  subtitle,
+  helper,
+  buttonLabel,
+}: EntryShellProps & {
+  shellClassName: string;
+  topicClassName: string;
+  buttonClassName: string;
+  inputFocusClassName: string;
+  emoji: string;
+  title: string;
+  subtitle: string;
+  helper: string;
+  buttonLabel: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-
-  const entryMeta = ENTRY_META[activityType];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -94,18 +135,18 @@ export function RoomEntryClient({
   }
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${entryMeta.shellClassName} flex items-center justify-center p-4`}>
+    <div className={`min-h-screen bg-gradient-to-br ${shellClassName} flex items-center justify-center p-4`}>
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">{entryMeta.emoji}</div>
-          <h1 className="text-2xl font-bold text-gray-800">{entryMeta.title}</h1>
-          <p className="text-gray-500 mt-2 text-sm leading-relaxed">{entryMeta.subtitle}</p>
+          <div className="text-6xl mb-3">{emoji}</div>
+          <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
+          <p className="text-gray-500 mt-2 text-sm leading-relaxed">{subtitle}</p>
           {topic && (
-            <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${entryMeta.topicClassName}`}>
+            <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${topicClassName}`}>
               오늘 주제: <strong>{topic}</strong>
             </div>
           )}
-          <p className="text-xs text-gray-400 mt-3">{entryMeta.helper}</p>
+          <p className="text-xs text-gray-400 mt-3">{helper}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,7 +158,7 @@ export function RoomEntryClient({
               required
               min={1}
               max={50}
-              className={`w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-2xl font-bold text-center text-gray-900 placeholder:text-gray-400 focus:outline-none ${entryMeta.inputFocusClassName}`}
+              className={`w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-2xl font-bold text-center text-gray-900 placeholder:text-gray-400 focus:outline-none ${inputFocusClassName}`}
               placeholder="15"
             />
           </div>
@@ -128,7 +169,7 @@ export function RoomEntryClient({
               type="text"
               required
               autoComplete="off"
-              className={`w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-xl font-bold text-center text-gray-900 placeholder:text-gray-400 focus:outline-none ${entryMeta.inputFocusClassName}`}
+              className={`w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-xl font-bold text-center text-gray-900 placeholder:text-gray-400 focus:outline-none ${inputFocusClassName}`}
               placeholder="홍길동"
             />
           </div>
@@ -141,9 +182,9 @@ export function RoomEntryClient({
           <button
             type="submit"
             disabled={pending}
-            className={`w-full py-4 text-white rounded-2xl font-bold text-lg disabled:opacity-50 transition-colors ${entryMeta.buttonClassName}`}
+            className={`w-full py-4 text-white rounded-2xl font-bold text-lg disabled:opacity-50 transition-colors ${buttonClassName}`}
           >
-            {pending ? "확인 중..." : `${entryMeta.buttonLabel} 🚀`}
+            {pending ? "확인 중..." : `${buttonLabel} 🚀`}
           </button>
         </form>
       </div>
