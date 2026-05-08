@@ -4,6 +4,7 @@ import { checkHasApiKey } from "@/app/actions/settings-actions";
 import { getClasses } from "@/app/actions/class-actions";
 import { signOut } from "@/app/actions/auth-actions";
 import { ManualModal } from "./manual-modal";
+import { BUILD_LABEL } from "@/lib/build-version";
 
 export default async function DashboardPage() {
   const [profile, classes, hasKey] = await Promise.all([
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
             <div>
               <h1 className="text-xl font-bold text-gray-800">아지트 글쓰기 연구소</h1>
               <p className="text-base text-gray-500">{profile?.name} 선생님</p>
+              <p className="text-xs text-gray-400 mt-0.5">{BUILD_LABEL}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

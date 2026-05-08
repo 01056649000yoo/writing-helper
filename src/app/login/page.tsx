@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { signIn } from "@/app/actions/auth-actions";
+import { BUILD_LABEL } from "@/lib/build-version";
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(signIn, null);
@@ -124,7 +125,7 @@ export default function LoginPage() {
             </div>
             
             <p className="text-center text-xs text-gray-300 mt-8 font-medium">
-              v2.1.0 • AZIT WRITING LAB
+              v2.1.0 • AZIT WRITING LAB • {BUILD_LABEL}
             </p>
           </div>
         </div>
