@@ -34,6 +34,7 @@ export async function saveGptApiKey(formData: FormData): Promise<{ error?: strin
       return { error: `프로필 업데이트 실패: ${updateError.message}` };
     }
 
+    revalidatePath("/dashboard/api-key");
     revalidatePath("/dashboard/settings");
     return { success: true };
   } catch (e) {

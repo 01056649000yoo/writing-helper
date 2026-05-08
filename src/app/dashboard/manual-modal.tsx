@@ -22,6 +22,7 @@ const STEPS = [
     color: "amber",
     items: [
       "대시보드 우측 상단 'API 키 설정' 버튼을 클릭합니다.",
+      "또는 '/dashboard/api-key' 페이지로 이동합니다.",
       "OpenAI 홈페이지(platform.openai.com)에서 API 키를 발급받습니다.",
       "발급받은 키(sk-로 시작)를 입력 후 저장합니다.",
       "키가 정상 등록되면 상단 버튼이 '✅ API 키 설정됨'으로 바뀝니다.",

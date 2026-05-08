@@ -106,7 +106,7 @@ function QuestionCard({
         value={q.question}
         onChange={(e) => onChange({ ...q, question: e.target.value })}
         rows={2}
-        className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        className="w-full px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
         placeholder="질문 내용"
       />
 
@@ -140,7 +140,7 @@ function QuestionCard({
               })
             }
             rows={Math.max(10, (q.choices?.length ?? 0) + 1)}
-            className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="w-full px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
             placeholder={"보기 1\n보기 2\n보기 3"}
           />
         </div>
@@ -150,7 +150,7 @@ function QuestionCard({
         type="text"
         value={q.hint ?? ""}
         onChange={(e) => onChange({ ...q, hint: e.target.value })}
-        className="w-full text-xs px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        className="w-full px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
         placeholder="힌트 (선택사항)"
       />
     </div>
@@ -913,7 +913,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             rows={4}
             value={draft.guidance}
             onChange={(event) => setDraft((prev) => ({ ...prev, guidance: event.target.value }))}
-            className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
+            className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
           />
         </div>
 
@@ -1031,7 +1031,7 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
             required
             value={draft.candidates}
             onChange={(event) => setDraft((prev) => ({ ...prev, candidates: event.target.value }))}
-            className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+            className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
             placeholder={"질문 후보를 한 줄에 하나씩 입력하세요.\n예)\n주인공은 왜 그런 선택을 했을까?\n이 장면이 우리에게 주는 의미는 무엇일까?"}
           />
           <p className="text-xs text-gray-400 mt-2">한 줄에 하나씩 입력하면 학생들이 선택지 형태로 보게 됩니다.</p>
@@ -1121,7 +1121,7 @@ function TopicFields({
           value={values.topic}
           onChange={(event) => onChange({ topic: event.target.value })}
           placeholder="예) 소풍, 이야기 속 선택, 오늘 배운 점"
-          className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
         />
       </div>
       <div>
@@ -1135,7 +1135,7 @@ function TopicFields({
           value={values.topic_description}
           onChange={(event) => onChange({ topic_description: event.target.value })}
           placeholder={placeholder}
-          className="w-full px-5 py-4 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+          className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
         />
         <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
           <span className="text-amber-500 text-base shrink-0 mt-0.5">💡</span>

@@ -31,7 +31,7 @@ export default async function DashboardPage() {
             >
               🃏 질문 카드 설정
             </Link>
-            <Link href="/dashboard/settings"
+            <Link href="/dashboard/api-key"
               className={`text-base px-5 py-2.5 rounded-xl border transition-colors ${hasKey ? "border-green-200 text-green-700 bg-green-50" : "border-red-200 text-red-700 bg-red-50"}`}>
               {hasKey ? "✅ API 키 설정됨" : "⚠️ API 키 설정 필요"}
             </Link>
@@ -49,7 +49,7 @@ export default async function DashboardPage() {
               <p className="text-lg font-semibold text-amber-800">⚠️ GPT API 키가 필요합니다</p>
               <p className="text-base text-amber-600 mt-1">AI 기반 활동을 열려면 먼저 OpenAI API 키를 등록해주세요.</p>
             </div>
-            <Link href="/dashboard/settings"
+            <Link href="/dashboard/api-key"
               className="bg-amber-500 text-white px-6 py-3 rounded-xl text-base font-semibold hover:bg-amber-600">
               키 등록하기
             </Link>
