@@ -749,6 +749,9 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <input type="hidden" name="class_id" value={classId} />
+        <input type="hidden" name="activity_type" value="question_generator" />
+
         <TopicFields
           values={{
             topic: draft.topic,
@@ -1013,6 +1016,9 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <input type="hidden" name="class_id" value={classId} />
+        <input type="hidden" name="activity_type" value="question_voting" />
+
         <TopicFields
           values={{
             topic: draft.topic,

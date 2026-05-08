@@ -115,22 +115,33 @@ function EntryShell({
     setPending(true);
     setError("");
 
-    const fd = new FormData(e.currentTarget);
-    const number = parseInt(String(fd.get("number")));
-    const name = String(fd.get("name")).trim();
+    try {
+      const fd = new FormData(e.currentTarget);
+      const number = parseInt(String(fd.get("number")));
+      const name = String(fd.get("name")).trim();
 
-    const result = await verifyStudent(roomId, number, name);
+      const result = await verifyStudent(roomId, number, name);
 
-    if (result.error) {
-      setError(result.error);
+      if (result.error) {
+        setError(result.error);
+        setPending(false);
+        return;
+      }
+
+      if (!result.sessionId) {
+        setError("학생 세션을 만들지 못했습니다. 선생님께 다시 확인해주세요.");
+        setPending(false);
+        return;
+      }
+
+      if (result.status === "done") {
+        router.push(`/room/${roomId}/result?session=${result.sessionId}`);
+      } else {
+        router.push(`/room/${roomId}/activity?session=${result.sessionId}`);
+      }
+    } catch {
+      setError("입장 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       setPending(false);
-      return;
-    }
-
-    if (result.status === "done") {
-      router.push(`/room/${roomId}/result?session=${result.sessionId}`);
-    } else {
-      router.push(`/room/${roomId}/activity?session=${result.sessionId}`);
     }
   }
 

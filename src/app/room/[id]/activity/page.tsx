@@ -38,10 +38,11 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const sessionId = searchParams.get("session") ?? "";
 
   const [roomId, setRoomId] = useState("");
-  const [activityType, setActivityType] = useState<ActivityType>("outline_builder");
+  const [activityType, setActivityType] = useState<ActivityType | null>(null);
   const [activityConfig, setActivityConfig] = useState<QuestionGeneratorConfig | null>(null);
-  const [step, setStep] = useState<Step>("level");
+  const [step, setStep] = useState<Step | null>(null);
   const [levelPending, setLevelPending] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -78,12 +79,26 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   }, [params]);
 
   useEffect(() => {
-    if (!roomId || !sessionId) return;
+    if (!roomId) return;
+
+    if (!sessionId) {
+      setError("학생 세션 정보를 찾지 못했습니다. 입장 화면에서 다시 시도해주세요.");
+      setPageLoading(false);
+      return;
+    }
 
     let active = true;
+    setPageLoading(true);
 
     getStudentRoomQuestions(sessionId, roomId).then((data) => {
-      if (!active || !data) return;
+      if (!active) return;
+
+      if (!data) {
+        setError("학생 세션을 확인하지 못했습니다. 입장 화면에서 다시 시도해주세요.");
+        setPageLoading(false);
+        return;
+      }
+
       setTopic(data.topic ?? "");
 
       const type = data.activity_type;
@@ -101,12 +116,43 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       } else {
         setStep("level");
       }
+      setPageLoading(false);
     });
 
     return () => {
       active = false;
     };
   }, [roomId, sessionId]);
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm text-center">
+          <div className="text-5xl mb-4 animate-pulse">⏳</div>
+          <h1 className="text-xl font-bold text-gray-800">활동을 준비하고 있어요</h1>
+          <p className="text-sm text-gray-500 mt-3">학생 정보를 확인한 뒤 알맞은 활동 화면으로 이동합니다.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && (!activityType || !step)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 to-orange-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center">
+          <div className="text-5xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold text-gray-800">학생 참여를 이어갈 수 없어요</h1>
+          <p className="text-sm text-red-500 mt-3 whitespace-pre-line">{error}</p>
+          <button
+            onClick={() => router.push(`/room/${roomId}`)}
+            className="w-full mt-6 py-4 bg-slate-700 text-white rounded-2xl font-bold text-base hover:bg-slate-800 transition-colors"
+          >
+            입장 화면으로 돌아가기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   async function handleLevelSelect(selectedLevel: StudentLevel) {
     if (levelPending) return;
