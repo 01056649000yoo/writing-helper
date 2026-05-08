@@ -75,6 +75,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     question_sets: QuestionSets | null;
     questions_generated_at: string | null;
     expires_at: string;
+    is_active: boolean;
   } = {
     teacher_id: user.id,
     class_id: classId,
@@ -87,6 +88,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     question_sets: null,
     questions_generated_at: null,
     expires_at: expiresAt,
+    is_active: true,
   };
 
   let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig;
@@ -167,6 +169,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       activity_config: activityConfig,
       activity_state: {},
       expires_at: expiresAt,
+      is_active: true,
     })
     .select("id")
     .single();
