@@ -227,12 +227,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
   async function handleQuestionSelectionSubmit() {
     const normalizedQuestion = remixedQuestion.trim();
+    const isDirectMode = questionBuildMode === "direct";
     if (!normalizedQuestion) {
       setError("오늘 주제에 맞게 바꾼 질문을 적어주세요.");
       return;
     }
 
-    if (requireReason && !reason.trim()) {
+    if (!isDirectMode && requireReason && !reason.trim()) {
       setError("왜 이렇게 바꿨는지도 한 줄 적어주세요.");
       return;
     }
