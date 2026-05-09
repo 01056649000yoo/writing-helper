@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createRoom, generateQuestionsPreview } from "@/app/actions/room-actions";
@@ -351,7 +351,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     outline_depth: "simple",
     duration_hours: "4",
   }), []);
-  const [draft, setDraft] = useActivityDraft<OutlineBuilderDraft>(
+  const [draft, setDraft, draftControls] = useActivityDraft<OutlineBuilderDraft>(
     buildDraftStorageKey(classId, "outline_builder"),
     initialDraft
   );
@@ -410,10 +410,12 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("duration_hours", formFields.duration_hours);
     fd.set("question_sets_json", JSON.stringify(questionSets));
 
+    draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
     const result = await createRoom(fd);
     if (result?.error) {
       persistActivityDraft(storageKey, draft);
+      draftControls.resumeAutosave();
       setLastSavedAt(Date.now());
       setError(result.error);
       setStep("preview");
@@ -670,7 +672,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     allow_custom_question: false,
     selectedCardSetIds: [],
   }), []);
-  const [draft, setDraft] = useActivityDraft<QuestionGeneratorDraft>(
+  const [draft, setDraft, draftControls] = useActivityDraft<QuestionGeneratorDraft>(
     buildDraftStorageKey(classId, "question_generator"),
     initialDraft
   );
@@ -728,10 +730,12 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     fd.set("class_id", classId);
     fd.set("activity_type", "question_generator");
     draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
+    draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
     const result = await createRoom(fd);
     if (result?.error) {
       persistActivityDraft(storageKey, draft);
+      draftControls.resumeAutosave();
       setLastSavedAt(Date.now());
       setError(result.error);
       setSaving(false);
@@ -979,7 +983,7 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     candidates: "",
     require_reason: true,
   }), []);
-  const [draft, setDraft] = useActivityDraft<QuestionVotingDraft>(
+  const [draft, setDraft, draftControls] = useActivityDraft<QuestionVotingDraft>(
     buildDraftStorageKey(classId, "question_voting"),
     initialDraft
   );
@@ -998,10 +1002,12 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     const fd = new FormData(e.currentTarget);
     fd.set("class_id", classId);
     fd.set("activity_type", "question_voting");
+    draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
     const result = await createRoom(fd);
     if (result?.error) {
       persistActivityDraft(storageKey, draft);
+      draftControls.resumeAutosave();
       setLastSavedAt(Date.now());
       setError(result.error);
       setSaving(false);
@@ -1248,16 +1254,22 @@ export default function NewRoomPage() {
 
 function useActivityDraft<T>(storageKey: string, initialState: T) {
   const [draft, setDraft] = useState<T>(initialState);
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+  const autosaveEnabledRef = useRef(true);
 
   useEffect(() => {
     const { draft: nextDraft } = readActivityDraft(storageKey, initialState);
     setDraft(nextDraft);
+    autosaveEnabledRef.current = true;
+    setAutosaveEnabled(true);
   }, [initialState, storageKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!autosaveEnabled) return;
 
     const saveDraft = () => {
+      if (!autosaveEnabledRef.current) return;
       persistActivityDraft(storageKey, draft);
     };
 
@@ -1267,9 +1279,19 @@ function useActivityDraft<T>(storageKey: string, initialState: T) {
       window.clearInterval(intervalId);
       saveDraft();
     };
-  }, [draft, storageKey]);
+  }, [autosaveEnabled, draft, storageKey]);
 
-  return [draft, setDraft] as const;
+  const suspendAutosave = useCallback(() => {
+    autosaveEnabledRef.current = false;
+    setAutosaveEnabled(false);
+  }, []);
+
+  const resumeAutosave = useCallback(() => {
+    autosaveEnabledRef.current = true;
+    setAutosaveEnabled(true);
+  }, []);
+
+  return [draft, setDraft, { suspendAutosave, resumeAutosave }] as const;
 }
 
 function parseActivityType(value: string | null): ActivityType | null {
