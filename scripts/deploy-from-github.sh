@@ -30,13 +30,24 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] pulling latest main"
 git checkout main
 git pull --ff-only origin main
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] installing dependencies"
-npm install --include=dev
+export BUILD_VERSION
+BUILD_VERSION="$(git rev-parse --short HEAD)"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] building app"
-npm run build
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] stopping old local process managers"
+launchctl bootout "gui/$(id -u)/com.jarvis.helper" >/dev/null 2>&1 || true
+launchctl disable "gui/$(id -u)/com.jarvis.helper" >/dev/null 2>&1 || true
+if [ -x "$PROJECT_ROOT/node_modules/.bin/pm2" ]; then
+  "$PROJECT_ROOT/node_modules/.bin/pm2" delete writing-helper >/dev/null 2>&1 || true
+  "$PROJECT_ROOT/node_modules/.bin/pm2" save --force >/dev/null 2>&1 || true
+  "$PROJECT_ROOT/node_modules/.bin/pm2" kill >/dev/null 2>&1 || true
+fi
+pkill -f "npm run start" >/dev/null 2>&1 || true
+pkill -f "next-server \\(v16\\.2\\.3\\)" >/dev/null 2>&1 || true
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] restarting pm2 app"
-npx pm2 restart writing-helper --update-env
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] building docker image"
+docker compose build
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] starting docker stack"
+docker compose up -d --remove-orphans
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] webhook deploy finished"

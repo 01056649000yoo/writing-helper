@@ -1,9 +1,0 @@
-{
-  admin off
-}
-
-helper.끄적끄적아지트.site {
-  encode gzip zstd
-
-  reverse_proxy 127.0.0.1:3000
-}

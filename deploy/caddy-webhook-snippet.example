@@ -1,0 +1,12 @@
+# helper.xn--vz0ba242ncqcba79xhwx.site 블록 안에 추가
+handle /api/github-deploy {
+    reverse_proxy host.docker.internal:4010
+}
+
+handle_path /__deploy/github/* {
+    reverse_proxy host.docker.internal:4010
+}
+
+# GitHub webhook 설정 예시
+# 기존 URL 유지: https://helper.xn--vz0ba242ncqcba79xhwx.site/api/github-deploy
+# 또는 새 경로: https://helper.xn--vz0ba242ncqcba79xhwx.site/__deploy/github/github-deploy

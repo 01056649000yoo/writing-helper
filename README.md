@@ -1,67 +1,83 @@
 ## Development
 
-개발 서버 실행:
-
 ```bash
+npm install
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000`으로 확인할 수 있습니다.
+로컬 개발은 `http://localhost:3000`에서 확인합니다.
 
-## Production On Mac Mini
+## Production: Docker
 
-이 프로젝트는 Vercel 대신 맥미니 로컬 호스팅 기준으로 운영할 수 있습니다.
-
-운영 실행:
+이 앱은 운영 시 Docker Compose 기준으로 실행합니다.
 
 ```bash
-npm install
-npm run build
-npm run start
+BUILD_VERSION=$(git rev-parse --short HEAD) docker compose build
+docker compose up -d
 ```
 
-상시 실행 권장:
+중지:
 
 ```bash
-pm2 start ecosystem.config.cjs
+docker compose down
 ```
 
-리버스 프록시 예시는 [Caddyfile.example](/Users/seunghyeonmaegmini/writing-helper/Caddyfile.example:1), 운영 문서는 [docs/mac-mini-hosting.md](/Users/seunghyeonmaegmini/writing-helper/docs/mac-mini-hosting.md:1)에 정리되어 있습니다.
+핵심 원칙:
 
-권장 포트 분리:
-
-- 개발: `3000`
-- 운영: `3000`
+- 앱 자체는 Docker 컨테이너로만 실행
+- PM2, LaunchAgent, 수동 `npm run start`로 이 앱을 다시 띄우지 않음
+- 공개 도메인은 Docker 프록시가 `writing-helper-app`만 보게 구성
 
 ## GitHub Auto Deploy
 
-GitHub webhook으로 맥미니 서버를 자동 동기화할 수 있습니다.
+자동 배포 흐름:
 
-- 엔드포인트: `/api/github-deploy`
-- 대상 이벤트: `push`
-- 대상 브랜치: `main`
-- 서명 방식: `x-hub-signature-256`
+1. GitHub `main` 푸시
+2. 맥미니 호스트의 webhook 수신기 실행
+3. `git pull --ff-only origin main`
+4. `docker compose build`
+5. `docker compose up -d --remove-orphans`
+6. 이전 컨테이너 교체
 
-필수 환경 변수:
+### Host Webhook Receiver
+
+앱 내부 `/api/github-deploy`는 더 이상 실제 배포를 담당하지 않습니다.  
+배포는 호스트에서 별도 수신기가 받습니다.
+
+관련 파일:
+
+- [scripts/deploy-webhook-server.mjs](/Users/seunghyeonmaegmini/writing-helper/scripts/deploy-webhook-server.mjs:1)
+- [scripts/run-deploy-webhook.sh](/Users/seunghyeonmaegmini/writing-helper/scripts/run-deploy-webhook.sh:1)
+- [scripts/deploy-from-github.sh](/Users/seunghyeonmaegmini/writing-helper/scripts/deploy-from-github.sh:1)
+- [deploy/com.writing-helper.deploy-webhook.plist.example](/Users/seunghyeonmaegmini/writing-helper/deploy/com.writing-helper.deploy-webhook.plist.example:1)
+- [deploy/caddy-webhook-snippet.example](/Users/seunghyeonmaegmini/writing-helper/deploy/caddy-webhook-snippet.example:1)
+
+기본 수신 주소:
+
+- 로컬: `http://127.0.0.1:4010/health`
+- webhook endpoint: `http://127.0.0.1:4010/github-deploy`
+
+공개 도메인에서 받으려면 프록시에 아래 경로를 연결합니다.
+
+- `https://helper.xn--vz0ba242ncqcba79xhwx.site/__deploy/github/github-deploy`
+
+### Required Environment Variables
+
+`.env.local`에 있어야 하는 값:
 
 ```bash
 GITHUB_WEBHOOK_SECRET=...
 GITHUB_WEBHOOK_REPO=01056649000yoo/writing-helper
 GITHUB_WEBHOOK_REF=refs/heads/main
+DEPLOY_WEBHOOK_HOST=127.0.0.1
+DEPLOY_WEBHOOK_PORT=4010
 ```
 
-웹훅이 들어오면 [scripts/deploy-from-github.sh](/Users/seunghyeonmaegmini/writing-helper/scripts/deploy-from-github.sh:1)가 실행되어 아래 순서로 반영됩니다.
+## Deploy Logs
 
-1. `git pull --ff-only origin main`
-2. `npm install`
-3. `npm run build`
-4. `npx pm2 restart writing-helper --update-env`
-
-로그 파일:
-
-- [logs/deploy-webhook.log](/Users/seunghyeonmaegmini/writing-helper/logs/deploy-webhook.log:1)
+- 앱 배포 로그: [logs/deploy-webhook.log](/Users/seunghyeonmaegmini/writing-helper/logs/deploy-webhook.log:1)
 
 ## Notes
 
-- Next.js 16 기준 Node 서버 배포는 `npm run build` + `npm run start` 구조를 사용합니다.
-- 운영에서는 `npm run dev`가 아니라 `pm2`로 `start` 프로세스를 유지하는 방식을 권장합니다.
+- 로그인 하단의 `deploy <commit>` 표기로 실제 배포 커밋을 확인할 수 있습니다.
+- Docker 빌드에서는 `NEXT_PUBLIC_BUILD_VERSION`이 직접 주입되고, 로컬 빌드에서는 Git 해시를 자동으로 읽습니다.

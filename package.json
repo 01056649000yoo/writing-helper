@@ -4,13 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "NEXT_PUBLIC_BUILD_VERSION=$(git rev-parse --short HEAD) next build",
+    "build": "NEXT_PUBLIC_BUILD_VERSION=${NEXT_PUBLIC_BUILD_VERSION:-$(git rev-parse --short HEAD 2>/dev/null || echo dev)} next build",
     "start": "next start",
-    "lint": "eslint",
-    "host:start": "pm2 start ecosystem.config.cjs",
-    "host:restart": "pm2 restart writing-helper",
-    "host:stop": "pm2 stop writing-helper",
-    "host:logs": "pm2 logs writing-helper"
+    "lint": "eslint"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
@@ -18,7 +14,6 @@
     "@types/qrcode": "^1.5.6",
     "next": "16.2.3",
     "openai": "^6.34.0",
-    "pm2": "^7.0.1",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"
