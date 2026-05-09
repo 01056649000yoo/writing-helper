@@ -352,31 +352,74 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                   setQuestionBuildMode("direct");
                   setSelectedCardSetId(null);
                   setSelectedPrompt(null);
-                  setStep("question_rewrite");
                 }}
-                className="rounded-3xl bg-white p-6 shadow-xl text-left hover:-translate-y-0.5 hover:shadow-2xl transition-all"
+                className={`rounded-3xl p-6 shadow-xl text-left transition-all ${
+                  questionBuildMode === "direct"
+                    ? "bg-sky-50 ring-2 ring-sky-400 shadow-2xl"
+                    : "bg-white hover:-translate-y-0.5 hover:shadow-2xl"
+                }`}
               >
                 <div className="text-4xl">✍️</div>
                 <h2 className="mt-4 text-xl font-bold text-gray-800">직접 질문 만들기</h2>
                 <p className="mt-3 text-sm text-gray-500 leading-relaxed">
                   스스로 질문을 잘 만들 수 있다면 바로 오늘 주제에 맞는 질문을 써봐요.
                 </p>
+                <div className="mt-4">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                    questionBuildMode === "direct"
+                      ? "bg-sky-500 text-white"
+                      : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {questionBuildMode === "direct" ? "선택됨" : "이 방법 선택"}
+                  </span>
+                </div>
               </button>
 
               <button
                 onClick={() => {
                   setQuestionBuildMode("card_remix");
-                  setStep("question_set");
                 }}
-                className="rounded-3xl bg-white p-6 shadow-xl text-left hover:-translate-y-0.5 hover:shadow-2xl transition-all"
+                className={`rounded-3xl p-6 shadow-xl text-left transition-all ${
+                  questionBuildMode === "card_remix"
+                    ? "bg-sky-50 ring-2 ring-sky-400 shadow-2xl"
+                    : "bg-white hover:-translate-y-0.5 hover:shadow-2xl"
+                }`}
               >
                 <div className="text-4xl">🃏</div>
                 <h2 className="mt-4 text-xl font-bold text-gray-800">질문 카드로 바꾸기</h2>
                 <p className="mt-3 text-sm text-gray-500 leading-relaxed">
                   질문 만들기가 어렵다면 마음에 드는 질문 카드를 골라 주제에 맞게 바꿔봐요.
                 </p>
+                <div className="mt-4">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                    questionBuildMode === "card_remix"
+                      ? "bg-sky-500 text-white"
+                      : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {questionBuildMode === "card_remix" ? "선택됨" : "이 방법 선택"}
+                  </span>
+                </div>
               </button>
             </div>
+
+            <button
+              onClick={() => {
+                if (questionBuildMode === "direct") {
+                  setSelectedCardSetId(null);
+                  setSelectedPrompt(null);
+                  setStep("question_rewrite");
+                  return;
+                }
+
+                if (questionBuildMode === "card_remix") {
+                  setStep("question_set");
+                }
+              }}
+              disabled={!questionBuildMode}
+              className="w-full mt-6 py-4 bg-sky-500 text-white rounded-2xl font-bold text-lg hover:bg-sky-600 disabled:opacity-40 disabled:hover:bg-sky-500 transition-colors"
+            >
+              다음으로 →
+            </button>
           </div>
         </div>
       );
@@ -556,7 +599,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 />
               </div>
 
-              {requireReason && (
+              {!isDirectMode && requireReason && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     왜 이렇게 바꿨나요?
