@@ -20,32 +20,45 @@ export const questionVotingDefinition: ActivityDefinition<
   usesAi: false,
   supportsRoomResult: true,
   createDefaultConfig: () => ({
+    sourceRoomId: null,
+    sourceRoomTitle: null,
+    sourceQuestions: [],
+    evaluationCriteria: [],
     maxSelections: 1,
     requireReason: true,
-    candidates: [],
   }),
   validateConfig: (input) => {
     const raw = isRecord(input) ? input : {};
-    const candidates = Array.isArray(raw.candidates)
-      ? raw.candidates.filter(isCandidate)
+    const sourceQuestions = Array.isArray(raw.sourceQuestions)
+      ? raw.sourceQuestions.filter(isCandidate)
+      : [];
+    const evaluationCriteria = Array.isArray(raw.evaluationCriteria)
+      ? raw.evaluationCriteria.filter((criterion): criterion is string => typeof criterion === "string" && criterion.trim().length > 0)
       : [];
 
-    if (candidates.length === 0) {
-      return { ok: false, errors: ["질문 후보가 1개 이상 필요합니다."] };
+    if (sourceQuestions.length === 0) {
+      return { ok: false, errors: ["질문 만들기 활동에서 가져온 질문이 1개 이상 필요합니다."] };
     }
 
     return {
       ok: true,
       value: {
-        maxSelections: clampNumber(raw.maxSelections, 1, Math.max(candidates.length, 1), 1),
+        sourceRoomId: typeof raw.sourceRoomId === "string" && raw.sourceRoomId.trim().length > 0
+          ? raw.sourceRoomId.trim()
+          : null,
+        sourceRoomTitle: typeof raw.sourceRoomTitle === "string" && raw.sourceRoomTitle.trim().length > 0
+          ? raw.sourceRoomTitle.trim()
+          : null,
+        sourceQuestions,
+        evaluationCriteria,
+        maxSelections: clampNumber(raw.maxSelections, 1, Math.max(sourceQuestions.length, 1), 1),
         requireReason: raw.requireReason !== false,
-        candidates,
       },
     };
   },
   emptySubmission: () => ({
     selectedQuestionIds: [],
-    reason: "",
+    reason: undefined,
   }),
   emptyResult: () => ({
     selectedQuestionIds: [],
@@ -72,4 +85,3 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
   if (!Number.isFinite(numberValue)) return fallback;
   return Math.min(Math.max(Math.trunc(numberValue), min), max);
 }
-

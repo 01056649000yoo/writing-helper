@@ -3,7 +3,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createRoom, generateQuestionsPreview } from "@/app/actions/room-actions";
+import {
+  createRoom,
+  generateQuestionsPreview,
+  getQuestionGeneratorSourceRooms,
+  type QuestionGeneratorSourceRoomSummary,
+} from "@/app/actions/room-actions";
 import { getQuestionCardSettings } from "@/app/actions/settings-actions";
 import { activityDefinitions, getActivityDefinition } from "@/features/activities/registry";
 import type { ActivityType, QuestionCardSet } from "@/features/activities/types";
@@ -48,8 +53,9 @@ type QuestionVotingDraft = {
   topic_description: string;
   duration_hours: string;
   max_selections: string;
-  candidates: string;
+  evaluation_criteria: string;
   require_reason: boolean;
+  source_room_id: string;
 };
 
 const DRAFT_SAVE_INTERVAL_MS = 5000;
@@ -959,19 +965,42 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
 function QuestionVotingSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [sourceRooms, setSourceRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
+  const [loadingSourceRooms, setLoadingSourceRooms] = useState(true);
   const initialDraft = useMemo<QuestionVotingDraft>(() => ({
     topic: "",
     topic_description: "",
     duration_hours: "4",
     max_selections: "1",
-    candidates: "",
+    evaluation_criteria: "생각이 더 이어지는 질문\n친구가 더 이야기하고 싶어지는 질문",
     require_reason: true,
+    source_room_id: "",
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<QuestionVotingDraft>(
     buildDraftStorageKey(classId, "question_voting"),
     initialDraft
   );
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    getQuestionGeneratorSourceRooms(classId).then((rooms) => {
+      if (!active) return;
+      setSourceRooms(rooms);
+      setDraft((prev) => ({
+        ...prev,
+        source_room_id: prev.source_room_id || rooms[0]?.roomId || "",
+      }));
+      setLoadingSourceRooms(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [classId, setDraft]);
+
+  const selectedSourceRoom = sourceRooms.find((room) => room.roomId === draft.source_room_id) ?? null;
 
   function handleSaveDraftNow() {
     persistActivityDraft(buildDraftStorageKey(classId, "question_voting"), draft);
@@ -980,6 +1009,10 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!draft.source_room_id) {
+      setError("평가에 사용할 질문 만들기 활동을 먼저 골라주세요.");
+      return;
+    }
     setSaving(true);
     setError("");
     const storageKey = buildDraftStorageKey(classId, "question_voting");
@@ -1029,17 +1062,88 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
         />
 
         <div>
-          <label className="block text-base font-medium text-gray-700 mb-2">질문 후보</label>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <label className="block text-base font-medium text-gray-700">질문 가져오기</label>
+            <span className="text-xs text-gray-400">질문 만들기 활동 결과를 그대로 평가에 사용해요</span>
+          </div>
+          {loadingSourceRooms ? (
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4 text-sm text-amber-700">
+              질문 만들기 활동 목록을 불러오고 있어요...
+            </div>
+          ) : sourceRooms.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/70 px-4 py-5 text-sm text-amber-700">
+              아직 같은 학급에서 제출이 끝난 질문 만들기 활동이 없어요. 먼저 질문 만들기 활동을 진행해 주세요.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {sourceRooms.map((room) => {
+                const selected = room.roomId === draft.source_room_id;
+                return (
+                  <button
+                    key={room.roomId}
+                    type="button"
+                    onClick={() => setDraft((prev) => ({ ...prev, source_room_id: room.roomId }))}
+                    className={`rounded-2xl border-2 p-4 text-left transition-colors ${
+                      selected
+                        ? "border-amber-400 bg-amber-50"
+                        : "border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/50"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-amber-500">질문 만들기 결과</p>
+                        <h3 className="mt-1 text-base font-bold text-gray-800">{room.title}</h3>
+                        <p className="mt-1 text-sm text-gray-500">주제: {room.topic}</p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                        질문 {room.questionCount}개
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs text-gray-400">
+                      {new Date(room.createdAt).toLocaleString("ko-KR")}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {selectedSourceRoom && (
+          <div className="rounded-3xl border border-amber-100 bg-amber-50/70 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-500">익명 질문 미리보기</p>
+                <h3 className="mt-1 text-base font-bold text-gray-800">{selectedSourceRoom.title}</h3>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                {selectedSourceRoom.questionCount}개
+              </span>
+            </div>
+            <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+              {selectedSourceRoom.questions.map((question, index) => (
+                <div key={question.id} className="rounded-2xl bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
+                  <span className="mr-2 text-xs font-bold text-amber-500">질문 {index + 1}</span>
+                  {question.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <input type="hidden" name="source_room_id" value={draft.source_room_id} />
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-2">좋은 질문의 기준</label>
           <textarea
-            name="candidates"
-            rows={7}
-            required
-            value={draft.candidates}
-            onChange={(event) => setDraft((prev) => ({ ...prev, candidates: event.target.value }))}
+            name="evaluation_criteria"
+            rows={4}
+            value={draft.evaluation_criteria}
+            onChange={(event) => setDraft((prev) => ({ ...prev, evaluation_criteria: event.target.value }))}
             className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
-            placeholder={"질문 후보를 한 줄에 하나씩 입력하세요.\n예)\n주인공은 왜 그런 선택을 했을까?\n이 장면이 우리에게 주는 의미는 무엇일까?"}
+            placeholder={"좋은 질문 기준을 한 줄에 하나씩 적어주세요.\n예)\n생각이 더 이어지는 질문\n친구가 더 말해보고 싶어지는 질문"}
           />
-          <p className="text-xs text-gray-400 mt-2">한 줄에 하나씩 입력하면 학생들이 선택지 형태로 보게 됩니다.</p>
+          <p className="text-xs text-gray-400 mt-2">학생은 이 기준을 보면서 익명 질문을 읽고 좋은 질문을 고르게 됩니다.</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -1092,10 +1196,10 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || loadingSourceRooms || sourceRooms.length === 0}
           className="w-full py-4 bg-amber-500 text-white rounded-xl font-bold text-lg hover:bg-amber-600 disabled:opacity-50 transition-colors"
         >
-          {saving ? "시작 중..." : "🚀 좋은 질문 고르기 활동 시작"}
+          {loadingSourceRooms ? "질문 목록 불러오는 중..." : saving ? "시작 중..." : "🚀 좋은 질문 고르기 활동 시작"}
         </button>
       </form>
     </>

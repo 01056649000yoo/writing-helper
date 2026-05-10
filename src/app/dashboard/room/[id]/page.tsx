@@ -4,7 +4,13 @@ import { headers } from "next/headers";
 import os from "os";
 import QRCodeSection from "./qr-section";
 import LiveStudentPanel from "./live-student-panel";
-import { getRoom, getRoomStudents, getQuestionGeneratorRoomResults, closeRoom } from "@/app/actions/room-actions";
+import {
+  getRoom,
+  getRoomStudents,
+  getQuestionGeneratorRoomResults,
+  getQuestionVotingRoomResults,
+  closeRoom,
+} from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
 
 export default async function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,6 +25,9 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
 
   const questionResults = room.activity_type === "question_generator"
     ? await getQuestionGeneratorRoomResults(id)
+    : [];
+  const questionVotingResults = room.activity_type === "question_voting"
+    ? await getQuestionVotingRoomResults(id)
     : [];
 
   const headersList = await headers();
@@ -95,6 +104,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
           isActive={room.is_active}
           activityType={room.activity_type}
           questionResults={questionResults}
+          questionVotingResults={questionVotingResults}
         />
       </div>
     </div>

@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { getQuestionGeneratorRoomResults, getRoomSessions } from "@/app/actions/room-actions";
+import {
+  getQuestionGeneratorRoomResults,
+  getQuestionVotingRoomResults,
+  getRoomSessions,
+} from "@/app/actions/room-actions";
 
 type Student = { id: string; student_number: number; student_name: string };
 type Session = {
@@ -27,6 +31,12 @@ type QuestionResult = {
     reason?: string;
   }>;
 };
+type QuestionVotingRanking = Array<{
+  questionId: string;
+  text: string;
+  votes: number;
+  reasons: string[];
+}>;
 
 function levelLabel(level: string) {
   if (!level || level === "null") return "";
@@ -273,23 +283,106 @@ function QuestionResultsModal({
   );
 }
 
+function QuestionVotingResultsModal({
+  ranking,
+  onClose,
+}: {
+  ranking: QuestionVotingRanking;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-violet-100 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-violet-500">좋은 질문 결과</p>
+            <h3 className="text-2xl font-bold text-gray-800 mt-1">익명 질문 투표 결과</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              학생들이 좋은 질문으로 고른 결과를 득표순으로 볼 수 있어요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
+          {ranking.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-violet-200 bg-violet-50/70 p-10 text-center">
+              <p className="text-base font-semibold text-violet-800">아직 제출된 평가가 없어요.</p>
+              <p className="mt-2 text-sm text-violet-600">학생들이 좋은 질문을 고르면 여기에 득표 순서대로 모입니다.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {ranking.map((question, index) => (
+                <div key={question.questionId} className="rounded-3xl border border-violet-100 bg-violet-50/70 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-violet-500">
+                        {index + 1}위 질문
+                      </p>
+                      <p className="mt-2 text-lg font-bold leading-relaxed text-violet-950">
+                        {question.text}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-violet-700">
+                      {question.votes}표
+                    </span>
+                  </div>
+
+                  {question.reasons.length > 0 && (
+                    <div className="mt-4 rounded-2xl bg-white p-4">
+                      <p className="text-xs font-semibold text-violet-600">학생들이 남긴 이유</p>
+                      <div className="mt-2 space-y-2">
+                        {question.reasons.map((reason, reasonIndex) => (
+                          <p key={`${question.questionId}-reason-${reasonIndex}`} className="text-sm leading-relaxed text-gray-700">
+                            • {reason}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LiveStudentPanel({
   roomId,
   students,
   isActive,
   activityType,
   questionResults: initialQuestionResults,
+  questionVotingResults: initialQuestionVotingResults,
 }: {
   roomId: string;
   students: Student[];
   isActive: boolean;
   activityType: ActivityType;
   questionResults: QuestionResult[];
+  questionVotingResults: QuestionVotingRanking;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
   const [isQuestionResultsOpen, setIsQuestionResultsOpen] = useState(false);
+  const [isQuestionVotingResultsOpen, setIsQuestionVotingResultsOpen] = useState(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>(initialQuestionResults);
+  const [questionVotingResults, setQuestionVotingResults] = useState<QuestionVotingRanking>(initialQuestionVotingResults);
 
   async function fetchSessions() {
     const data = await getRoomSessions(roomId);
@@ -298,6 +391,9 @@ export default function LiveStudentPanel({
     if (activityType === "question_generator") {
       const questionData = await getQuestionGeneratorRoomResults(roomId);
       setQuestionResults((questionData as QuestionResult[]) ?? []);
+    } else if (activityType === "question_voting") {
+      const votingData = await getQuestionVotingRoomResults(roomId);
+      setQuestionVotingResults(votingData ?? []);
     }
   }
 
@@ -329,6 +425,12 @@ export default function LiveStudentPanel({
           onClose={() => setIsQuestionResultsOpen(false)}
         />
       )}
+      {isQuestionVotingResultsOpen && (
+        <QuestionVotingResultsModal
+          ranking={questionVotingResults}
+          onClose={() => setIsQuestionVotingResultsOpen(false)}
+        />
+      )}
 
       <div className="bg-white rounded-3xl shadow-xl p-8 space-y-6">
         {/* 헤더 */}
@@ -337,6 +439,9 @@ export default function LiveStudentPanel({
             <h2 className="text-xl font-bold text-gray-800">학생 활동 현황</h2>
             {activityType === "question_generator" && (
               <p className="mt-1 text-sm text-gray-500">학생들이 만든 질문을 모달에서 한 번에 모아볼 수 있어요.</p>
+            )}
+            {activityType === "question_voting" && (
+              <p className="mt-1 text-sm text-gray-500">학생들이 고른 좋은 질문 결과를 득표순으로 바로 확인할 수 있어요.</p>
             )}
           </div>
           <div className="flex items-center gap-3">
@@ -348,6 +453,16 @@ export default function LiveStudentPanel({
                 disabled={questionResults.length === 0}
               >
                 질문 결과 모아보기
+              </button>
+            )}
+            {activityType === "question_voting" && (
+              <button
+                type="button"
+                onClick={() => setIsQuestionVotingResultsOpen(true)}
+                className="rounded-2xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-600 disabled:cursor-not-allowed disabled:bg-violet-200"
+                disabled={questionVotingResults.length === 0}
+              >
+                좋은 질문 결과 보기
               </button>
             )}
             <div className="flex gap-3 text-sm">
@@ -396,10 +511,18 @@ export default function LiveStudentPanel({
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-semibold text-green-600">
-                {activityType === "question_generator" ? "✅ 질문 제출 완료" : "✅ 개요 완성"}
+                {activityType === "question_generator"
+                  ? "✅ 질문 제출 완료"
+                  : activityType === "question_voting"
+                    ? "✅ 좋은 질문 평가 완료"
+                    : "✅ 개요 완성"}
               </p>
               <p className="text-xs text-gray-400">
-                {activityType === "question_generator" ? "보기 → 학생 질문 상세" : "QR 버튼 → 학생 개인 결과 QR"}
+                {activityType === "question_generator"
+                  ? "보기 → 학생 질문 상세"
+                  : activityType === "question_voting"
+                    ? "보기 → 학생 선택 결과"
+                    : "QR 버튼 → 학생 개인 결과 QR"}
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -409,14 +532,16 @@ export default function LiveStudentPanel({
                   <span className="text-sm text-green-300 font-mono w-5 shrink-0">{s.student_number}</span>
                   <span className="text-sm font-medium text-green-800 truncate flex-1">{s.student_name}</span>
                   {/* QR 버튼 */}
-                  <button
-                    type="button"
-                    onClick={() => setQrTarget(s)}
-                    className="text-xs bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded-lg font-medium transition-colors shrink-0"
-                    title="개인 결과 QR 보기"
-                  >
-                    QR
-                  </button>
+                  {activityType === "outline_builder" && (
+                    <button
+                      type="button"
+                      onClick={() => setQrTarget(s)}
+                      className="text-xs bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded-lg font-medium transition-colors shrink-0"
+                      title="개인 결과 QR 보기"
+                    >
+                      QR
+                    </button>
+                  )}
                   {/* 결과 보기 링크 */}
                   <Link
                     href={`/dashboard/room/${roomId}/result/${s.id}`}

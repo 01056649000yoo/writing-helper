@@ -8,11 +8,13 @@ import {
   requestOutline,
   getStudentRoomQuestions,
   submitQuestionGenerator,
+  submitQuestionVoting,
 } from "@/app/actions/student-actions";
 import type {
   QuestionCardSet,
   QuestionGeneratorConfig,
   QuestionGeneratorSubmission,
+  QuestionVotingConfig,
 } from "@/features/activities/types";
 import type { StudentLevel, QuestionSets, Question, Answer } from "@/types";
 
@@ -40,7 +42,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
   const [roomId, setRoomId] = useState("");
   const [activityType, setActivityType] = useState<ActivityType | null>(null);
-  const [activityConfig, setActivityConfig] = useState<QuestionGeneratorConfig | null>(null);
+  const [questionGeneratorConfig, setQuestionGeneratorConfig] = useState<QuestionGeneratorConfig | null>(null);
+  const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
   const [step, setStep] = useState<Step | null>(null);
   const [levelPending, setLevelPending] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -57,22 +60,26 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [reason, setReason] = useState("");
   const [questionSelections, setQuestionSelections] = useState<QuestionSelection[]>([]);
   const [questionBuildMode, setQuestionBuildMode] = useState<QuestionBuildMode | null>(null);
+  const [selectedVotingQuestionIds, setSelectedVotingQuestionIds] = useState<string[]>([]);
+  const [votingReason, setVotingReason] = useState("");
 
   const enabledCardSets = useMemo(() => {
-    const allowedIds = new Set(activityConfig?.enabledCardSetIds ?? []);
+    const allowedIds = new Set(questionGeneratorConfig?.enabledCardSetIds ?? []);
     const source = allowedIds.size > 0
-      ? (activityConfig?.cardSets ?? []).filter((cardSet) => allowedIds.has(cardSet.id))
-      : (activityConfig?.cardSets ?? []);
+      ? (questionGeneratorConfig?.cardSets ?? []).filter((cardSet) => allowedIds.has(cardSet.id))
+      : (questionGeneratorConfig?.cardSets ?? []);
     return source;
-  }, [activityConfig]);
+  }, [questionGeneratorConfig]);
 
   const selectedCardSet = useMemo(
     () => enabledCardSets.find((cardSet) => cardSet.id === selectedCardSetId) ?? null,
     [enabledCardSets, selectedCardSetId]
   );
 
-  const maxSelections = activityConfig?.maxSelections ?? 1;
-  const requireReason = activityConfig?.requireReason ?? true;
+  const maxSelections = questionGeneratorConfig?.maxSelections ?? 1;
+  const requireReason = questionGeneratorConfig?.requireReason ?? true;
+  const votingMaxSelections = questionVotingConfig?.maxSelections ?? 1;
+  const votingRequireReason = questionVotingConfig?.requireReason ?? true;
 
   useEffect(() => {
     params.then((p) => setRoomId(p.id));
@@ -109,7 +116,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       }
 
       if (type === "question_generator") {
-        setActivityConfig(normalizeQuestionGeneratorConfig(data.activity_config));
+        setQuestionGeneratorConfig(normalizeQuestionGeneratorConfig(data.activity_config));
         const existingSubmission = data.existing_submission as QuestionGeneratorSubmission | null;
         if (existingSubmission?.selections?.length) {
           setQuestionSelections(existingSubmission.selections);
@@ -119,6 +126,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           setStep("question_intro");
         }
       } else if (type === "question_voting") {
+        setQuestionVotingConfig(normalizeQuestionVotingConfig(data.activity_config));
         setStep("question_voting");
       } else {
         setStep("level");
@@ -302,7 +310,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               오늘 주제: <strong>{topic}</strong>
             </p>
             <p className="text-sm text-gray-500 leading-relaxed mt-4">
-              {activityConfig?.guidance ?? "직접 질문을 만들거나 질문 카드를 골라 오늘 주제에 어울리게 질문을 바꿔봐요."}
+              {questionGeneratorConfig?.guidance ?? "직접 질문을 만들거나 질문 카드를 골라 오늘 주제에 어울리게 질문을 바꿔봐요."}
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-left text-sm">
               <div className="rounded-2xl bg-gray-50 p-4">
@@ -661,16 +669,171 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   }
 
   if (activityType === "question_voting") {
+    const votingQuestions = questionVotingConfig?.sourceQuestions ?? [];
+    const selectedCount = selectedVotingQuestionIds.length;
+
+    async function handleQuestionVotingSubmit() {
+      setError("");
+
+      if (selectedVotingQuestionIds.length === 0) {
+        setError("좋은 질문을 1개 이상 골라주세요.");
+        return;
+      }
+
+      if (votingRequireReason && !votingReason.trim()) {
+        setError("왜 좋은 질문인지 한 줄 적어주세요.");
+        return;
+      }
+
+      setStep("question_submitting");
+      const result = await submitQuestionVoting(sessionId, roomId, {
+        selectedQuestionIds: selectedVotingQuestionIds,
+        reason: votingReason.trim() || undefined,
+      });
+
+      if (result.error) {
+        setError(result.error);
+        setStep("question_voting");
+        return;
+      }
+
+      router.push(`/room/${roomId}/result?session=${sessionId}`);
+    }
+
+    function toggleVotingQuestion(questionId: string) {
+      setSelectedVotingQuestionIds((prev) => {
+        if (prev.includes(questionId)) {
+          return prev.filter((currentId) => currentId !== questionId);
+        }
+
+        if (prev.length >= votingMaxSelections) {
+          return prev;
+        }
+
+        return [...prev, questionId];
+      });
+    }
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center">
-          <div className="text-6xl mb-4">🗳️</div>
-          <h1 className="text-2xl font-bold text-gray-800">좋은 질문 고르기</h1>
-          <p className="text-gray-500 mt-3 leading-relaxed">
-            이 활동의 학생 화면은 지금 다듬는 중이에요.
-            <br />
-            선생님이 질문 후보를 준비하면 여기에서 좋은 질문을 고르게 될 거예요.
-          </p>
+      <div className="min-h-screen bg-gradient-to-br from-violet-50 to-indigo-100 p-4">
+        <div className="max-w-3xl mx-auto pt-8 pb-16 space-y-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
+            <div className="text-5xl mb-3">🗳️</div>
+            <h1 className="text-2xl font-bold text-gray-800">좋은 질문 고르기</h1>
+            <p className="text-gray-500 mt-2 text-sm leading-relaxed">
+              친구들이 만든 질문을 익명으로 읽고, 오늘 기준에 맞는 좋은 질문을 골라봐요.
+            </p>
+            <div className="mt-4 rounded-2xl bg-violet-50 px-4 py-3 text-sm text-violet-700">
+              오늘 주제: <strong>{topic}</strong>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-500">좋은 질문의 기준</p>
+                <h2 className="mt-1 text-lg font-bold text-gray-800">이 기준을 생각하며 질문을 읽어봐요</h2>
+              </div>
+              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
+                {selectedCount} / {votingMaxSelections} 선택
+              </span>
+            </div>
+
+            {(questionVotingConfig?.evaluationCriteria?.length ?? 0) > 0 ? (
+              <div className="grid gap-2">
+                {questionVotingConfig?.evaluationCriteria.map((criterion, index) => (
+                  <div key={`${criterion}-${index}`} className="rounded-2xl bg-violet-50 px-4 py-3 text-sm text-violet-900">
+                    {index + 1}. {criterion}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-violet-50 px-4 py-4 text-sm text-violet-700">
+                여러 가지 생각이 이어지는 질문인지, 친구가 더 말해보고 싶어지는 질문인지 떠올리며 골라봐요.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-500">익명 질문 목록</p>
+                <h2 className="mt-1 text-lg font-bold text-gray-800">친구들이 만든 질문</h2>
+              </div>
+              <p className="text-xs text-gray-400">작성자는 보이지 않아요</p>
+            </div>
+
+            {votingQuestions.length === 0 ? (
+              <div className="rounded-2xl bg-red-50 px-4 py-4 text-sm text-red-600">
+                평가할 질문을 불러오지 못했어요. 선생님께 다시 열어달라고 알려주세요.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {votingQuestions.map((question, index) => {
+                  const selected = selectedVotingQuestionIds.includes(question.id);
+                  const blocked = !selected && selectedCount >= votingMaxSelections;
+
+                  return (
+                    <button
+                      key={question.id}
+                      type="button"
+                      onClick={() => toggleVotingQuestion(question.id)}
+                      disabled={blocked}
+                      className={`rounded-2xl border-2 p-4 text-left transition-colors ${
+                        selected
+                          ? "border-violet-400 bg-violet-50"
+                          : blocked
+                            ? "border-gray-100 bg-gray-50 text-gray-400"
+                            : "border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-0.5 rounded-full px-2 py-1 text-xs font-bold ${
+                          selected ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          질문 {index + 1}
+                        </span>
+                        <div className="flex-1">
+                          <p className="text-base font-medium leading-relaxed text-gray-900">
+                            {question.text}
+                          </p>
+                          <p className="mt-2 text-xs text-gray-400">
+                            {selected ? "선택했어요" : blocked ? `좋은 질문은 ${votingMaxSelections}개까지 고를 수 있어요` : "좋다고 생각하면 눌러서 선택해요"}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {votingRequireReason && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  왜 이 질문이 좋다고 생각했나요?
+                </label>
+                <textarea
+                  value={votingReason}
+                  onChange={(event) => setVotingReason(event.target.value)}
+                  rows={3}
+                  placeholder="좋은 질문이라고 생각한 이유를 짧게 적어봐요."
+                  className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-violet-400 resize-none"
+                />
+              </div>
+            )}
+
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
+            <button
+              type="button"
+              onClick={handleQuestionVotingSubmit}
+              disabled={votingQuestions.length === 0}
+              className="w-full py-4 bg-violet-500 text-white rounded-2xl font-bold text-lg hover:bg-violet-600 disabled:opacity-50 transition-colors"
+            >
+              좋은 질문 제출하기
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -859,6 +1022,46 @@ function normalizeQuestionGeneratorConfig(value: unknown): QuestionGeneratorConf
     guidance: typeof raw.guidance === "string" && raw.guidance.trim()
       ? raw.guidance.trim()
       : "직접 질문을 만들거나 질문 카드를 고르고, 오늘 주제에 어울리게 질문을 바꿔봐요.",
+    requireReason: raw.requireReason !== false,
+  };
+}
+
+function normalizeQuestionVotingConfig(value: unknown): QuestionVotingConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      sourceRoomId: null,
+      sourceRoomTitle: null,
+      sourceQuestions: [],
+      evaluationCriteria: [],
+      maxSelections: 1,
+      requireReason: true,
+    };
+  }
+
+  const raw = value as Record<string, unknown>;
+  const sourceQuestions = Array.isArray(raw.sourceQuestions)
+    ? raw.sourceQuestions
+        .filter((question): question is Record<string, unknown> => typeof question === "object" && question !== null && !Array.isArray(question))
+        .map((question, index) => ({
+          id: typeof question.id === "string" && question.id.trim() ? question.id.trim() : `question-${index + 1}`,
+          text: typeof question.text === "string" ? question.text.trim() : "",
+        }))
+        .filter((question) => question.text.length > 0)
+    : [];
+
+  const evaluationCriteria = Array.isArray(raw.evaluationCriteria)
+    ? raw.evaluationCriteria
+        .filter((criterion): criterion is string => typeof criterion === "string")
+        .map((criterion) => criterion.trim())
+        .filter(Boolean)
+    : [];
+
+  return {
+    sourceRoomId: typeof raw.sourceRoomId === "string" && raw.sourceRoomId.trim() ? raw.sourceRoomId.trim() : null,
+    sourceRoomTitle: typeof raw.sourceRoomTitle === "string" && raw.sourceRoomTitle.trim() ? raw.sourceRoomTitle.trim() : null,
+    sourceQuestions,
+    evaluationCriteria,
+    maxSelections: normalizeSelectionCount(raw.maxSelections),
     requireReason: raw.requireReason !== false,
   };
 }

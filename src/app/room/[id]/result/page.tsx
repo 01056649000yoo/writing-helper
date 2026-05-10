@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getStudentResult } from "@/app/actions/student-actions";
-import type { QuestionGeneratorSubmission } from "@/features/activities/types";
+import type {
+  QuestionGeneratorSubmission,
+  QuestionVotingConfig,
+  QuestionVotingSubmission,
+} from "@/features/activities/types";
 
 type ActivityType = "outline_builder" | "question_generator" | "question_voting";
 
@@ -40,6 +44,10 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const [activityType, setActivityType] = useState<ActivityType>("outline_builder");
   const [questionSubmission, setQuestionSubmission] = useState<QuestionGeneratorSubmission | null>(null);
   const [anonymousPeerQuestions, setAnonymousPeerQuestions] = useState<Array<{ id: string; order: number; questionOrder: number; text: string }>>([]);
+  const [questionVotingSubmission, setQuestionVotingSubmission] = useState<QuestionVotingSubmission | null>(null);
+  const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
+  const [questionVotingRanking, setQuestionVotingRanking] = useState<Array<{ questionId: string; text: string; votes: number; reasons: string[] }>>([]);
+  const [questionVotingClosed, setQuestionVotingClosed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -56,6 +64,10 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
       setActivityType((data.activityType as ActivityType) ?? "outline_builder");
       setQuestionSubmission(data.questionGeneratorSubmission ?? null);
       setAnonymousPeerQuestions(data.anonymousPeerQuestions ?? []);
+      setQuestionVotingSubmission(data.questionVotingSubmission ?? null);
+      setQuestionVotingConfig(data.questionVotingConfig ?? null);
+      setQuestionVotingRanking(data.questionVotingRanking ?? []);
+      setQuestionVotingClosed(data.questionVotingClosed ?? false);
       setLoaded(true);
     });
   }, [sessionId, roomId]);
@@ -67,6 +79,15 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
 
     return viewMode === "draft" && draft ? draft : outline;
   }, [activityType, draft, outline, questionSubmission, viewMode]);
+
+  const selectedVotingQuestions = useMemo(() => {
+    if (!questionVotingSubmission || !questionVotingConfig) return [];
+    const questionMap = new Map(questionVotingConfig.sourceQuestions.map((question) => [question.id, question.text] as const));
+    return questionVotingSubmission.selectedQuestionIds.map((questionId) => ({
+      id: questionId,
+      text: questionMap.get(questionId) ?? "질문을 찾을 수 없어요.",
+    }));
+  }, [questionVotingConfig, questionVotingSubmission]);
 
   function copyCurrentText() {
     if (!currentText) return;
@@ -196,6 +217,78 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               </div>
             )}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activityType === "question_voting" && questionVotingSubmission) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-50 to-indigo-100 p-4">
+        <div className="max-w-2xl mx-auto pt-8 pb-16 space-y-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
+            <div className="text-5xl mb-2">🗳️</div>
+            <h1 className="text-2xl font-bold text-gray-800">좋은 질문 평가 완료!</h1>
+            <p className="text-gray-500 mt-1 text-sm">
+              <strong className="text-violet-600">{studentName}</strong>의{" "}
+              <strong>{topic}</strong> 활동 결과
+            </p>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-500">내가 고른 질문</p>
+                <h2 className="mt-1 text-lg font-bold text-gray-800">좋은 질문으로 선택한 질문</h2>
+              </div>
+              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
+                {selectedVotingQuestions.length}개 선택
+              </span>
+            </div>
+
+            {selectedVotingQuestions.map((question, index) => (
+              <div key={question.id} className="rounded-2xl bg-violet-50 p-4">
+                <p className="text-xs font-semibold text-violet-600">선택한 질문 {index + 1}</p>
+                <p className="mt-2 text-base font-medium leading-relaxed text-violet-950">{question.text}</p>
+              </div>
+            ))}
+
+            {questionVotingSubmission.reason && (
+              <div className="rounded-2xl bg-emerald-50 p-4">
+                <p className="text-xs font-semibold text-emerald-700 mb-2">내가 이렇게 고른 이유</p>
+                <p className="text-sm leading-relaxed text-emerald-950">{questionVotingSubmission.reason}</p>
+              </div>
+            )}
+          </div>
+
+          {questionVotingClosed && questionVotingRanking.length > 0 && (
+            <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-violet-500">최종 결과</p>
+                  <h2 className="mt-1 text-lg font-bold text-gray-800">우리 반이 고른 좋은 질문</h2>
+                </div>
+                <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
+                  활동 종료
+                </span>
+              </div>
+              <div className="space-y-3">
+                {questionVotingRanking.map((question, index) => (
+                  <div key={question.questionId} className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-violet-500">{index + 1}위 질문</p>
+                        <p className="mt-2 text-base font-medium leading-relaxed text-violet-950">{question.text}</p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700">
+                        {question.votes}표
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

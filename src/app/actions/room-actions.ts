@@ -9,11 +9,13 @@ import { getApiKey } from "@/lib/vault";
 import { generateQuestionSets } from "@/lib/gpt";
 import { getTeacherQuestionCardSets } from "@/lib/question-card-sets";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
+import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
 import type {
   ActivityType,
   OutlineBuilderConfig,
   QuestionGeneratorConfig,
   QuestionVotingConfig,
+  QuestionVotingRoomResult,
 } from "@/features/activities/types";
 import type { SubjectType, GradeLevel, OutlineDepth, RoomStudent, QuestionSets } from "@/types";
 
@@ -139,24 +141,28 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       requireReason: formData.get("require_reason") !== null,
     };
   } else {
-    const candidateLines = String(formData.get("candidates") ?? "")
+    const sourceRoomId = String(formData.get("source_room_id") ?? "").trim();
+    const evaluationCriteria = String(formData.get("evaluation_criteria") ?? "")
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean);
 
-    if (candidateLines.length === 0) {
-      return { error: "질문 후보를 1개 이상 입력해주세요." };
+    if (!sourceRoomId) {
+      return { error: "질문을 가져올 질문 만들기 활동을 선택해주세요." };
     }
 
-    const candidates = candidateLines.map((text, index) => ({
-      id: `candidate-${index + 1}`,
-      text,
-    }));
+    const sourceRoom = await getQuestionGeneratorSourceRoomSummary(admin, user.id, sourceRoomId);
+    if (!sourceRoom) {
+      return { error: "질문 만들기 결과를 불러오지 못했습니다. 다시 선택해주세요." };
+    }
 
     activityConfig = {
-      maxSelections: clampNumber(formData.get("max_selections"), 1, candidates.length, 1),
+      sourceRoomId: sourceRoom.roomId,
+      sourceRoomTitle: sourceRoom.title,
+      sourceQuestions: sourceRoom.questions,
+      evaluationCriteria,
+      maxSelections: clampNumber(formData.get("max_selections"), 1, sourceRoom.questions.length, 1),
       requireReason: formData.get("require_reason") !== "off",
-      candidates,
     };
   }
 
@@ -387,6 +393,18 @@ export type QuestionGeneratorRoomResultSummary = {
   }>;
 };
 
+export type QuestionGeneratorSourceRoomSummary = {
+  roomId: string;
+  title: string;
+  topic: string;
+  createdAt: string;
+  questionCount: number;
+  questions: Array<{
+    id: string;
+    text: string;
+  }>;
+};
+
 export async function getQuestionGeneratorRoomResults(roomId: string): Promise<QuestionGeneratorRoomResultSummary[]> {
   const user = await getCurrentUser();
   if (!user) return [];
@@ -431,6 +449,143 @@ export async function getQuestionGeneratorRoomResults(roomId: string): Promise<Q
     });
 
   return results;
+}
+
+export async function getQuestionGeneratorSourceRooms(classId?: string): Promise<QuestionGeneratorSourceRoomSummary[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  let query = admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("id, title, topic, created_at")
+    .eq("teacher_id", user.id)
+    .eq("activity_type", "question_generator")
+    .order("created_at", { ascending: false });
+
+  if (classId) {
+    query = query.eq("class_id", classId);
+  }
+
+  const { data: rooms } = await query;
+  if (!rooms || rooms.length === 0) return [];
+
+  const roomIds = rooms.map((room) => room.id);
+  const { data: sessions } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("room_id, submission")
+    .in("room_id", roomIds)
+    .eq("status", "done");
+
+  const questionsByRoom = new Map<string, Array<{ id: string; text: string }>>();
+
+  for (const session of sessions ?? []) {
+    const submission = normalizeQuestionGeneratorSubmission(session.submission);
+    if (!submission) continue;
+
+    const current = questionsByRoom.get(session.room_id) ?? [];
+    submission.selections.forEach((selection) => {
+      current.push({
+        id: `${session.room_id}-${selection.id}`,
+        text: selection.remixedQuestion,
+      });
+    });
+    questionsByRoom.set(session.room_id, current);
+  }
+
+  return rooms.flatMap((room) => {
+    const questions = questionsByRoom.get(room.id) ?? [];
+    if (questions.length === 0) return [];
+
+    return [{
+      roomId: room.id,
+      title: room.title ?? room.topic ?? "질문 만들기 활동",
+      topic: room.topic ?? room.title ?? "",
+      createdAt: room.created_at,
+      questionCount: questions.length,
+      questions,
+    }];
+  });
+}
+
+export async function getQuestionVotingRoomResults(roomId: string): Promise<QuestionVotingRoomResult["ranking"]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id, activity_type, activity_config")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== user.id || room.activity_type !== "question_voting") {
+    return [];
+  }
+
+  const config = normalizeQuestionVotingConfig(room.activity_config);
+  if (!config?.sourceQuestions?.length) return [];
+
+  const { data: sessions } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("submission")
+    .eq("room_id", roomId)
+    .eq("status", "done");
+
+  const submissions = (sessions ?? [])
+    .map((session) => normalizeQuestionVotingSubmission(session.submission))
+    .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission));
+
+  return buildQuestionVotingRanking(config, submissions);
+}
+
+async function getQuestionGeneratorSourceRoomSummary(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  teacherId: string,
+  roomId: string,
+): Promise<QuestionGeneratorSourceRoomSummary | null> {
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("id, title, topic, created_at, teacher_id, activity_type")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== teacherId || room.activity_type !== "question_generator") {
+    return null;
+  }
+
+  const { data: sessions } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("room_id, submission")
+    .eq("room_id", roomId)
+    .eq("status", "done");
+
+  const questions = (sessions ?? []).flatMap((session) => {
+    const submission = normalizeQuestionGeneratorSubmission(session.submission);
+    if (!submission) return [];
+
+    return submission.selections.map((selection) => ({
+      id: `${session.room_id}-${selection.id}`,
+      text: selection.remixedQuestion,
+    }));
+  });
+
+  return questions.length > 0
+    ? {
+        roomId: room.id,
+        title: room.title ?? room.topic ?? "질문 만들기 활동",
+        topic: room.topic ?? room.title ?? "",
+        createdAt: room.created_at,
+        questionCount: questions.length,
+        questions,
+      }
+    : null;
 }
 
 async function getShortCodeForRoom(roomId: string, teacherId: string) {

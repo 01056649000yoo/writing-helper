@@ -5,8 +5,16 @@ import { getApiKey } from "@/lib/vault";
 import { generateDraftFromAnswers, generateOutline } from "@/lib/gpt";
 import { parseOutlineResult, serializeOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
+import {
+  buildQuestionVotingRanking,
+  normalizeQuestionVotingConfig,
+  normalizeQuestionVotingSubmission,
+} from "@/lib/question-voting";
 import type { StudentLevel, Answer } from "@/types";
-import type { QuestionGeneratorSubmission } from "@/features/activities/types";
+import type {
+  QuestionGeneratorSubmission,
+  QuestionVotingSubmission,
+} from "@/features/activities/types";
 
 // 학생 인증 (번호+이름 대조)
 export async function verifyStudent(
@@ -105,7 +113,7 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     admin.schema("writing_helper").from("student_sessions")
       .select("student_name, submission").eq("id", sessionId).maybeSingle(),
     admin.schema("writing_helper").from("rooms")
-      .select("topic, activity_type").eq("id", roomId).maybeSingle(),
+      .select("topic, activity_type, activity_config, is_active").eq("id", roomId).maybeSingle(),
   ]);
 
   const activityType = roomRes.data?.activity_type ?? "outline_builder";
@@ -123,6 +131,28 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     };
   }
 
+  if (activityType === "question_voting") {
+    const votingConfig = normalizeQuestionVotingConfig(roomRes.data?.activity_config);
+    const questionVotingSubmission = normalizeQuestionVotingSubmission(sessionRes.data?.submission);
+    const ranking = !roomRes.data?.is_active && votingConfig
+      ? await getQuestionVotingRankingForRoom(roomId, votingConfig)
+      : [];
+
+    return {
+      activityType,
+      outline: "",
+      draft: "",
+      studentName: sessionRes.data?.student_name ?? "",
+      topic: roomRes.data?.topic ?? "",
+      questionGeneratorSubmission: null,
+      anonymousPeerQuestions: [],
+      questionVotingSubmission,
+      questionVotingConfig: votingConfig,
+      questionVotingRanking: ranking,
+      questionVotingClosed: roomRes.data?.is_active === false,
+    };
+  }
+
   return {
     activityType,
     ...parseOutlineResult(queueRes.data?.result ?? null),
@@ -130,6 +160,10 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     topic: roomRes.data?.topic ?? "",
     questionGeneratorSubmission: null,
     anonymousPeerQuestions: [],
+    questionVotingSubmission: null,
+    questionVotingConfig: null,
+    questionVotingRanking: [],
+    questionVotingClosed: false,
   };
 }
 
@@ -448,6 +482,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
   return {
     ...data,
     existing_submission: normalizeQuestionGeneratorSubmission(submissionData?.submission),
+    existing_voting_submission: normalizeQuestionVotingSubmission(submissionData?.submission),
     session_status: submissionData?.status ?? "in_progress",
   };
 }
@@ -522,6 +557,77 @@ export async function submitQuestionGenerator(
   return {};
 }
 
+export async function submitQuestionVoting(
+  sessionId: string,
+  roomId: string,
+  submission: QuestionVotingSubmission,
+): Promise<{ error?: string }> {
+  if (!sessionId || !roomId) return { error: "잘못된 요청입니다." };
+
+  const admin = createSupabaseAdminClient();
+  const [sessionRes, roomRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_config")
+      .eq("id", roomId)
+      .maybeSingle(),
+  ]);
+
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 평가 활동입니다." };
+
+  const config = normalizeQuestionVotingConfig(roomRes.data.activity_config);
+  if (!config) return { error: "평가 활동 설정을 불러오지 못했습니다." };
+
+  const allowedIds = new Set(config.sourceQuestions.map((question) => question.id));
+  const selectedQuestionIds = Array.from(new Set(
+    (submission.selectedQuestionIds ?? [])
+      .map((questionId) => questionId.trim())
+      .filter((questionId) => allowedIds.has(questionId)),
+  ));
+
+  if (selectedQuestionIds.length === 0) {
+    return { error: "좋은 질문을 1개 이상 골라주세요." };
+  }
+
+  if (selectedQuestionIds.length > config.maxSelections) {
+    return { error: `좋은 질문은 ${config.maxSelections}개까지 고를 수 있어요.` };
+  }
+
+  const reason = submission.reason?.trim();
+  if (config.requireReason && !reason) {
+    return { error: "왜 좋은 질문인지 한 줄 적어주세요." };
+  }
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .update({
+      submission: {
+        selectedQuestionIds,
+        reason: reason || null,
+      },
+      result: {
+        selectedQuestionIds,
+      },
+      status: "done",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .eq("room_id", roomId);
+
+  if (error) return { error: "질문 평가 저장에 실패했습니다." };
+  return {};
+}
+
 async function getAnonymousQuestionGeneratorResults(sessionId: string, roomId: string) {
   const admin = createSupabaseAdminClient();
   const { data } = await admin
@@ -544,4 +650,20 @@ async function getAnonymousQuestionGeneratorResults(sessionId: string, roomId: s
       text: selection.remixedQuestion,
     }));
   });
+}
+
+async function getQuestionVotingRankingForRoom(roomId: string, config: NonNullable<ReturnType<typeof normalizeQuestionVotingConfig>>) {
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("submission")
+    .eq("room_id", roomId)
+    .eq("status", "done");
+
+  const submissions = (data ?? [])
+    .map((session) => normalizeQuestionVotingSubmission(session.submission))
+    .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission));
+
+  return buildQuestionVotingRanking(config, submissions);
 }

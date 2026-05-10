@@ -5,6 +5,11 @@ import { getCurrentUser } from "@/app/actions/auth-actions";
 import { StudentResultQr } from "./student-result-qr";
 import { parseOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
+import {
+  buildQuestionVotingRanking,
+  normalizeQuestionVotingConfig,
+  normalizeQuestionVotingSubmission,
+} from "@/lib/question-voting";
 
 export default async function TeacherResultPage({
   params,
@@ -38,7 +43,7 @@ export default async function TeacherResultPage({
   const { data: room } = await admin
     .schema("writing_helper")
     .from("rooms")
-    .select("title, topic, teacher_id, activity_type")
+    .select("title, topic, teacher_id, activity_type, activity_config")
     .eq("id", id)
     .maybeSingle();
 
@@ -47,7 +52,27 @@ export default async function TeacherResultPage({
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/share/${sessionId}`;
   const resultPayload = parseOutlineResult(queue?.result);
   const questionSubmission = normalizeQuestionGeneratorSubmission(session.submission);
+  const questionVotingSubmission = normalizeQuestionVotingSubmission(session.submission);
+  const questionVotingConfig = normalizeQuestionVotingConfig(room?.activity_config);
   const isQuestionGenerator = room?.activity_type === "question_generator";
+  const isQuestionVoting = room?.activity_type === "question_voting";
+
+  let questionVotingRanking: ReturnType<typeof buildQuestionVotingRanking> = [];
+  if (isQuestionVoting && questionVotingConfig) {
+    const { data: allVotingSessions } = await admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("submission")
+      .eq("room_id", id)
+      .eq("status", "done");
+
+    questionVotingRanking = buildQuestionVotingRanking(
+      questionVotingConfig,
+      (allVotingSessions ?? [])
+        .map((currentSession) => normalizeQuestionVotingSubmission(currentSession.submission))
+        .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission)),
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -67,7 +92,7 @@ export default async function TeacherResultPage({
               </div>
             </div>
             {/* 학생 개인 QR */}
-            {!isQuestionGenerator && resultPayload.outline && (
+            {!isQuestionGenerator && !isQuestionVoting && resultPayload.outline && (
               <StudentResultQr
                 shareUrl={shareUrl}
                 studentName={session.student_name}
@@ -76,7 +101,7 @@ export default async function TeacherResultPage({
             )}
           </div>
 
-          {!isQuestionGenerator && resultPayload.outline && (
+          {!isQuestionGenerator && !isQuestionVoting && resultPayload.outline && (
             <div className="grid gap-4">
               <div className="bg-indigo-50 rounded-2xl p-6">
                 <h2 className="font-bold text-indigo-800 mb-3">📝 완성된 글쓰기 개요</h2>
@@ -138,7 +163,65 @@ export default async function TeacherResultPage({
             </div>
           )}
 
-          {!isQuestionGenerator && (
+          {isQuestionVoting && questionVotingSubmission && questionVotingConfig && (
+            <div className="grid gap-4">
+              <div className="bg-violet-50 rounded-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-violet-500">학생이 고른 질문</p>
+                    <h2 className="text-lg font-bold text-gray-800 mt-1">좋은 질문으로 선택한 질문</h2>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700">
+                    {questionVotingSubmission.selectedQuestionIds.length}개 선택
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {questionVotingSubmission.selectedQuestionIds.map((questionId, index) => {
+                    const questionText = questionVotingConfig.sourceQuestions.find((question) => question.id === questionId)?.text
+                      ?? "질문을 찾을 수 없습니다.";
+
+                    return (
+                      <div key={questionId} className="rounded-2xl bg-white p-4">
+                        <p className="text-xs font-semibold text-violet-500">선택한 질문 {index + 1}</p>
+                        <p className="mt-2 text-base font-medium leading-relaxed text-violet-950">{questionText}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {questionVotingSubmission.reason && (
+                  <div className="rounded-2xl bg-emerald-50 p-4">
+                    <p className="text-xs font-semibold text-emerald-700 mb-2">선택 이유</p>
+                    <p className="text-sm text-emerald-950 leading-relaxed">{questionVotingSubmission.reason}</p>
+                  </div>
+                )}
+              </div>
+
+              {questionVotingRanking.length > 0 && (
+                <div className="bg-white rounded-2xl border border-violet-100 p-6">
+                  <h2 className="font-bold text-violet-800 mb-4">📊 현재 좋은 질문 득표 결과</h2>
+                  <div className="space-y-3">
+                    {questionVotingRanking.map((question, index) => (
+                      <div key={question.questionId} className="rounded-2xl bg-violet-50 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-semibold text-violet-500">{index + 1}위 질문</p>
+                            <p className="mt-2 text-sm font-medium leading-relaxed text-violet-950">{question.text}</p>
+                          </div>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700">
+                            {question.votes}표
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isQuestionGenerator && !isQuestionVoting && (
           <div>
             <h2 className="font-bold text-gray-700 mb-3">💬 학생 답변 내용</h2>
             <div className="space-y-3">

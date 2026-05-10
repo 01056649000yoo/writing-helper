@@ -98,17 +98,20 @@ export type QuestionGeneratorRoomResult = {
 };
 
 export type QuestionVotingConfig = {
-  maxSelections: number;
-  requireReason: boolean;
-  candidates: Array<{
+  sourceRoomId: string | null;
+  sourceRoomTitle: string | null;
+  sourceQuestions: Array<{
     id: string;
     text: string;
   }>;
+  evaluationCriteria: string[];
+  maxSelections: number;
+  requireReason: boolean;
 };
 
 export type QuestionVotingSubmission = {
   selectedQuestionIds: string[];
-  reason: string;
+  reason?: string;
 };
 
 export type QuestionVotingResult = {
@@ -120,5 +123,6 @@ export type QuestionVotingRoomResult = {
     questionId: string;
     text: string;
     votes: number;
+    reasons: string[];
   }>;
 };
