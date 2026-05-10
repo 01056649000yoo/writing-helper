@@ -8,6 +8,10 @@ import {
   getQuestionVotingRoomResults,
   getRoomSessions,
 } from "@/app/actions/room-actions";
+import {
+  QuestionVotingCompactList,
+  QuestionVotingTopThree,
+} from "@/components/question-voting-ranking-summary";
 
 type Student = { id: string; student_number: number; student_name: string };
 type Session = {
@@ -324,36 +328,8 @@ function QuestionVotingResultsModal({
             </div>
           ) : (
             <div className="space-y-4">
-              {ranking.map((question, index) => (
-                <div key={question.questionId} className="rounded-3xl border border-violet-100 bg-violet-50/70 p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-violet-500">
-                        {index + 1}위 질문
-                      </p>
-                      <p className="mt-2 text-lg font-bold leading-relaxed text-violet-950">
-                        {question.text}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-violet-700">
-                      {question.votes}표
-                    </span>
-                  </div>
-
-                  {question.reasons.length > 0 && (
-                    <div className="mt-4 rounded-2xl bg-white p-4">
-                      <p className="text-xs font-semibold text-violet-600">학생들이 남긴 이유</p>
-                      <div className="mt-2 space-y-2">
-                        {question.reasons.map((reason, reasonIndex) => (
-                          <p key={`${question.questionId}-reason-${reasonIndex}`} className="text-sm leading-relaxed text-gray-700">
-                            • {reason}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+              <QuestionVotingTopThree ranking={ranking} />
+              <QuestionVotingCompactList ranking={ranking} showReasons />
             </div>
           )}
         </div>

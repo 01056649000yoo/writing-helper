@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getStudentResult } from "@/app/actions/student-actions";
+import {
+  QuestionVotingCompactList,
+  QuestionVotingTopThree,
+} from "@/components/question-voting-ranking-summary";
 import type {
   QuestionGeneratorSubmission,
   QuestionVotingConfig,
@@ -272,21 +276,8 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                   활동 종료
                 </span>
               </div>
-              <div className="space-y-3">
-                {questionVotingRanking.map((question, index) => (
-                  <div key={question.questionId} className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wide text-violet-500">{index + 1}위 질문</p>
-                        <p className="mt-2 text-base font-medium leading-relaxed text-violet-950">{question.text}</p>
-                      </div>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700">
-                        {question.votes}표
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <QuestionVotingTopThree ranking={questionVotingRanking} />
+              <QuestionVotingCompactList ranking={questionVotingRanking} />
             </div>
           )}
         </div>
