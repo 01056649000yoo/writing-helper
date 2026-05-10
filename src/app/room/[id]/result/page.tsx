@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getStudentResult } from "@/app/actions/student-actions";
 import type { QuestionGeneratorSubmission } from "@/features/activities/types";
@@ -38,6 +39,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const [viewMode, setViewMode] = useState<"outline" | "draft">("outline");
   const [activityType, setActivityType] = useState<ActivityType>("outline_builder");
   const [questionSubmission, setQuestionSubmission] = useState<QuestionGeneratorSubmission | null>(null);
+  const [anonymousPeerQuestions, setAnonymousPeerQuestions] = useState<Array<{ id: string; order: number; questionOrder: number; text: string }>>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
       setTopic(data.topic ?? "");
       setActivityType((data.activityType as ActivityType) ?? "outline_builder");
       setQuestionSubmission(data.questionGeneratorSubmission ?? null);
+      setAnonymousPeerQuestions(data.anonymousPeerQuestions ?? []);
       setLoaded(true);
     });
   }, [sessionId, roomId]);
@@ -159,6 +162,40 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
           >
             {copied ? "✅ 복사됐어요!" : "📋 내 질문 복사하기"}
           </button>
+
+          <Link
+            href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+            className="block w-full rounded-2xl border border-sky-200 bg-white py-4 text-center font-bold text-sky-700 transition-colors hover:bg-sky-50"
+          >
+            ✏️ 질문 다시 수정하기
+          </Link>
+
+          <div className="bg-white rounded-3xl shadow-xl p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-500">우리 반 질문 함께 보기</p>
+                <h2 className="mt-1 text-lg font-bold text-gray-800">친구들이 만든 질문</h2>
+              </div>
+              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
+                익명 공개
+              </span>
+            </div>
+
+            {anonymousPeerQuestions.length === 0 ? (
+              <p className="mt-4 rounded-2xl bg-violet-50 px-4 py-4 text-sm leading-relaxed text-violet-700">
+                아직 다른 친구 질문이 없어요. 친구들이 제출하면 여기에 익명으로 함께 보입니다.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {anonymousPeerQuestions.map((question, index) => (
+                  <div key={question.id} className="rounded-2xl bg-violet-50 p-4">
+                    <p className="text-xs font-semibold text-violet-600">친구 질문 {index + 1}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-violet-950">{question.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

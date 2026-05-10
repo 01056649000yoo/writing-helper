@@ -36,6 +36,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session") ?? "";
+  const editMode = searchParams.get("edit") === "1";
 
   const [roomId, setRoomId] = useState("");
   const [activityType, setActivityType] = useState<ActivityType | null>(null);
@@ -109,7 +110,14 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
       if (type === "question_generator") {
         setActivityConfig(normalizeQuestionGeneratorConfig(data.activity_config));
-        setStep("question_intro");
+        const existingSubmission = data.existing_submission as QuestionGeneratorSubmission | null;
+        if (existingSubmission?.selections?.length) {
+          setQuestionSelections(existingSubmission.selections);
+          setStep(editMode ? "question_path" : "question_intro");
+        } else {
+          setQuestionSelections([]);
+          setStep("question_intro");
+        }
       } else if (type === "question_voting") {
         setStep("question_voting");
       } else {
@@ -121,7 +129,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     return () => {
       active = false;
     };
-  }, [roomId, sessionId]);
+  }, [editMode, roomId, sessionId]);
 
   if (pageLoading) {
     return (
@@ -279,6 +287,10 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     setReason("");
   }
 
+  function removeQuestionSelection(selectionId: string) {
+    setQuestionSelections((prev) => prev.filter((selection) => selection.id !== selectionId));
+  }
+
   if (activityType === "question_generator") {
     if (step === "question_intro") {
       return (
@@ -338,8 +350,19 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 <div className="space-y-2">
                   {questionSelections.map((selection) => (
                     <div key={selection.id} className="rounded-2xl bg-sky-50 px-4 py-3">
-                      <p className="text-xs font-semibold text-sky-700">{selection.cardSetLabel}</p>
-                      <p className="text-sm text-gray-800 mt-1">{selection.remixedQuestion}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-sky-700">{selection.cardSetLabel}</p>
+                          <p className="text-sm text-gray-800 mt-1">{selection.remixedQuestion}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeQuestionSelection(selection.id)}
+                          className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                        >
+                          삭제
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -348,6 +371,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
             <div className="grid gap-4 md:grid-cols-2">
               <button
+                disabled={questionSelections.length >= maxSelections}
                 onClick={() => {
                   setQuestionBuildMode("direct");
                   setSelectedCardSetId(null);
@@ -376,6 +400,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               </button>
 
               <button
+                disabled={questionSelections.length >= maxSelections}
                 onClick={() => {
                   setQuestionBuildMode("card_remix");
                 }}
@@ -402,8 +427,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               </button>
             </div>
 
+            {questionSelections.length >= maxSelections && (
+              <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                질문을 모두 채웠어요. 수정하려면 위에서 기존 질문을 삭제한 뒤 새 질문을 만들어주세요.
+              </div>
+            )}
+
             <button
               onClick={() => {
+                if (questionSelections.length >= maxSelections) return;
                 if (questionBuildMode === "direct") {
                   setSelectedCardSetId(null);
                   setSelectedPrompt(null);

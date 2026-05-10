@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getApiKey } from "@/lib/vault";
 import { generateDraftFromAnswers, generateOutline } from "@/lib/gpt";
 import { parseOutlineResult, serializeOutlineResult } from "@/lib/result-format";
+import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import type { StudentLevel, Answer } from "@/types";
 import type { QuestionGeneratorSubmission } from "@/features/activities/types";
 
@@ -110,6 +111,7 @@ export async function getStudentResult(sessionId: string, roomId: string) {
   const activityType = roomRes.data?.activity_type ?? "outline_builder";
 
   if (activityType === "question_generator") {
+    const anonymousPeerQuestions = await getAnonymousQuestionGeneratorResults(sessionId, roomId);
     return {
       activityType,
       outline: "",
@@ -117,6 +119,7 @@ export async function getStudentResult(sessionId: string, roomId: string) {
       studentName: sessionRes.data?.student_name ?? "",
       topic: roomRes.data?.topic ?? "",
       questionGeneratorSubmission: normalizeQuestionGeneratorSubmission(sessionRes.data?.submission),
+      anonymousPeerQuestions,
     };
   }
 
@@ -126,6 +129,7 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     studentName: sessionRes.data?.student_name ?? "",
     topic: roomRes.data?.topic ?? "",
     questionGeneratorSubmission: null,
+    anonymousPeerQuestions: [],
   };
 }
 
@@ -431,8 +435,21 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
     .select("topic, title, question_sets, activity_type, activity_config")
     .eq("id", roomId)
     .maybeSingle();
+  if (!data) return null;
 
-  return data ?? null;
+  const { data: submissionData } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("submission, status")
+    .eq("id", sessionId)
+    .eq("room_id", roomId)
+    .maybeSingle();
+
+  return {
+    ...data,
+    existing_submission: normalizeQuestionGeneratorSubmission(submissionData?.submission),
+    session_status: submissionData?.status ?? "in_progress",
+  };
 }
 
 export async function getStudentRoomEntry(roomId: string) {
@@ -505,40 +522,26 @@ export async function submitQuestionGenerator(
   return {};
 }
 
-function normalizeQuestionGeneratorSubmission(value: unknown): QuestionGeneratorSubmission | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+async function getAnonymousQuestionGeneratorResults(sessionId: string, roomId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("id, submission")
+    .eq("room_id", roomId)
+    .eq("status", "done")
+    .neq("id", sessionId)
+    .order("updated_at", { ascending: true });
 
-  const rawSelections = Array.isArray((value as { selections?: unknown[] }).selections)
-    ? (value as { selections: unknown[] }).selections
-    : [];
+  return (data ?? []).flatMap((session, sessionIndex) => {
+    const submission = normalizeQuestionGeneratorSubmission(session.submission);
+    if (!submission) return [];
 
-  const selections = rawSelections
-    .filter((selection): selection is Record<string, unknown> => typeof selection === "object" && selection !== null && !Array.isArray(selection))
-    .map((selection, index) => ({
-      id: typeof selection.id === "string" && selection.id.trim()
-        ? selection.id.trim()
-        : `selection-${index + 1}`,
-      method: normalizeQuestionMethod(selection.method),
-      cardSetId: normalizeCardSetId(selection.cardSetId),
-      cardSetLabel: String(selection.cardSetLabel ?? "").trim() || (selection.method === "direct" ? "직접 질문 만들기" : "질문 카드"),
-      originalPrompt: typeof selection.originalPrompt === "string" && selection.originalPrompt.trim()
-        ? selection.originalPrompt.trim()
-        : null,
-      remixedQuestion: String(selection.remixedQuestion ?? "").trim(),
-      reason: typeof selection.reason === "string" && selection.reason.trim()
-        ? selection.reason.trim()
-        : undefined,
-    }))
-    .filter((selection) => selection.remixedQuestion.length > 0);
-
-  return selections.length > 0 ? { selections } : null;
-}
-
-function normalizeCardSetId(value: unknown): string | "custom" {
-  if (value === "custom") return "custom";
-  return typeof value === "string" && value.trim() ? value.trim() : "custom";
-}
-
-function normalizeQuestionMethod(value: unknown): QuestionGeneratorSubmission["selections"][number]["method"] {
-  return value === "direct" ? "direct" : "card_remix";
+    return submission.selections.map((selection, selectionIndex) => ({
+      id: `${session.id}-${selection.id}`,
+      order: sessionIndex + 1,
+      questionOrder: selectionIndex + 1,
+      text: selection.remixedQuestion,
+    }));
+  });
 }
