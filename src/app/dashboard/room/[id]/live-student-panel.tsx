@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
+import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import {
+  getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
   getRoomSessions,
@@ -21,7 +23,7 @@ type Session = {
   level: string | null;
   status: string;
 };
-type ActivityType = "outline_builder" | "question_generator" | "question_voting";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
 type QuestionResult = {
   sessionId: string;
   studentNumber: number;
@@ -40,6 +42,19 @@ type QuestionVotingRanking = Array<{
   text: string;
   votes: number;
   reasons: string[];
+}>;
+type OneLineShareResults = Array<{
+  entryId: string;
+  sessionId: string;
+  studentNumber: number;
+  studentName: string;
+  content: string;
+  likeCount: number;
+  likedByCurrentSession: boolean;
+  isMine: boolean;
+  containsKeywords: boolean;
+  createdAt: string;
+  updatedAt: string;
 }>;
 
 function levelLabel(level: string) {
@@ -338,6 +353,50 @@ function QuestionVotingResultsModal({
   );
 }
 
+function OneLineShareResultsModal({
+  entries,
+  onClose,
+}: {
+  entries: OneLineShareResults;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-rose-100 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-rose-500">한줄모아 결과</p>
+            <h3 className="text-2xl font-bold text-gray-800 mt-1">학생 한 줄 모아보기</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              좋아요를 많이 받은 문장부터 학생 이름과 함께 볼 수 있어요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
+          <div className="space-y-4">
+            <OneLineShareTopThree entries={entries} showStudentName />
+            <OneLineShareBoard entries={entries} showStudentName />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LiveStudentPanel({
   roomId,
   students,
@@ -345,6 +404,7 @@ export default function LiveStudentPanel({
   activityType,
   questionResults: initialQuestionResults,
   questionVotingResults: initialQuestionVotingResults,
+  oneLineShareResults: initialOneLineShareResults,
 }: {
   roomId: string;
   students: Student[];
@@ -352,13 +412,16 @@ export default function LiveStudentPanel({
   activityType: ActivityType;
   questionResults: QuestionResult[];
   questionVotingResults: QuestionVotingRanking;
+  oneLineShareResults: OneLineShareResults;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
   const [isQuestionResultsOpen, setIsQuestionResultsOpen] = useState(false);
   const [isQuestionVotingResultsOpen, setIsQuestionVotingResultsOpen] = useState(false);
+  const [isOneLineShareResultsOpen, setIsOneLineShareResultsOpen] = useState(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>(initialQuestionResults);
   const [questionVotingResults, setQuestionVotingResults] = useState<QuestionVotingRanking>(initialQuestionVotingResults);
+  const [oneLineShareResults, setOneLineShareResults] = useState<OneLineShareResults>(initialOneLineShareResults);
 
   async function fetchSessions() {
     const data = await getRoomSessions(roomId);
@@ -370,6 +433,9 @@ export default function LiveStudentPanel({
     } else if (activityType === "question_voting") {
       const votingData = await getQuestionVotingRoomResults(roomId);
       setQuestionVotingResults(votingData ?? []);
+    } else if (activityType === "one_line_share") {
+      const oneLineData = await getOneLineShareRoomResults(roomId);
+      setOneLineShareResults(oneLineData ?? []);
     }
   }
 
@@ -407,6 +473,12 @@ export default function LiveStudentPanel({
           onClose={() => setIsQuestionVotingResultsOpen(false)}
         />
       )}
+      {isOneLineShareResultsOpen && (
+        <OneLineShareResultsModal
+          entries={oneLineShareResults}
+          onClose={() => setIsOneLineShareResultsOpen(false)}
+        />
+      )}
 
       <div className="bg-white rounded-3xl shadow-xl p-8 space-y-6">
         {/* 헤더 */}
@@ -418,6 +490,9 @@ export default function LiveStudentPanel({
             )}
             {activityType === "question_voting" && (
               <p className="mt-1 text-sm text-gray-500">학생들이 고른 좋은 질문 결과를 득표순으로 바로 확인할 수 있어요.</p>
+            )}
+            {activityType === "one_line_share" && (
+              <p className="mt-1 text-sm text-gray-500">학생들이 쓴 한 줄과 좋아요 수를 실시간으로 모아볼 수 있어요.</p>
             )}
           </div>
           <div className="flex items-center gap-3">
@@ -439,6 +514,16 @@ export default function LiveStudentPanel({
                 disabled={questionVotingResults.length === 0}
               >
                 좋은 질문 결과 보기
+              </button>
+            )}
+            {activityType === "one_line_share" && (
+              <button
+                type="button"
+                onClick={() => setIsOneLineShareResultsOpen(true)}
+                className="rounded-2xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-rose-200"
+                disabled={oneLineShareResults.length === 0}
+              >
+                한줄모아 결과 보기
               </button>
             )}
             <div className="flex gap-3 text-sm">
@@ -491,6 +576,8 @@ export default function LiveStudentPanel({
                   ? "✅ 질문 제출 완료"
                   : activityType === "question_voting"
                     ? "✅ 좋은 질문 평가 완료"
+                    : activityType === "one_line_share"
+                      ? "✅ 한 줄 제출 완료"
                     : "✅ 개요 완성"}
               </p>
               <p className="text-xs text-gray-400">
@@ -498,6 +585,8 @@ export default function LiveStudentPanel({
                   ? "보기 → 학생 질문 상세"
                   : activityType === "question_voting"
                     ? "보기 → 학생 선택 결과"
+                    : activityType === "one_line_share"
+                      ? "보기 → 학생 문장 상세"
                     : "QR 버튼 → 학생 개인 결과 QR"}
               </p>
             </div>

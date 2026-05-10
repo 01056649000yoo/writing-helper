@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { verifyStudent } from "@/app/actions/student-actions";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
 
 type EntryShellProps = {
   roomId: string;
@@ -24,6 +24,10 @@ export function RoomEntryClient({
 
   if (activityType === "question_voting") {
     return <QuestionVotingEntry roomId={roomId} topic={topic} />;
+  }
+
+  if (activityType === "one_line_share") {
+    return <OneLineShareEntry roomId={roomId} topic={topic} />;
   }
 
   return <OutlineBuilderEntry roomId={roomId} topic={topic} />;
@@ -79,6 +83,24 @@ function QuestionVotingEntry({ roomId, topic }: EntryShellProps) {
       subtitle="내 번호와 이름을 입력하고 가장 좋은 질문을 골라요"
       helper="친구들이 만든 질문을 읽고 가장 생각해보고 싶은 질문을 선택해요."
       buttonLabel="질문 고르러 가기"
+    />
+  );
+}
+
+function OneLineShareEntry({ roomId, topic }: EntryShellProps) {
+  return (
+    <EntryShell
+      roomId={roomId}
+      topic={topic}
+      shellClassName="from-rose-50 to-pink-100"
+      topicClassName="bg-rose-50 text-rose-700"
+      buttonClassName="bg-rose-500 hover:bg-rose-600"
+      inputFocusClassName="focus:border-rose-400"
+      emoji="💬"
+      title="한줄모아"
+      subtitle="내 번호와 이름을 입력하고 핵심단어를 담은 한 줄을 나눠요"
+      helper="한 줄을 쓰고 나면 친구 문장을 읽으며 좋아요로 반응할 수 있어요."
+      buttonLabel="한줄모아 시작"
     />
   );
 }

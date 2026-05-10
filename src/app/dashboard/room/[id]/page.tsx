@@ -7,6 +7,7 @@ import LiveStudentPanel from "./live-student-panel";
 import {
   getRoom,
   getRoomStudents,
+  getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
   closeRoom,
@@ -28,6 +29,9 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
     : [];
   const questionVotingResults = room.activity_type === "question_voting"
     ? await getQuestionVotingRoomResults(id)
+    : [];
+  const oneLineShareResults = room.activity_type === "one_line_share"
+    ? await getOneLineShareRoomResults(id)
     : [];
 
   const headersList = await headers();
@@ -102,10 +106,11 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
           roomId={id}
           students={students}
           isActive={room.is_active}
-          activityType={room.activity_type}
-          questionResults={questionResults}
-          questionVotingResults={questionVotingResults}
-        />
+        activityType={room.activity_type}
+        questionResults={questionResults}
+        questionVotingResults={questionVotingResults}
+        oneLineShareResults={oneLineShareResults}
+      />
       </div>
     </div>
   );

@@ -58,6 +58,14 @@ type QuestionVotingDraft = {
   source_room_topic: string;
 };
 
+type OneLineShareDraft = {
+  topic: string;
+  topic_description: string;
+  keywords: string;
+  max_reactions_per_student: string;
+  duration_hours: string;
+};
+
 const DRAFT_SAVE_INTERVAL_MS = 5000;
 
 const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary: string }> = {
@@ -75,6 +83,11 @@ const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary
     emoji: "🗳️",
     tone: "from-amber-50 via-white to-orange-50",
     summary: "질문 후보 중에서 가장 좋은 질문을 고르고 이유를 나누는 활동",
+  },
+  one_line_share: {
+    emoji: "💬",
+    tone: "from-rose-50 via-white to-pink-50",
+    summary: "핵심단어를 넣은 한 문장을 나누고 친구 문장에 좋아요로 반응하는 활동",
   },
 };
 
@@ -232,7 +245,7 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
             </p>
           </div>
 
-          <div className="p-6 sm:p-8 grid gap-4 md:grid-cols-3">
+          <div className="p-6 sm:p-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {activityDefinitions.map((activity) => {
               const meta = ACTIVITY_META[activity.id];
               return (
@@ -1203,6 +1216,136 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
   );
 }
 
+function OneLineShareSetup({ classId }: { classId: string }) {
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const initialDraft = useMemo<OneLineShareDraft>(() => ({
+    topic: "오늘 수업 한 줄 정리",
+    topic_description: "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.",
+    keywords: "",
+    max_reactions_per_student: "3",
+    duration_hours: "4",
+  }), []);
+  const [draft, setDraft, draftControls] = useActivityDraft<OneLineShareDraft>(
+    buildDraftStorageKey(classId, "one_line_share"),
+    initialDraft,
+  );
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+  function handleSaveDraftNow() {
+    persistActivityDraft(buildDraftStorageKey(classId, "one_line_share"), draft);
+    setLastSavedAt(Date.now());
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    const storageKey = buildDraftStorageKey(classId, "one_line_share");
+    const fd = new FormData(e.currentTarget);
+    fd.set("class_id", classId);
+    fd.set("activity_type", "one_line_share");
+    draftControls.suspendAutosave();
+    clearActivityDraft(storageKey);
+    const result = await createRoom(fd);
+    if (result?.error) {
+      persistActivityDraft(storageKey, draft);
+      draftControls.resumeAutosave();
+      setLastSavedAt(Date.now());
+      setError(result.error);
+      setSaving(false);
+      return;
+    }
+  }
+
+  return (
+    <>
+      <div className="rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 mb-6 text-sm text-rose-800">
+        학생이 핵심단어를 넣어 한 문장으로 생각을 나누고, 친구 문장에는 댓글 대신 좋아요로 간단하게 반응하는 활동입니다.
+      </div>
+
+      <div className="mb-6">
+        <DraftSection
+          title="한줄모아 활동 설정 저장"
+          description="안내 제목, 설명, 핵심단어를 저장해 두고 나중에 돌아와 이어서 수정할 수 있어요."
+          onSave={handleSaveDraftNow}
+          lastSavedAt={lastSavedAt}
+        />
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <input type="hidden" name="class_id" value={classId} />
+        <input type="hidden" name="activity_type" value="one_line_share" />
+
+        <TopicFields
+          values={{
+            topic: draft.topic,
+            topic_description: draft.topic_description,
+          }}
+          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+          hint="학생에게 보일 활동 제목과 설명입니다. 핵심단어와 함께 한 문장으로 무엇을 표현할지 안내해 주세요."
+          placeholder="예) 오늘 배운 증발과 물의 순환을 떠올리며, 핵심단어를 넣어 내 생각을 한 문장으로 정리해 봅니다."
+        />
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-2">핵심단어</label>
+          <textarea
+            name="keywords"
+            rows={3}
+            value={draft.keywords}
+            onChange={(event) => setDraft((prev) => ({ ...prev, keywords: event.target.value }))}
+            placeholder={"한 줄에 하나씩 또는 쉼표로 적어주세요.\n예)\n증발\n물의 순환"}
+            className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-300 resize-none"
+          />
+          <p className="text-xs text-gray-400 mt-2">학생은 핵심단어를 한 개 이상 포함해 한 줄을 쓰게 됩니다.</p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">학생당 좋아요 개수</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3, 4, 5].map((count) => (
+                <label
+                  key={count}
+                  className="flex items-center justify-center gap-2 border border-gray-200 rounded-xl px-3 py-3 cursor-pointer has-[:checked]:border-rose-400 has-[:checked]:bg-rose-50"
+                >
+                  <input
+                    type="radio"
+                    name="max_reactions_per_student"
+                    value={count}
+                    checked={draft.max_reactions_per_student === String(count)}
+                    onChange={() => setDraft((prev) => ({ ...prev, max_reactions_per_student: String(count) }))}
+                    className="text-rose-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">{count}개</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">활동 운영 시간</label>
+            <DurationField
+              value={draft.duration_hours}
+              onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full py-4 bg-rose-500 text-white rounded-xl font-bold text-lg hover:bg-rose-600 disabled:opacity-50 transition-colors"
+        >
+          {saving ? "시작 중..." : "🚀 한줄모아 활동 시작"}
+        </button>
+      </form>
+    </>
+  );
+}
+
 function TopicFields({
   values,
   onChange,
@@ -1325,6 +1468,7 @@ function NewRoomForm() {
       {activityType === "outline_builder" && <OutlineBuilderSetup classId={classId} />}
       {activityType === "question_generator" && <QuestionGeneratorSetup classId={classId} />}
       {activityType === "question_voting" && <QuestionVotingSetup classId={classId} />}
+      {activityType === "one_line_share" && <OneLineShareSetup classId={classId} />}
     </PageShell>
   );
 }
@@ -1380,7 +1524,7 @@ function useActivityDraft<T>(storageKey: string, initialState: T) {
 }
 
 function parseActivityType(value: string | null): ActivityType | null {
-  if (value === "outline_builder" || value === "question_generator" || value === "question_voting") {
+  if (value === "outline_builder" || value === "question_generator" || value === "question_voting" || value === "one_line_share") {
     return value;
   }
   return null;

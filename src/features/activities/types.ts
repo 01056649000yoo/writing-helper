@@ -3,12 +3,14 @@ import type { GradeLevel, OutlineDepth, QuestionSets, SubjectType, StudentLevel,
 export type ActivityType =
   | "outline_builder"
   | "question_generator"
-  | "question_voting";
+  | "question_voting"
+  | "one_line_share";
 
 export type ActivityCategory =
   | "writing"
   | "questioning"
-  | "discussion";
+  | "discussion"
+  | "reflection";
 
 export type ActivityConfigValidation<TConfig> =
   | { ok: true; value: TConfig }
@@ -125,4 +127,40 @@ export type QuestionVotingRoomResult = {
     votes: number;
     reasons: string[];
   }>;
+};
+
+export type OneLineShareConfig = {
+  promptTitle: string;
+  promptDescription: string;
+  keywords: string[];
+  maxReactionsPerStudent: number;
+};
+
+export type OneLineShareSubmission = {
+  entryId: string | null;
+  content: string | null;
+};
+
+export type OneLineShareResult = {
+  entryId: string | null;
+  submitted: boolean;
+  likeCount: number;
+};
+
+export type OneLineShareBoardEntry = {
+  entryId: string;
+  sessionId: string;
+  studentNumber: number;
+  studentName: string;
+  content: string;
+  likeCount: number;
+  likedByCurrentSession: boolean;
+  isMine: boolean;
+  containsKeywords: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OneLineShareRoomResult = {
+  entries: OneLineShareBoardEntry[];
 };

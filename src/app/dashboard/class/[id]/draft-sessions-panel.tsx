@@ -13,12 +13,14 @@ const ACTIVITY_LABEL: Record<ActivityType, string> = {
   outline_builder: "글 개요 짜기",
   question_generator: "질문 만들기",
   question_voting: "좋은 질문 고르기",
+  one_line_share: "한줄모아",
 };
 
 const ACTIVITY_EMOJI: Record<ActivityType, string> = {
   outline_builder: "📝",
   question_generator: "❓",
   question_voting: "🗳️",
+  one_line_share: "💬",
 };
 
 function getDraftTitle(draft: ActivityDraftSummary) {

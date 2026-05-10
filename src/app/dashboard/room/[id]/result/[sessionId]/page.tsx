@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/app/actions/auth-actions";
+import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import { StudentResultQr } from "./student-result-qr";
+import { buildOneLineShareBoard } from "@/lib/one-line-share";
 import { parseOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import {
@@ -60,6 +62,7 @@ export default async function TeacherResultPage({
   const questionVotingConfig = normalizeQuestionVotingConfig(room?.activity_config);
   const isQuestionGenerator = room?.activity_type === "question_generator";
   const isQuestionVoting = room?.activity_type === "question_voting";
+  const isOneLineShare = room?.activity_type === "one_line_share";
 
   let questionVotingRanking: ReturnType<typeof buildQuestionVotingRanking> = [];
   if (isQuestionVoting && questionVotingConfig) {
@@ -76,6 +79,25 @@ export default async function TeacherResultPage({
         .map((currentSession) => normalizeQuestionVotingSubmission(currentSession.submission))
         .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission)),
     );
+  }
+
+  let oneLineShareEntries: ReturnType<typeof buildOneLineShareBoard> = [];
+  if (isOneLineShare) {
+    const [entriesRes, reactionsRes] = await Promise.all([
+      admin
+        .schema("writing_helper")
+        .from("one_line_entries")
+        .select("id, session_id, student_number, student_name, content, contains_keywords, created_at, updated_at")
+        .eq("room_id", id),
+      admin
+        .schema("writing_helper")
+        .from("one_line_reactions")
+        .select("entry_id, session_id")
+        .eq("room_id", id)
+        .eq("reaction_type", "like"),
+    ]);
+
+    oneLineShareEntries = buildOneLineShareBoard(entriesRes.data ?? [], reactionsRes.data ?? [], sessionId);
   }
 
   return (
@@ -214,7 +236,36 @@ export default async function TeacherResultPage({
             </div>
           )}
 
-          {!isQuestionGenerator && !isQuestionVoting && (
+          {isOneLineShare && (
+            <div className="grid gap-4">
+              <div className="bg-rose-50 rounded-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-rose-500">학생이 쓴 한 줄</p>
+                    <h2 className="text-lg font-bold text-gray-800 mt-1">오늘의 문장</h2>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-base font-medium text-rose-950 leading-relaxed">
+                    {typeof session.submission?.content === "string" && session.submission.content.trim()
+                      ? session.submission.content
+                      : "아직 제출된 문장이 없습니다."}
+                  </p>
+                </div>
+              </div>
+
+              {oneLineShareEntries.length > 0 && (
+                <div className="bg-white rounded-2xl border border-rose-100 p-6 space-y-4">
+                  <h2 className="font-bold text-rose-800">💬 현재 한줄모아 반응 결과</h2>
+                  <OneLineShareTopThree entries={oneLineShareEntries} showStudentName />
+                  <OneLineShareBoard entries={oneLineShareEntries} showStudentName />
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isQuestionGenerator && !isQuestionVoting && !isOneLineShare && (
           <div>
             <h2 className="font-bold text-gray-700 mb-3">💬 학생 답변 내용</h2>
             <div className="space-y-3">

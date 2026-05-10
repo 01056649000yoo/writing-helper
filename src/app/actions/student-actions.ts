@@ -5,6 +5,7 @@ import { getApiKey } from "@/lib/vault";
 import { generateDraftFromAnswers, generateOutline } from "@/lib/gpt";
 import { parseOutlineResult, serializeOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
+import { buildOneLineShareBoard, includesConfiguredKeyword, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import {
   buildQuestionVotingRanking,
   normalizeQuestionVotingConfig,
@@ -12,6 +13,8 @@ import {
 } from "@/lib/question-voting";
 import type { StudentLevel, Answer } from "@/types";
 import type {
+  OneLineShareConfig,
+  OneLineShareSubmission,
   QuestionGeneratorSubmission,
   QuestionVotingSubmission,
 } from "@/features/activities/types";
@@ -128,6 +131,14 @@ export async function getStudentResult(sessionId: string, roomId: string) {
       topic: roomRes.data?.topic ?? "",
       questionGeneratorSubmission: normalizeQuestionGeneratorSubmission(sessionRes.data?.submission),
       anonymousPeerQuestions,
+      questionVotingSubmission: null,
+      questionVotingConfig: null,
+      questionVotingRanking: [],
+      questionVotingClosed: false,
+      oneLineShareConfig: null,
+      oneLineShareEntry: null,
+      oneLineShareBoard: [],
+      oneLineShareClosed: false,
     };
   }
 
@@ -150,6 +161,34 @@ export async function getStudentResult(sessionId: string, roomId: string) {
       questionVotingConfig: votingConfig,
       questionVotingRanking: ranking,
       questionVotingClosed: roomRes.data?.is_active === false,
+      oneLineShareConfig: null,
+      oneLineShareEntry: null,
+      oneLineShareBoard: [],
+      oneLineShareClosed: false,
+    };
+  }
+
+  if (activityType === "one_line_share") {
+    const oneLineShareConfig = normalizeOneLineShareConfig(roomRes.data?.activity_config);
+    const oneLineShareEntry = await getOneLineShareEntryBySession(sessionId);
+    const oneLineShareBoard = await getOneLineShareBoardForSession(sessionId, roomId);
+
+    return {
+      activityType,
+      outline: "",
+      draft: "",
+      studentName: sessionRes.data?.student_name ?? "",
+      topic: roomRes.data?.topic ?? "",
+      questionGeneratorSubmission: null,
+      anonymousPeerQuestions: [],
+      questionVotingSubmission: null,
+      questionVotingConfig: null,
+      questionVotingRanking: [],
+      questionVotingClosed: false,
+      oneLineShareConfig,
+      oneLineShareEntry,
+      oneLineShareBoard,
+      oneLineShareClosed: roomRes.data?.is_active === false,
     };
   }
 
@@ -164,6 +203,10 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     questionVotingConfig: null,
     questionVotingRanking: [],
     questionVotingClosed: false,
+    oneLineShareConfig: null,
+    oneLineShareEntry: null,
+    oneLineShareBoard: [],
+    oneLineShareClosed: false,
   };
 }
 
@@ -479,10 +522,24 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
     .eq("room_id", roomId)
     .maybeSingle();
 
+  const { data: oneLineEntry } = await admin
+    .schema("writing_helper")
+    .from("one_line_entries")
+    .select("id, content")
+    .eq("session_id", sessionId)
+    .eq("room_id", roomId)
+    .maybeSingle();
+
   return {
     ...data,
     existing_submission: normalizeQuestionGeneratorSubmission(submissionData?.submission),
     existing_voting_submission: normalizeQuestionVotingSubmission(submissionData?.submission),
+    existing_one_line_submission: oneLineEntry
+      ? ({
+          entryId: oneLineEntry.id,
+          content: oneLineEntry.content,
+        } satisfies OneLineShareSubmission)
+      : null,
     session_status: submissionData?.status ?? "in_progress",
   };
 }
@@ -628,6 +685,197 @@ export async function submitQuestionVoting(
   return {};
 }
 
+export async function submitOneLineShare(
+  sessionId: string,
+  roomId: string,
+  content: string,
+): Promise<{ error?: string; entryId?: string }> {
+  if (!sessionId || !roomId) return { error: "잘못된 요청입니다." };
+
+  const normalizedContent = content.trim();
+  if (!normalizedContent) {
+    return { error: "한 줄 문장을 적어주세요." };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const [sessionRes, roomRes, existingEntryRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, student_number, student_name")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_config")
+      .eq("id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("one_line_entries")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("session_id", sessionId)
+      .maybeSingle(),
+  ]);
+
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+
+  const config = normalizeOneLineShareConfig(roomRes.data.activity_config);
+  if (!config) return { error: "활동 설정을 불러오지 못했습니다." };
+
+  if (config.keywords.length > 0 && !includesConfiguredKeyword(normalizedContent, config.keywords)) {
+    return { error: "핵심단어를 한 개 이상 넣어 문장을 다시 써주세요." };
+  }
+
+  const payload = {
+    room_id: roomId,
+    session_id: sessionId,
+    student_number: sessionRes.data.student_number,
+    student_name: sessionRes.data.student_name,
+    content: normalizedContent,
+    contains_keywords: includesConfiguredKeyword(normalizedContent, config.keywords),
+    updated_at: new Date().toISOString(),
+  };
+
+  const entryRes = existingEntryRes.data
+    ? await admin
+        .schema("writing_helper")
+        .from("one_line_entries")
+        .update(payload)
+        .eq("id", existingEntryRes.data.id)
+        .eq("room_id", roomId)
+        .select("id")
+        .single()
+    : await admin
+        .schema("writing_helper")
+        .from("one_line_entries")
+        .insert(payload)
+        .select("id")
+        .single();
+
+  if (entryRes.error || !entryRes.data) {
+    return { error: "한 줄 저장에 실패했습니다." };
+  }
+
+  const reactionCount = await getReactionCountForEntry(roomId, entryRes.data.id);
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .update({
+      submission: {
+        entryId: entryRes.data.id,
+        content: normalizedContent,
+      },
+      result: {
+        entryId: entryRes.data.id,
+        submitted: true,
+        likeCount: reactionCount,
+      },
+      status: "done",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .eq("room_id", roomId);
+
+  if (error) return { error: "학생 활동 상태 저장에 실패했습니다." };
+  return { entryId: entryRes.data.id };
+}
+
+export async function toggleOneLineReaction(
+  sessionId: string,
+  roomId: string,
+  entryId: string,
+): Promise<{
+  error?: string;
+  entries?: ReturnType<typeof buildOneLineShareBoard>;
+}> {
+  if (!sessionId || !roomId || !entryId) return { error: "잘못된 요청입니다." };
+
+  const admin = createSupabaseAdminClient();
+  const [sessionRes, roomRes, entryRes, existingReactionRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_config")
+      .eq("id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("one_line_entries")
+      .select("id, session_id")
+      .eq("id", entryId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("one_line_reactions")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("entry_id", entryId)
+      .eq("session_id", sessionId)
+      .eq("reaction_type", "like")
+      .maybeSingle(),
+  ]);
+
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+  if (!entryRes.data) return { error: "문장을 찾을 수 없습니다." };
+  if (entryRes.data.session_id === sessionId) return { error: "내 문장에는 좋아요를 누를 수 없어요." };
+
+  const config = normalizeOneLineShareConfig(roomRes.data.activity_config);
+  const maxReactions = config?.maxReactionsPerStudent ?? 3;
+
+  if (existingReactionRes.data) {
+    const { error } = await admin
+      .schema("writing_helper")
+      .from("one_line_reactions")
+      .delete()
+      .eq("id", existingReactionRes.data.id);
+
+    if (error) return { error: "좋아요를 취소하지 못했습니다." };
+  } else {
+    const { count } = await admin
+      .schema("writing_helper")
+      .from("one_line_reactions")
+      .select("*", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .eq("session_id", sessionId)
+      .eq("reaction_type", "like");
+
+    if ((count ?? 0) >= maxReactions) {
+      return { error: `좋아요는 ${maxReactions}개까지 누를 수 있어요.` };
+    }
+
+    const { error } = await admin
+      .schema("writing_helper")
+      .from("one_line_reactions")
+      .insert({
+        room_id: roomId,
+        entry_id: entryId,
+        session_id: sessionId,
+        reaction_type: "like",
+      });
+
+    if (error) return { error: "좋아요를 저장하지 못했습니다." };
+  }
+
+  return {
+    entries: await getOneLineShareBoardForSession(sessionId, roomId),
+  };
+}
+
 async function getAnonymousQuestionGeneratorResults(sessionId: string, roomId: string) {
   const admin = createSupabaseAdminClient();
   const { data } = await admin
@@ -666,4 +914,56 @@ async function getQuestionVotingRankingForRoom(roomId: string, config: NonNullab
     .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission));
 
   return buildQuestionVotingRanking(config, submissions);
+}
+
+async function getOneLineShareBoardForSession(sessionId: string, roomId: string) {
+  const admin = createSupabaseAdminClient();
+  const [entriesRes, reactionsRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("one_line_entries")
+      .select("id, session_id, student_number, student_name, content, contains_keywords, created_at, updated_at")
+      .eq("room_id", roomId),
+    admin
+      .schema("writing_helper")
+      .from("one_line_reactions")
+      .select("entry_id, session_id")
+      .eq("room_id", roomId)
+      .eq("reaction_type", "like"),
+  ]);
+
+  return buildOneLineShareBoard(entriesRes.data ?? [], reactionsRes.data ?? [], sessionId);
+}
+
+async function getOneLineShareEntryBySession(sessionId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .schema("writing_helper")
+    .from("one_line_entries")
+    .select("id, content, contains_keywords, created_at, updated_at")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  return {
+    entryId: data.id,
+    content: data.content,
+    containsKeywords: data.contains_keywords,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+}
+
+async function getReactionCountForEntry(roomId: string, entryId: string) {
+  const admin = createSupabaseAdminClient();
+  const { count } = await admin
+    .schema("writing_helper")
+    .from("one_line_reactions")
+    .select("*", { count: "exact", head: true })
+    .eq("room_id", roomId)
+    .eq("entry_id", entryId)
+    .eq("reaction_type", "like");
+
+  return count ?? 0;
 }

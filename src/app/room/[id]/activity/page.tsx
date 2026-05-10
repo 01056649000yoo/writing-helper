@@ -7,10 +7,13 @@ import {
   saveAnswers,
   requestOutline,
   getStudentRoomQuestions,
+  submitOneLineShare,
   submitQuestionGenerator,
   submitQuestionVoting,
 } from "@/app/actions/student-actions";
+import { normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import type {
+  OneLineShareConfig,
   QuestionCardSet,
   QuestionGeneratorConfig,
   QuestionGeneratorSubmission,
@@ -18,7 +21,7 @@ import type {
 } from "@/features/activities/types";
 import type { StudentLevel, QuestionSets, Question, Answer } from "@/types";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
 type Step =
   | "level"
   | "questions"
@@ -29,6 +32,8 @@ type Step =
   | "question_rewrite"
   | "question_submitting"
   | "question_voting"
+  | "one_line_share"
+  | "one_line_submitting"
   | "submitting";
 
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
@@ -44,6 +49,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [activityType, setActivityType] = useState<ActivityType | null>(null);
   const [questionGeneratorConfig, setQuestionGeneratorConfig] = useState<QuestionGeneratorConfig | null>(null);
   const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
+  const [oneLineShareConfig, setOneLineShareConfig] = useState<OneLineShareConfig | null>(null);
   const [step, setStep] = useState<Step | null>(null);
   const [levelPending, setLevelPending] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -62,6 +68,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [questionBuildMode, setQuestionBuildMode] = useState<QuestionBuildMode | null>(null);
   const [selectedVotingQuestionIds, setSelectedVotingQuestionIds] = useState<string[]>([]);
   const [votingReason, setVotingReason] = useState("");
+  const [oneLineContent, setOneLineContent] = useState("");
 
   const enabledCardSets = useMemo(() => {
     const allowedIds = new Set(questionGeneratorConfig?.enabledCardSetIds ?? []);
@@ -109,7 +116,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       setTopic(data.topic ?? "");
 
       const type = data.activity_type;
-      if (type === "question_generator" || type === "question_voting") {
+      if (type === "question_generator" || type === "question_voting" || type === "one_line_share") {
         setActivityType(type);
       } else {
         setActivityType("outline_builder");
@@ -128,6 +135,10 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       } else if (type === "question_voting") {
         setQuestionVotingConfig(normalizeQuestionVotingConfig(data.activity_config));
         setStep("question_voting");
+      } else if (type === "one_line_share") {
+        setOneLineShareConfig(normalizeOneLineShareConfig(data.activity_config));
+        setOneLineContent(data.existing_one_line_submission?.content ?? "");
+        setStep("one_line_share");
       } else {
         setStep("level");
       }
@@ -832,6 +843,114 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               className="w-full py-4 bg-violet-500 text-white rounded-2xl font-bold text-lg hover:bg-violet-600 disabled:opacity-50 transition-colors"
             >
               좋은 질문 제출하기
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activityType === "one_line_share") {
+    const keywords = oneLineShareConfig?.keywords ?? [];
+    const normalizedContent = oneLineContent.trim();
+    const containsKeyword = keywords.length === 0
+      ? true
+      : keywords.some((keyword) => normalizedContent.toLowerCase().includes(keyword.toLowerCase()));
+
+    async function handleOneLineShareSubmit() {
+      if (!normalizedContent) {
+        setError("한 줄 문장을 적어주세요.");
+        return;
+      }
+
+      if (!containsKeyword) {
+        setError("핵심단어를 한 개 이상 넣어 문장을 다시 써주세요.");
+        return;
+      }
+
+      setError("");
+      setStep("one_line_submitting");
+      const result = await submitOneLineShare(sessionId, roomId, normalizedContent);
+
+      if (result.error) {
+        setError(result.error);
+        setStep("one_line_share");
+        return;
+      }
+
+      router.push(`/room/${roomId}/result?session=${sessionId}`);
+    }
+
+    if (step === "one_line_submitting") {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-rose-50 to-pink-100 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm text-center">
+            <div className="text-6xl mb-6 animate-bounce">💬</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">한 줄을 정리하고 있어요</h1>
+            <p className="text-gray-500 text-sm">친구들이 볼 수 있는 보드에 올리는 중이에요.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 to-pink-100 p-4">
+        <div className="max-w-2xl mx-auto pt-8 pb-16 space-y-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
+            <div className="text-5xl mb-3">💬</div>
+            <h1 className="text-2xl font-bold text-gray-800">한줄모아</h1>
+            <p className="mt-2 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              오늘 활동: <strong>{topic}</strong>
+            </p>
+            <p className="text-sm text-gray-500 leading-relaxed mt-4">
+              {oneLineShareConfig?.promptDescription ?? "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요."}
+            </p>
+          </div>
+
+          {keywords.length > 0 && (
+            <div className="bg-white rounded-3xl shadow-xl p-6">
+              <p className="text-xs font-bold uppercase tracking-wide text-rose-500">오늘의 핵심단어</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {keywords.map((keyword) => (
+                  <span key={keyword} className="rounded-full bg-rose-100 px-3 py-1.5 text-sm font-semibold text-rose-700">
+                    #{keyword}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-gray-400">핵심단어를 한 개 이상 포함해서 문장을 써보세요.</p>
+            </div>
+          )}
+
+          <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">내 한 줄</label>
+              <textarea
+                value={oneLineContent}
+                onChange={(event) => setOneLineContent(event.target.value)}
+                rows={4}
+                placeholder="예) 증발은 물이 눈에 보이지 않게 공기 중으로 올라가는 변화라는 것을 새롭게 알게 되었다."
+                className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-rose-400 resize-none"
+              />
+            </div>
+
+            <div className={`rounded-2xl px-4 py-3 text-sm ${
+              containsKeyword ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+            }`}>
+              {keywords.length === 0
+                ? "핵심단어가 없어 자유롭게 한 줄을 써도 괜찮아요."
+                : containsKeyword
+                  ? "좋아요! 핵심단어가 문장에 들어 있어요."
+                  : "핵심단어를 한 개 이상 넣으면 더 좋아요."}
+            </div>
+
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
+            <button
+              type="button"
+              onClick={handleOneLineShareSubmit}
+              className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg hover:bg-rose-600 transition-colors"
+            >
+              {normalizedContent ? "한 줄 제출하고 친구 문장 보러 가기" : "한 줄을 먼저 적어주세요"}
             </button>
           </div>
         </div>

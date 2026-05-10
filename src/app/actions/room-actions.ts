@@ -10,9 +10,12 @@ import { generateQuestionSets } from "@/lib/gpt";
 import { getTeacherQuestionCardSets } from "@/lib/question-card-sets";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
+import { buildOneLineShareBoard, includesConfiguredKeyword, normalizeKeywordText, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import type {
   ActivityType,
   OutlineBuilderConfig,
+  OneLineShareConfig,
+  OneLineShareRoomResult,
   QuestionGeneratorConfig,
   QuestionVotingConfig,
   QuestionVotingRoomResult,
@@ -93,7 +96,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     is_active: true,
   };
 
-  let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig;
+  let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig | OneLineShareConfig;
 
   if (activityType === "outline_builder") {
     const profile = await getTeacherProfile();
@@ -139,7 +142,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       guidance,
       requireReason: formData.get("require_reason") !== null,
     };
-  } else {
+  } else if (activityType === "question_voting") {
     const sourceRoomId = String(formData.get("source_room_id") ?? "").trim();
     const evaluationCriteria = String(formData.get("evaluation_criteria") ?? "")
       .split("\n")
@@ -166,6 +169,21 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       maxSelections: clampNumber(formData.get("max_selections"), 1, sourceRoom.questions.length, 1),
       requireReason: formData.get("require_reason") !== "off",
     };
+  } else {
+    const promptTitle = String(formData.get("prompt_title") ?? "").trim() || "오늘 수업 한 줄 정리";
+    const promptDescription = String(formData.get("prompt_description") ?? "").trim()
+      || "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.";
+    const keywords = normalizeKeywordText(String(formData.get("keywords") ?? ""));
+
+    topic = promptTitle;
+    topicDescription = promptDescription;
+
+    activityConfig = {
+      promptTitle,
+      promptDescription,
+      keywords,
+      maxReactionsPerStudent: clampNumber(formData.get("max_reactions_per_student"), 1, 10, 3),
+    };
   }
 
   if (!topic) return { error: "주제를 입력해주세요." };
@@ -175,7 +193,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     .from("rooms")
     .insert({
       ...baseRoomPayload,
-      title: topic,
+      title: activityType === "one_line_share" ? "한줄모아" : topic,
       topic,
       topic_description: topicDescription,
       activity_type: activityType,
@@ -214,7 +232,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 }
 
 function parseActivityType(value: FormDataEntryValue | null): ActivityType {
-  return value === "question_generator" || value === "question_voting"
+  return value === "question_generator" || value === "question_voting" || value === "one_line_share"
     ? value
     : "outline_builder";
 }
@@ -553,6 +571,39 @@ export async function getQuestionVotingRoomResults(roomId: string): Promise<Ques
     .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission));
 
   return buildQuestionVotingRanking(config, submissions);
+}
+
+export async function getOneLineShareRoomResults(roomId: string): Promise<OneLineShareRoomResult["entries"]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id, activity_type")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== user.id || room.activity_type !== "one_line_share") {
+    return [];
+  }
+
+  const [entriesRes, reactionsRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("one_line_entries")
+      .select("id, session_id, student_number, student_name, content, contains_keywords, created_at, updated_at")
+      .eq("room_id", roomId),
+    admin
+      .schema("writing_helper")
+      .from("one_line_reactions")
+      .select("entry_id, session_id")
+      .eq("room_id", roomId)
+      .eq("reaction_type", "like"),
+  ]);
+
+  return buildOneLineShareBoard(entriesRes.data ?? [], reactionsRes.data ?? [], null);
 }
 
 async function getQuestionGeneratorSourceRoomSummary(

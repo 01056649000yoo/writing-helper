@@ -3,18 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { getStudentResult } from "@/app/actions/student-actions";
+import { getStudentResult, toggleOneLineReaction } from "@/app/actions/student-actions";
+import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import {
   QuestionVotingCompactList,
   QuestionVotingTopThree,
 } from "@/components/question-voting-ranking-summary";
 import type {
+  OneLineShareBoardEntry,
+  OneLineShareConfig,
   QuestionGeneratorSubmission,
   QuestionVotingConfig,
   QuestionVotingSubmission,
 } from "@/features/activities/types";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
 
 function parseOutline(text: string) {
   const sections: { title: string; content: string }[] = [];
@@ -52,6 +55,11 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
   const [questionVotingRanking, setQuestionVotingRanking] = useState<Array<{ questionId: string; text: string; votes: number; reasons: string[] }>>([]);
   const [questionVotingClosed, setQuestionVotingClosed] = useState(false);
+  const [oneLineShareConfig, setOneLineShareConfig] = useState<OneLineShareConfig | null>(null);
+  const [oneLineShareEntry, setOneLineShareEntry] = useState<{ entryId: string; content: string; containsKeywords: boolean; createdAt: string; updatedAt: string } | null>(null);
+  const [oneLineShareBoard, setOneLineShareBoard] = useState<OneLineShareBoardEntry[]>([]);
+  const [oneLineShareClosed, setOneLineShareClosed] = useState(false);
+  const [reactionPendingEntryId, setReactionPendingEntryId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -72,6 +80,10 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
       setQuestionVotingConfig(data.questionVotingConfig ?? null);
       setQuestionVotingRanking(data.questionVotingRanking ?? []);
       setQuestionVotingClosed(data.questionVotingClosed ?? false);
+      setOneLineShareConfig(data.oneLineShareConfig ?? null);
+      setOneLineShareEntry(data.oneLineShareEntry ?? null);
+      setOneLineShareBoard(data.oneLineShareBoard ?? []);
+      setOneLineShareClosed(data.oneLineShareClosed ?? false);
       setLoaded(true);
     });
   }, [sessionId, roomId]);
@@ -92,6 +104,11 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
       text: questionMap.get(questionId) ?? "질문을 찾을 수 없어요.",
     }));
   }, [questionVotingConfig, questionVotingSubmission]);
+
+  const usedReactionCount = useMemo(
+    () => oneLineShareBoard.filter((entry) => entry.likedByCurrentSession).length,
+    [oneLineShareBoard],
+  );
 
   function copyCurrentText() {
     if (!currentText) return;
@@ -280,6 +297,80 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               <QuestionVotingCompactList ranking={questionVotingRanking} />
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (activityType === "one_line_share" && oneLineShareConfig && oneLineShareEntry) {
+    async function handleToggleReaction(entryId: string) {
+      setReactionPendingEntryId(entryId);
+      const result = await toggleOneLineReaction(sessionId, roomId, entryId);
+      if (result.entries) {
+        setOneLineShareBoard(result.entries);
+      }
+      setReactionPendingEntryId(null);
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 to-pink-100 p-4">
+        <div className="max-w-3xl mx-auto pt-8 pb-16 space-y-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
+            <div className="text-5xl mb-2">💬</div>
+            <h1 className="text-2xl font-bold text-gray-800">한줄모아</h1>
+            <p className="text-gray-500 mt-1 text-sm">
+              <strong className="text-rose-600">{studentName}</strong>의{" "}
+              <strong>{topic}</strong> 활동 결과
+            </p>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-rose-500">내가 쓴 한 줄</p>
+                <h2 className="mt-1 text-lg font-bold text-gray-800">오늘의 한 문장</h2>
+              </div>
+              {oneLineShareEntry.containsKeywords && (
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  핵심단어 포함
+                </span>
+              )}
+            </div>
+            <div className="rounded-2xl bg-rose-50 p-4">
+              <p className="text-base font-medium leading-relaxed text-rose-950">{oneLineShareEntry.content}</p>
+            </div>
+          </div>
+
+          {oneLineShareBoard.length > 0 && (
+            <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-rose-500">우리 반 한줄모아</p>
+                  <h2 className="mt-1 text-lg font-bold text-gray-800">친구들이 쓴 한 줄</h2>
+                </div>
+                <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                  좋아요 {usedReactionCount}/{oneLineShareConfig.maxReactionsPerStudent}
+                </span>
+              </div>
+              <OneLineShareTopThree entries={oneLineShareBoard} />
+              <OneLineShareBoard
+                entries={oneLineShareBoard}
+                interactive
+                closed={oneLineShareClosed}
+                maxReactionsPerStudent={oneLineShareConfig.maxReactionsPerStudent}
+                currentReactionCount={usedReactionCount}
+                onToggleLike={handleToggleReaction}
+                pendingEntryId={reactionPendingEntryId}
+              />
+            </div>
+          )}
+
+          <Link
+            href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+            className="block w-full rounded-2xl border border-rose-200 bg-white py-4 text-center font-bold text-rose-700 transition-colors hover:bg-rose-50"
+          >
+            ✏️ 한 줄 다시 수정하기
+          </Link>
         </div>
       </div>
     );

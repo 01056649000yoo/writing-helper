@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { RoomEntryClient } from "./room-entry-client";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
 
 export default async function RoomEntryPage({
   params,
@@ -24,7 +24,7 @@ export default async function RoomEntryPage({
   }
 
   const activityType: ActivityType =
-    room.activity_type === "question_generator" || room.activity_type === "question_voting"
+    room.activity_type === "question_generator" || room.activity_type === "question_voting" || room.activity_type === "one_line_share"
       ? room.activity_type
       : "outline_builder";
 

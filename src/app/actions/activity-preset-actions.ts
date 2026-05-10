@@ -125,13 +125,15 @@ function buildPresetTitle(activityType: ActivityType, config: Record<string, unk
       return "질문 카드 활동 설정";
     case "question_voting":
       return "좋은 질문 고르기 설정";
+    case "one_line_share":
+      return "한줄모아 설정";
     default:
       return "활동 설정";
   }
 }
 
 function normalizeActivityType(value: string): ActivityType {
-  return value === "question_generator" || value === "question_voting"
+  return value === "question_generator" || value === "question_voting" || value === "one_line_share"
     ? value
     : "outline_builder";
 }
