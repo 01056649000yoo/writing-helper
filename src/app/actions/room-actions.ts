@@ -175,6 +175,9 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     .from("rooms")
     .insert({
       ...baseRoomPayload,
+      title: topic,
+      topic,
+      topic_description: topicDescription,
       activity_type: activityType,
       activity_config: activityConfig,
       activity_state: {},
@@ -188,7 +191,12 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     const fallback = await admin
       .schema("writing_helper")
       .from("rooms")
-      .insert(baseRoomPayload)
+      .insert({
+        ...baseRoomPayload,
+        title: topic,
+        topic,
+        topic_description: topicDescription,
+      })
       .select("id")
       .single();
 
