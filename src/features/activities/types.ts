@@ -64,7 +64,6 @@ export type QuestionGeneratorConfig = {
   maxSelections: number;
   guidance: string;
   requireReason: boolean;
-  allowCustomQuestion: boolean;
 };
 
 export type StudentQuestion = {

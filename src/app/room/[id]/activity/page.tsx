@@ -71,7 +71,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   );
 
   const maxSelections = activityConfig?.maxSelections ?? 1;
-  const allowCustomQuestion = activityConfig?.allowCustomQuestion ?? false;
   const requireReason = activityConfig?.requireReason ?? true;
 
   useEffect(() => {
@@ -527,19 +526,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 </button>
               ))}
 
-              {allowCustomQuestion && (
-                <button
-                  onClick={() => {
-                    setQuestionBuildMode("direct");
-                    setSelectedPrompt(null);
-                    setStep("question_rewrite");
-                  }}
-                  className="rounded-3xl border-2 border-dashed border-sky-300 bg-white p-5 text-left text-sky-700 hover:bg-sky-50 transition-colors"
-                >
-                  <p className="font-semibold">내가 직접 질문 만들기</p>
-                  <p className="text-sm text-sky-600 mt-1">카드를 참고해서 완전히 새로운 질문을 써볼래요.</p>
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -812,7 +798,6 @@ function normalizeQuestionGeneratorConfig(value: unknown): QuestionGeneratorConf
       maxSelections: 1,
       guidance: "마음에 드는 질문 카드를 고르고, 오늘 주제에 어울리게 질문을 바꿔봐요.",
       requireReason: true,
-      allowCustomQuestion: false,
     };
   }
 
@@ -843,7 +828,6 @@ function normalizeQuestionGeneratorConfig(value: unknown): QuestionGeneratorConf
       ? raw.guidance.trim()
       : "직접 질문을 만들거나 질문 카드를 고르고, 오늘 주제에 어울리게 질문을 바꿔봐요.",
     requireReason: raw.requireReason !== false,
-    allowCustomQuestion: Boolean(raw.allowCustomQuestion),
   };
 }
 

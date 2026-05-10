@@ -40,7 +40,6 @@ type QuestionGeneratorDraft = {
   max_selections: string;
   guidance: string;
   require_reason: boolean;
-  allow_custom_question: boolean;
   selectedCardSetIds: string[];
 };
 
@@ -669,7 +668,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     max_selections: "1",
     guidance: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
     require_reason: true,
-    allow_custom_question: false,
     selectedCardSetIds: [],
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<QuestionGeneratorDraft>(
@@ -941,20 +939,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           <div>
             <p className="text-sm font-semibold text-gray-800">왜 이렇게 바꿨는지 함께 적기</p>
             <p className="text-xs text-gray-400 mt-1">질문을 고친 이유를 짧게 적게 합니다.</p>
-          </div>
-        </label>
-
-        <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50/70">
-          <input
-            type="checkbox"
-            name="allow_custom_question"
-            checked={draft.allow_custom_question}
-            onChange={(event) => setDraft((prev) => ({ ...prev, allow_custom_question: event.target.checked }))}
-            className="text-emerald-500"
-          />
-          <div>
-            <p className="text-sm font-semibold text-gray-800">카드 외에 새 질문 직접 쓰기 허용</p>
-            <p className="text-xs text-gray-400 mt-1">필요하면 학생이 아예 새로운 질문을 추가로 만들 수 있습니다.</p>
           </div>
         </label>
 

@@ -26,7 +26,6 @@ export const questionGeneratorDefinition: ActivityDefinition<
     maxSelections: 1,
     guidance: "직접 질문을 만들거나 질문 카드를 골라 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
     requireReason: true,
-    allowCustomQuestion: false,
   }),
   validateConfig: (input) => {
     const raw = isRecord(input) ? input : {};
@@ -45,7 +44,6 @@ export const questionGeneratorDefinition: ActivityDefinition<
         maxSelections: clampNumber(raw.maxSelections, 1, 4, 1),
         guidance,
         requireReason: raw.requireReason !== false,
-        allowCustomQuestion: Boolean(raw.allowCustomQuestion),
       },
     };
   },

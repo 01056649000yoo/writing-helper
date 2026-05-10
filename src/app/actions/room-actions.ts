@@ -137,7 +137,6 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
       guidance,
       requireReason: formData.get("require_reason") !== null,
-      allowCustomQuestion: formData.get("allow_custom_question") === "on",
     };
   } else {
     const candidateLines = String(formData.get("candidates") ?? "")
