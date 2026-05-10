@@ -487,7 +487,7 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
   const { data: sessions } = await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("room_id, submission")
+    .select("id, room_id, submission")
     .in("room_id", roomIds)
     .eq("status", "done");
 
@@ -500,7 +500,7 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
     const current = questionsByRoom.get(session.room_id) ?? [];
     submission.selections.forEach((selection) => {
       current.push({
-        id: `${session.room_id}-${selection.id}`,
+        id: `${session.id}-${selection.id}`,
         text: selection.remixedQuestion,
       });
     });
@@ -574,7 +574,7 @@ async function getQuestionGeneratorSourceRoomSummary(
   const { data: sessions } = await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("room_id, submission")
+    .select("id, room_id, submission")
     .eq("room_id", roomId)
     .eq("status", "done");
 
@@ -583,7 +583,7 @@ async function getQuestionGeneratorSourceRoomSummary(
     if (!submission) return [];
 
     return submission.selections.map((selection) => ({
-      id: `${session.room_id}-${selection.id}`,
+      id: `${session.id}-${selection.id}`,
       text: selection.remixedQuestion,
     }));
   });

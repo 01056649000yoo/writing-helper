@@ -19,6 +19,7 @@ export function normalizeQuestionVotingConfig(value: unknown): QuestionVotingCon
         }))
         .filter((question) => question.id.length > 0 && question.text.length > 0)
     : [];
+  const dedupedSourceQuestions = dedupeQuestions(sourceQuestions);
 
   const evaluationCriteria = Array.isArray(raw.evaluationCriteria)
     ? raw.evaluationCriteria
@@ -27,7 +28,7 @@ export function normalizeQuestionVotingConfig(value: unknown): QuestionVotingCon
         .filter(Boolean)
     : [];
 
-  return sourceQuestions.length > 0
+  return dedupedSourceQuestions.length > 0
     ? {
         sourceRoomId: typeof raw.sourceRoomId === "string" && raw.sourceRoomId.trim()
           ? raw.sourceRoomId.trim()
@@ -35,9 +36,9 @@ export function normalizeQuestionVotingConfig(value: unknown): QuestionVotingCon
         sourceRoomTitle: typeof raw.sourceRoomTitle === "string" && raw.sourceRoomTitle.trim()
           ? raw.sourceRoomTitle.trim()
           : null,
-        sourceQuestions,
+        sourceQuestions: dedupedSourceQuestions,
         evaluationCriteria,
-        maxSelections: clampNumber(raw.maxSelections, 1, Math.max(sourceQuestions.length, 1), 1),
+        maxSelections: clampNumber(raw.maxSelections, 1, Math.max(dedupedSourceQuestions.length, 1), 1),
         requireReason: raw.requireReason === true,
       }
     : null;
@@ -115,4 +116,22 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
   const numberValue = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numberValue)) return fallback;
   return Math.min(Math.max(Math.trunc(numberValue), min), max);
+}
+
+function dedupeQuestions(questions: Array<{ id: string; text: string }>) {
+  const seen = new Map<string, number>();
+
+  return questions.map((question) => {
+    const count = seen.get(question.id) ?? 0;
+    seen.set(question.id, count + 1);
+
+    if (count === 0) {
+      return question;
+    }
+
+    return {
+      ...question,
+      id: `${question.id}__${count + 1}`,
+    };
+  });
 }
