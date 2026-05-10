@@ -49,8 +49,6 @@ type QuestionGeneratorDraft = {
 };
 
 type QuestionVotingDraft = {
-  topic: string;
-  topic_description: string;
   duration_hours: string;
   max_selections: string;
   evaluation_criteria: string;
@@ -968,8 +966,6 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
   const [sourceRooms, setSourceRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
   const [loadingSourceRooms, setLoadingSourceRooms] = useState(true);
   const initialDraft = useMemo<QuestionVotingDraft>(() => ({
-    topic: "",
-    topic_description: "",
     duration_hours: "4",
     max_selections: "1",
     evaluation_criteria: "생각이 더 이어지는 질문\n친구가 더 이야기하고 싶어지는 질문",
@@ -1050,16 +1046,6 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
       <form onSubmit={handleSubmit} className="space-y-6">
         <input type="hidden" name="class_id" value={classId} />
         <input type="hidden" name="activity_type" value="question_voting" />
-
-        <TopicFields
-          values={{
-            topic: draft.topic,
-            topic_description: draft.topic_description,
-          }}
-          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          hint="어떤 관점으로 좋은 질문을 고를지 함께 안내하면 활동 목표가 더 분명해집니다."
-          placeholder="예) 친구들의 생각을 가장 넓혀주는 질문을 골라 봅시다."
-        />
 
         <div>
           <div className="flex items-center justify-between gap-3 mb-3">

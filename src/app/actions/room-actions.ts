@@ -27,8 +27,8 @@ export async function generateQuestionsPreview(formData: FormData): Promise<{ qu
   const profile = await getTeacherProfile();
   if (!profile?.vault_secret_id) return { error: "GPT API 키를 먼저 설정해주세요." };
 
-  const topic = String(formData.get("topic") ?? "").trim();
-  const topicDescription = String(formData.get("topic_description") ?? "").trim();
+  let topic = String(formData.get("topic") ?? "").trim();
+  let topicDescription = String(formData.get("topic_description") ?? "").trim();
   const subjectType = String(formData.get("subject_type")) as SubjectType;
   const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
   const outlineDepth = (String(formData.get("outline_depth")) || "simple") as OutlineDepth;
@@ -52,8 +52,8 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   if (!user) return { error: "로그인이 필요합니다." };
 
   const classId = String(formData.get("class_id") ?? "").trim();
-  const topic = String(formData.get("topic") ?? "").trim();
-  const topicDescription = String(formData.get("topic_description") ?? "").trim();
+  let topic = String(formData.get("topic") ?? "").trim();
+  let topicDescription = String(formData.get("topic_description") ?? "").trim();
   const activityType = parseActivityType(formData.get("activity_type"));
   const subjectType = String(formData.get("subject_type")) as SubjectType;
   const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
@@ -62,7 +62,6 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   const questionSetsJson = String(formData.get("question_sets_json") ?? "").trim();
 
   if (!classId) return { error: "학급을 선택해주세요." };
-  if (!topic) return { error: "주제를 입력해주세요." };
 
   const admin = createSupabaseAdminClient();
   const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
@@ -156,6 +155,9 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       return { error: "질문 만들기 결과를 불러오지 못했습니다. 다시 선택해주세요." };
     }
 
+    topic = sourceRoom.title || sourceRoom.topic || "좋은 질문 고르기";
+    topicDescription = sourceRoom.topic || sourceRoom.title || "";
+
     activityConfig = {
       sourceRoomId: sourceRoom.roomId,
       sourceRoomTitle: sourceRoom.title,
@@ -165,6 +167,8 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       requireReason: formData.get("require_reason") !== "off",
     };
   }
+
+  if (!topic) return { error: "주제를 입력해주세요." };
 
   let { data: room, error: roomError } = await admin
     .schema("writing_helper")
