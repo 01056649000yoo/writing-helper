@@ -54,6 +54,8 @@ type QuestionVotingDraft = {
   evaluation_criteria: string;
   require_reason: boolean;
   source_room_id: string;
+  source_room_title: string;
+  source_room_topic: string;
 };
 
 const DRAFT_SAVE_INTERVAL_MS = 5000;
@@ -971,6 +973,8 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     evaluation_criteria: "생각이 더 이어지는 질문\n친구가 더 이야기하고 싶어지는 질문",
     require_reason: true,
     source_room_id: "",
+    source_room_title: "",
+    source_room_topic: "",
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<QuestionVotingDraft>(
     buildDraftStorageKey(classId, "question_voting"),
@@ -987,6 +991,8 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
       setDraft((prev) => ({
         ...prev,
         source_room_id: prev.source_room_id || rooms[0]?.roomId || "",
+        source_room_title: prev.source_room_title || rooms[0]?.title || "",
+        source_room_topic: prev.source_room_topic || rooms[0]?.topic || "",
       }));
       setLoadingSourceRooms(false);
     });
@@ -1068,7 +1074,12 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
                   <button
                     key={room.roomId}
                     type="button"
-                    onClick={() => setDraft((prev) => ({ ...prev, source_room_id: room.roomId }))}
+                    onClick={() => setDraft((prev) => ({
+                      ...prev,
+                      source_room_id: room.roomId,
+                      source_room_title: room.title,
+                      source_room_topic: room.topic,
+                    }))}
                     className={`rounded-2xl border-2 p-4 text-left transition-colors ${
                       selected
                         ? "border-amber-400 bg-amber-50"

@@ -1048,6 +1048,7 @@ function normalizeQuestionVotingConfig(value: unknown): QuestionVotingConfig {
         }))
         .filter((question) => question.text.length > 0)
     : [];
+  const dedupedSourceQuestions = dedupeVotingQuestions(sourceQuestions);
 
   const evaluationCriteria = Array.isArray(raw.evaluationCriteria)
     ? raw.evaluationCriteria
@@ -1059,7 +1060,7 @@ function normalizeQuestionVotingConfig(value: unknown): QuestionVotingConfig {
   return {
     sourceRoomId: typeof raw.sourceRoomId === "string" && raw.sourceRoomId.trim() ? raw.sourceRoomId.trim() : null,
     sourceRoomTitle: typeof raw.sourceRoomTitle === "string" && raw.sourceRoomTitle.trim() ? raw.sourceRoomTitle.trim() : null,
-    sourceQuestions,
+    sourceQuestions: dedupedSourceQuestions,
     evaluationCriteria,
     maxSelections: normalizeSelectionCount(raw.maxSelections),
     requireReason: raw.requireReason !== false,
@@ -1070,4 +1071,22 @@ function normalizeSelectionCount(value: unknown) {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed)) return 1;
   return Math.min(Math.max(Math.trunc(parsed), 1), 4);
+}
+
+function dedupeVotingQuestions(questions: Array<{ id: string; text: string }>) {
+  const seen = new Map<string, number>();
+
+  return questions.map((question) => {
+    const count = seen.get(question.id) ?? 0;
+    seen.set(question.id, count + 1);
+
+    if (count === 0) {
+      return question;
+    }
+
+    return {
+      ...question,
+      id: `${question.id}__${count + 1}`,
+    };
+  });
 }

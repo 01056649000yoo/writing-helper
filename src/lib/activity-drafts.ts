@@ -13,6 +13,8 @@ export type ActivityDraftSummary = {
   activityType: ActivityType;
   topic: string;
   topicDescription: string;
+  sourceRoomTitle: string;
+  sourceRoomTopic: string;
   savedAt: number | null;
 };
 
@@ -96,6 +98,8 @@ export function listActivityDraftsForClass(classId: string): ActivityDraftSummar
         activityType,
         topic: typeof payload.data.topic === "string" ? payload.data.topic : "",
         topicDescription: typeof payload.data.topic_description === "string" ? payload.data.topic_description : "",
+        sourceRoomTitle: typeof payload.data.source_room_title === "string" ? payload.data.source_room_title : "",
+        sourceRoomTopic: typeof payload.data.source_room_topic === "string" ? payload.data.source_room_topic : "",
         savedAt: typeof payload.savedAt === "number" ? payload.savedAt : null,
       });
     } catch {

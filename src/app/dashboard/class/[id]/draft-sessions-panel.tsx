@@ -21,6 +21,15 @@ const ACTIVITY_EMOJI: Record<ActivityType, string> = {
   question_voting: "🗳️",
 };
 
+function getDraftTitle(draft: ActivityDraftSummary) {
+  if (draft.activityType === "question_voting") {
+    const base = draft.sourceRoomTopic || draft.sourceRoomTitle || draft.topic;
+    return base ? `${base} 질문 고르기` : ACTIVITY_LABEL[draft.activityType];
+  }
+
+  return draft.topic || ACTIVITY_LABEL[draft.activityType];
+}
+
 export function DraftSessionsPanel({ classId }: { classId: string }) {
   const [drafts, setDrafts] = useState<ActivityDraftSummary[]>([]);
   const [confirmingDeleteKey, setConfirmingDeleteKey] = useState<string | null>(null);
@@ -49,7 +58,7 @@ export function DraftSessionsPanel({ classId }: { classId: string }) {
                 <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">초안</span>
               </div>
               <h3 className="font-bold text-gray-800 text-base">
-                {draft.topic || ACTIVITY_LABEL[draft.activityType]}
+                {getDraftTitle(draft)}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
                 활동: {ACTIVITY_LABEL[draft.activityType]}
