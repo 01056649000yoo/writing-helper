@@ -122,6 +122,16 @@ function QuestionResultsModal({
   onClose: () => void;
 }) {
   const totalQuestions = results.reduce((sum, result) => sum + result.selections.length, 0);
+  const [viewMode, setViewMode] = useState<"students" | "questions">("students");
+  const flattenedQuestions = results.flatMap((result) =>
+    result.selections.map((selection, index) => ({
+      sessionId: result.sessionId,
+      studentNumber: result.studentNumber,
+      studentName: result.studentName,
+      order: index + 1,
+      selection,
+    }))
+  );
 
   return (
     <div
@@ -150,10 +160,55 @@ function QuestionResultsModal({
         </div>
 
         <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
+          <div className="mb-5 inline-flex rounded-2xl bg-sky-50 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("students")}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
+                viewMode === "students"
+                  ? "bg-white text-sky-700 shadow-sm"
+                  : "text-sky-600 hover:text-sky-700"
+              }`}
+            >
+              학생별 보기
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("questions")}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
+                viewMode === "questions"
+                  ? "bg-white text-sky-700 shadow-sm"
+                  : "text-sky-600 hover:text-sky-700"
+              }`}
+            >
+              질문만 모아보기
+            </button>
+          </div>
+
           {results.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/70 p-10 text-center">
               <p className="text-base font-semibold text-sky-800">아직 제출된 질문이 없어요.</p>
               <p className="mt-2 text-sm text-sky-600">학생이 질문 만들기를 완료하면 여기에 모아볼 수 있습니다.</p>
+            </div>
+          ) : viewMode === "questions" ? (
+            <div className="grid gap-3">
+              {flattenedQuestions.map(({ sessionId, studentNumber, studentName, order, selection }) => (
+                <div key={`${sessionId}-${selection.id}`} className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-sky-500">
+                        {studentNumber}번 {studentName} · 질문 {order}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-base font-medium leading-relaxed text-sky-950">
+                    {selection.remixedQuestion}
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="space-y-4">
