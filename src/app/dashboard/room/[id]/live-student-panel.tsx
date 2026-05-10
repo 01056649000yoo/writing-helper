@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { getRoomSessions } from "@/app/actions/room-actions";
+import { getQuestionGeneratorRoomResults, getRoomSessions } from "@/app/actions/room-actions";
 
 type Student = { id: string; student_number: number; student_name: string };
 type Session = {
@@ -12,6 +12,20 @@ type Session = {
   student_name: string;
   level: string | null;
   status: string;
+};
+type ActivityType = "outline_builder" | "question_generator" | "question_voting";
+type QuestionResult = {
+  sessionId: string;
+  studentNumber: number;
+  studentName: string;
+  selections: Array<{
+    id: string;
+    method: "direct" | "card_remix";
+    cardSetLabel: string;
+    originalPrompt: string | null;
+    remixedQuestion: string;
+    reason?: string;
+  }>;
 };
 
 function levelLabel(level: string) {
@@ -100,21 +114,136 @@ function StudentQrModal({
   );
 }
 
+function QuestionResultsModal({
+  results,
+  onClose,
+}: {
+  results: QuestionResult[];
+  onClose: () => void;
+}) {
+  const totalQuestions = results.reduce((sum, result) => sum + result.selections.length, 0);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-sky-100 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-500">질문 만들기 결과</p>
+            <h3 className="text-2xl font-bold text-gray-800 mt-1">학생 질문 모아보기</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {results.length}명의 학생이 만든 질문 {totalQuestions}개를 한 번에 확인할 수 있어요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
+          {results.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/70 p-10 text-center">
+              <p className="text-base font-semibold text-sky-800">아직 제출된 질문이 없어요.</p>
+              <p className="mt-2 text-sm text-sky-600">학생이 질문 만들기를 완료하면 여기에 모아볼 수 있습니다.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {results.map((result) => (
+                <div key={result.sessionId} className="rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-sky-500">학생</p>
+                      <h4 className="text-lg font-bold text-gray-800">
+                        {result.studentNumber}번 {result.studentName}
+                      </h4>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700">
+                      질문 {result.selections.length}개
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {result.selections.map((selection, index) => (
+                      <div key={selection.id} className="rounded-2xl bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-sky-500">
+                              질문 {index + 1}
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                              {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {selection.originalPrompt && (
+                          <div className="mt-3 rounded-2xl bg-gray-50 p-3">
+                            <p className="text-xs font-semibold text-gray-500">고른 질문 카드</p>
+                            <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
+                          </div>
+                        )}
+
+                        <div className="mt-3 rounded-2xl bg-sky-50 p-3">
+                          <p className="text-xs font-semibold text-sky-700">학생이 만든 질문</p>
+                          <p className="mt-1 text-base font-medium leading-relaxed text-sky-950">
+                            {selection.remixedQuestion}
+                          </p>
+                        </div>
+
+                        {selection.reason && (
+                          <div className="mt-3 rounded-2xl bg-emerald-50 p-3">
+                            <p className="text-xs font-semibold text-emerald-700">이렇게 만든 이유</p>
+                            <p className="mt-1 text-sm leading-relaxed text-emerald-950">{selection.reason}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LiveStudentPanel({
   roomId,
   students,
   isActive,
+  activityType,
+  questionResults: initialQuestionResults,
 }: {
   roomId: string;
   students: Student[];
   isActive: boolean;
+  activityType: ActivityType;
+  questionResults: QuestionResult[];
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
+  const [isQuestionResultsOpen, setIsQuestionResultsOpen] = useState(false);
+  const [questionResults, setQuestionResults] = useState<QuestionResult[]>(initialQuestionResults);
 
   async function fetchSessions() {
     const data = await getRoomSessions(roomId);
     setSessions((data as Session[]) ?? []);
+
+    if (activityType === "question_generator") {
+      const questionData = await getQuestionGeneratorRoomResults(roomId);
+      setQuestionResults((questionData as QuestionResult[]) ?? []);
+    }
   }
 
   useEffect(() => {
@@ -122,7 +251,7 @@ export default function LiveStudentPanel({
     if (!isActive) return;
     const interval = setInterval(fetchSessions, 4000);
     return () => clearInterval(interval);
-  }, [roomId, isActive]);
+  }, [roomId, isActive, activityType]);
 
   const doneSessions = sessions.filter(s => s.status === "done");
   const activeSessions = sessions.filter(s => s.status === "in_progress");
@@ -139,12 +268,33 @@ export default function LiveStudentPanel({
           onClose={() => setQrTarget(null)}
         />
       )}
+      {isQuestionResultsOpen && (
+        <QuestionResultsModal
+          results={questionResults}
+          onClose={() => setIsQuestionResultsOpen(false)}
+        />
+      )}
 
       <div className="bg-white rounded-3xl shadow-xl p-8 space-y-6">
         {/* 헤더 */}
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800">학생 활동 현황</h2>
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">학생 활동 현황</h2>
+            {activityType === "question_generator" && (
+              <p className="mt-1 text-sm text-gray-500">학생들이 만든 질문을 모달에서 한 번에 모아볼 수 있어요.</p>
+            )}
+          </div>
           <div className="flex items-center gap-3">
+            {activityType === "question_generator" && (
+              <button
+                type="button"
+                onClick={() => setIsQuestionResultsOpen(true)}
+                className="rounded-2xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-200"
+                disabled={questionResults.length === 0}
+              >
+                질문 결과 모아보기
+              </button>
+            )}
             <div className="flex gap-3 text-sm">
               <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
                 접속 중 {activeSessions.length}명
@@ -190,8 +340,12 @@ export default function LiveStudentPanel({
         {doneSessions.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold text-green-600">✅ 개요 완성</p>
-              <p className="text-xs text-gray-400">QR 버튼 → 학생 개인 결과 QR</p>
+              <p className="text-sm font-semibold text-green-600">
+                {activityType === "question_generator" ? "✅ 질문 제출 완료" : "✅ 개요 완성"}
+              </p>
+              <p className="text-xs text-gray-400">
+                {activityType === "question_generator" ? "보기 → 학생 질문 상세" : "QR 버튼 → 학생 개인 결과 QR"}
+              </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {doneSessions.map(s => (

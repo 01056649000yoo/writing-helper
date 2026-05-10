@@ -8,6 +8,7 @@ import { getCurrentUser, getTeacherProfile } from "./auth-actions";
 import { getApiKey } from "@/lib/vault";
 import { generateQuestionSets } from "@/lib/gpt";
 import { getTeacherQuestionCardSets } from "@/lib/question-card-sets";
+import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import type {
   ActivityType,
   OutlineBuilderConfig,
@@ -371,6 +372,66 @@ export async function getRoomSessions(roomId: string) {
     .eq("room_id", roomId)
     .order("created_at");
   return data ?? [];
+}
+
+export type QuestionGeneratorRoomResultSummary = {
+  sessionId: string;
+  studentNumber: number;
+  studentName: string;
+  selections: Array<{
+    id: string;
+    method: "direct" | "card_remix";
+    cardSetLabel: string;
+    originalPrompt: string | null;
+    remixedQuestion: string;
+    reason?: string;
+  }>;
+};
+
+export async function getQuestionGeneratorRoomResults(roomId: string): Promise<QuestionGeneratorRoomResultSummary[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id, activity_type")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== user.id || room.activity_type !== "question_generator") {
+    return [];
+  }
+
+  const { data } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("id, student_number, student_name, submission")
+    .eq("room_id", roomId)
+    .eq("status", "done")
+    .order("student_number");
+
+  const results: QuestionGeneratorRoomResultSummary[] = (data ?? []).flatMap((session) => {
+      const submission = normalizeQuestionGeneratorSubmission(session.submission);
+      if (!submission) return [];
+
+      return [{
+        sessionId: session.id,
+        studentNumber: session.student_number,
+        studentName: session.student_name,
+        selections: submission.selections.map((selection) => ({
+          id: selection.id,
+          method: selection.method,
+          cardSetLabel: selection.cardSetLabel,
+          originalPrompt: selection.originalPrompt,
+          remixedQuestion: selection.remixedQuestion,
+          reason: selection.reason,
+        })),
+      }];
+    });
+
+  return results;
 }
 
 async function getShortCodeForRoom(roomId: string, teacherId: string) {
