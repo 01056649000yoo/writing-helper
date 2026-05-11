@@ -235,6 +235,7 @@ const COMING_SOON_ACTIVITIES: {
   badge: string;
   summary: string;
   effect: string;
+  href?: string;
 }[] = [
   {
     emoji: "🔬",
@@ -244,6 +245,7 @@ const COMING_SOON_ACTIVITIES: {
     summary:
       "본 것(관찰) → 생각한 것(추론) → 궁금한 것(질문) 3단계 틀로 과학적 사고를 글로 옮기는 활동",
     effect: "단순 사실 나열을 넘어 과학적 사고력 훈련",
+    href: "/dashboard/science/new",
   },
   {
     emoji: "🎭",
@@ -349,6 +351,11 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
                       {COMING_SOON_ACTIVITIES.length}개
                     </span>
+                    {COMING_SOON_ACTIVITIES.some((a) => a.href) && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-600">
+                        {COMING_SOON_ACTIVITIES.filter((a) => a.href).length}개 출시
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-gray-400 ml-7">교과와 연계한 깊이 있는 글쓰기 활동</p>
                 </div>
@@ -356,26 +363,48 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {COMING_SOON_ACTIVITIES.map((activity) => (
-                  <div
-                    key={activity.label}
-                    className={`flex flex-col rounded-2xl border border-gray-200/80 bg-gradient-to-br ${activity.tone} p-5 opacity-55 cursor-not-allowed`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-3xl">{activity.emoji}</span>
-                      <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-semibold text-amber-500 shadow-sm">
-                        준비 중
-                      </span>
+                {COMING_SOON_ACTIVITIES.map((activity) =>
+                  activity.href ? (
+                    <Link
+                      key={activity.label}
+                      href={activity.href}
+                      className={`flex flex-col rounded-2xl border border-cyan-200 bg-gradient-to-br ${activity.tone} p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-3xl">{activity.emoji}</span>
+                        <span className="rounded-full bg-cyan-500 px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+                          NEW
+                        </span>
+                      </div>
+                      <h3 className="mt-4 text-base font-bold text-gray-800">{activity.label}</h3>
+                      <p className="mt-1.5 text-xs leading-5 text-gray-500 flex-1">{activity.summary}</p>
+                      <div className="mt-4 pt-3 border-t border-cyan-100/80 flex justify-end">
+                        <span className="inline-flex items-center gap-1 bg-cyan-500 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full">
+                          선택하기 →
+                        </span>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div
+                      key={activity.label}
+                      className={`flex flex-col rounded-2xl border border-gray-200/80 bg-gradient-to-br ${activity.tone} p-5 opacity-55 cursor-not-allowed`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-3xl">{activity.emoji}</span>
+                        <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-semibold text-amber-500 shadow-sm">
+                          준비 중
+                        </span>
+                      </div>
+                      <h3 className="mt-4 text-base font-bold text-gray-800">{activity.label}</h3>
+                      <p className="mt-1.5 text-xs leading-5 text-gray-500 flex-1">{activity.summary}</p>
+                      <div className="mt-4 pt-3 border-t border-gray-100/80 flex justify-end">
+                        <span className="inline-flex items-center gap-1 bg-gray-300 text-gray-500 text-xs font-semibold px-3.5 py-1.5 rounded-full">
+                          곧 출시 →
+                        </span>
+                      </div>
                     </div>
-                    <h3 className="mt-4 text-base font-bold text-gray-800">{activity.label}</h3>
-                    <p className="mt-1.5 text-xs leading-5 text-gray-500 flex-1">{activity.summary}</p>
-                    <div className="mt-4 pt-3 border-t border-gray-100/80 flex justify-end">
-                      <span className="inline-flex items-center gap-1 bg-gray-300 text-gray-500 text-xs font-semibold px-3.5 py-1.5 rounded-full">
-                        곧 출시 →
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </section>
 

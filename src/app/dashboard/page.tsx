@@ -3,14 +3,16 @@ import { getTeacherProfile } from "@/app/actions/auth-actions";
 import { checkHasApiKey } from "@/app/actions/settings-actions";
 import { getClasses } from "@/app/actions/class-actions";
 import { signOut } from "@/app/actions/auth-actions";
+import { getScienceRooms } from "@/app/actions/science-actions";
 import { ManualModal } from "./manual-modal";
 import { BUILD_LABEL } from "@/lib/build-version";
 
 export default async function DashboardPage() {
-  const [profile, classes, hasKey] = await Promise.all([
+  const [profile, classes, hasKey, scienceRooms] = await Promise.all([
     getTeacherProfile(),
     getClasses(),
     checkHasApiKey(),
+    getScienceRooms(),
   ]);
 
   return (
@@ -93,6 +95,61 @@ export default async function DashboardPage() {
             ))}
           </div>
         )}
+        {/* 과목별 글쓰기 활동 */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              🔬 과목별 글쓰기 활동
+            </h2>
+            <Link
+              href="/dashboard/science/new"
+              className="px-6 py-3 rounded-xl font-semibold text-base bg-cyan-500 text-white hover:bg-cyan-600 transition-colors"
+            >
+              + 과학 활동 만들기
+            </Link>
+          </div>
+
+          {scienceRooms.length === 0 ? (
+            <div className="bg-white rounded-2xl p-10 text-center shadow-sm">
+              <div className="text-5xl mb-4">🧪</div>
+              <p className="text-lg text-gray-500 font-medium">아직 만든 과학 활동이 없습니다.</p>
+              <p className="text-sm text-gray-400 mt-1">관찰 → 추론 → 질문 3단계 과학 글쓰기 활동을 시작해보세요.</p>
+              <Link
+                href="/dashboard/science/new"
+                className="inline-block mt-5 px-7 py-3 bg-cyan-500 text-white rounded-xl text-base font-semibold hover:bg-cyan-600 transition-colors"
+              >
+                첫 활동 만들기
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {scienceRooms.map((room) => (
+                <Link
+                  key={room.id}
+                  href={`/dashboard/science/${room.id}`}
+                  className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-cyan-100 flex flex-col"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="text-3xl">🔬</span>
+                    {room.is_active ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        진행 중
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">종료</span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
+                  <p className="text-xs text-gray-400 mt-1 flex-1 line-clamp-2">{room.topic}</p>
+                  <p className="text-xs text-gray-300 mt-3">
+                    {new Date(room.created_at).toLocaleDateString("ko-KR")} 개설
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

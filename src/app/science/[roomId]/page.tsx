@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, startTransition } from "react";
 import {
   getActiveScienceRoom,
   createScienceSession,
-  getScienceSession,
   saveScienceStep1,
   saveScienceStep2,
   saveScienceStep3,
@@ -499,24 +498,34 @@ function Step4Review({
   const [sessions, setSessions] = useState<ScienceSession[]>([]);
   const [reviews, setReviews] = useState<ScienceReview[]>([]);
 
-  const load = useCallback(async () => {
+  const roomId = room.id;
+
+  const runLoad = useCallback(async (cancelled: { value: boolean }) => {
     const [s, r] = await Promise.all([
-      getScienceRoomSessions(room.id),
-      getScienceRoomReviews(room.id),
+      getScienceRoomSessions(roomId),
+      getScienceRoomReviews(roomId),
     ]);
-    setSessions(s.filter((s) => s.id !== mySessionId && s.status === "done"));
-    setReviews(r);
-  }, [room.id, mySessionId]);
+    if (cancelled.value) return;
+    startTransition(() => {
+      setSessions(s.filter((sess) => sess.id !== mySessionId && sess.status === "done"));
+      setReviews(r);
+    });
+  }, [roomId, mySessionId]);
 
   useEffect(() => {
-    void load();
-    const t = setInterval(() => void load(), 5000);
-    return () => clearInterval(t);
-  }, [load]);
+    const cancelled = { value: false };
+    void runLoad(cancelled);
+    const t = setInterval(() => void runLoad(cancelled), 5000);
+    return () => {
+      cancelled.value = true;
+      clearInterval(t);
+    };
+  }, [runLoad]);
 
   async function react(targetId: string, reaction: ScienceReaction) {
-    await toggleScienceReview(room.id, mySessionId, targetId, reaction);
-    void load();
+    await toggleScienceReview(roomId, mySessionId, targetId, reaction);
+    const cancelled = { value: false };
+    void runLoad(cancelled);
   }
 
   function myReaction(targetId: string, reaction: ScienceReaction) {
