@@ -132,3 +132,16 @@ CREATE POLICY "anyone inserts science_reviews"
 CREATE POLICY "anyone deletes own science_review"
   ON writing_helper.science_reviews FOR DELETE
   USING (true);
+
+-- 권한 부여 (새 테이블은 ALL ON ALL TABLES 소급 적용 안 됨)
+GRANT ALL ON writing_helper.science_rooms    TO service_role;
+GRANT ALL ON writing_helper.science_sessions TO service_role;
+GRANT ALL ON writing_helper.science_reviews  TO service_role;
+
+GRANT ALL ON writing_helper.science_rooms    TO authenticated;
+GRANT ALL ON writing_helper.science_sessions TO authenticated;
+GRANT ALL ON writing_helper.science_reviews  TO authenticated;
+
+GRANT SELECT                 ON writing_helper.science_rooms    TO anon;
+GRANT SELECT, INSERT, UPDATE ON writing_helper.science_sessions TO anon;
+GRANT SELECT, INSERT, DELETE ON writing_helper.science_reviews  TO anon;
