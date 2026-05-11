@@ -274,41 +274,10 @@ const COMING_SOON_ACTIVITIES: {
   },
 ];
 
-function SectionHeader({
-  emoji,
-  title,
-  desc,
-  count,
-  countLabel,
-  countColor,
-}: {
-  emoji: string;
-  title: string;
-  desc: string;
-  count: number;
-  countLabel: string;
-  countColor: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-start gap-3">
-        <span className="text-2xl mt-0.5">{emoji}</span>
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">{title}</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
-        </div>
-      </div>
-      <span className={`shrink-0 mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${countColor}`}>
-        {count}개 · {countLabel}
-      </span>
-    </div>
-  );
-}
-
 function ActivitySelectionScreen({ classId }: { classId: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-5xl mx-auto pt-8 pb-16">
+      <div className="max-w-6xl mx-auto pt-8 pb-16">
         <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="text-indigo-500 text-sm hover:underline">
           ← {classId ? "학급으로" : "대시보드로"}
         </Link>
@@ -323,36 +292,44 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
             </p>
           </div>
 
-          <div className="p-6 sm:p-8 space-y-10">
+          {/* 좌우 2-파트 레이아웃 */}
+          <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+
             {/* ── 파트 1: 글쓰기 활동 꾸러미 ── */}
-            <section>
-              <SectionHeader
-                emoji="📦"
-                title="글쓰기 활동 꾸러미"
-                desc="질문·투표·공유 등 수업 흐름을 이끄는 핵심 활동들"
-                count={activityDefinitions.length}
-                countLabel="바로 사용"
-                countColor="bg-indigo-50 text-indigo-600"
-              />
-              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section className="flex-1 p-6 sm:p-8">
+              <div className="flex items-start justify-between gap-3 mb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📦</span>
+                    <h2 className="text-base font-bold text-gray-800">글쓰기 활동 꾸러미</h2>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600">
+                      {activityDefinitions.length}개
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400 ml-7">질문·투표·공유 등 수업 흐름을 이끄는 핵심 활동</p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-full">바로 사용</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {activityDefinitions.map((activity) => {
                   const meta = ACTIVITY_META[activity.id];
                   return (
                     <Link
                       key={activity.id}
                       href={`/dashboard/room/new?class_id=${classId}&activity_type=${activity.id}`}
-                      className={`flex flex-col rounded-3xl border border-gray-200 bg-gradient-to-br ${meta.tone} p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-200`}
+                      className={`flex flex-col rounded-2xl border border-gray-200 bg-gradient-to-br ${meta.tone} p-5 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-200`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="text-4xl">{meta.emoji}</span>
-                        <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-500 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-3xl">{meta.emoji}</span>
+                        <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-semibold text-gray-400 shadow-sm">
                           플러그인
                         </span>
                       </div>
-                      <h3 className="mt-5 text-xl font-bold text-gray-800">{activity.label}</h3>
-                      <p className="mt-2 text-sm leading-6 text-gray-600 flex-1">{meta.summary}</p>
-                      <div className="mt-5 pt-4 border-t border-gray-100/80 flex justify-end">
-                        <span className="inline-flex items-center gap-1.5 bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors">
+                      <h3 className="mt-4 text-base font-bold text-gray-800">{activity.label}</h3>
+                      <p className="mt-1.5 text-xs leading-5 text-gray-500 flex-1">{meta.summary}</p>
+                      <div className="mt-4 pt-3 border-t border-gray-100/80 flex justify-end">
+                        <span className="inline-flex items-center gap-1 bg-indigo-600 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full">
                           선택하기 →
                         </span>
                       </div>
@@ -362,35 +339,38 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
               </div>
             </section>
 
-            {/* 구분선 */}
-            <div className="border-t border-gray-100" />
-
             {/* ── 파트 2: 과목별 글쓰기 활동 ── */}
-            <section>
-              <SectionHeader
-                emoji="📚"
-                title="과목별 글쓰기 활동"
-                desc="교과와 연계한 깊이 있는 글쓰기 활동들 — 순차적으로 출시됩니다"
-                count={COMING_SOON_ACTIVITIES.length}
-                countLabel="출시 예정"
-                countColor="bg-amber-50 text-amber-600"
-              />
-              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section className="flex-1 p-6 sm:p-8 bg-gray-50/60">
+              <div className="flex items-start justify-between gap-3 mb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📚</span>
+                    <h2 className="text-base font-bold text-gray-800">과목별 글쓰기 활동</h2>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
+                      {COMING_SOON_ACTIVITIES.length}개
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400 ml-7">교과와 연계한 깊이 있는 글쓰기 활동</p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">출시 예정</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {COMING_SOON_ACTIVITIES.map((activity) => (
                   <div
                     key={activity.label}
-                    className={`flex flex-col rounded-3xl border border-gray-200/70 bg-gradient-to-br ${activity.tone} p-6 opacity-60 cursor-not-allowed`}
+                    className={`flex flex-col rounded-2xl border border-gray-200/80 bg-gradient-to-br ${activity.tone} p-5 opacity-55 cursor-not-allowed`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="text-4xl">{activity.emoji}</span>
-                      <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-amber-500 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-3xl">{activity.emoji}</span>
+                      <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-semibold text-amber-500 shadow-sm">
                         준비 중
                       </span>
                     </div>
-                    <h3 className="mt-5 text-xl font-bold text-gray-800">{activity.label}</h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-600 flex-1">{activity.summary}</p>
-                    <div className="mt-5 pt-4 border-t border-gray-100/80 flex justify-end">
-                      <span className="inline-flex items-center gap-1.5 bg-gray-300 text-gray-500 text-sm font-semibold px-4 py-2 rounded-full">
+                    <h3 className="mt-4 text-base font-bold text-gray-800">{activity.label}</h3>
+                    <p className="mt-1.5 text-xs leading-5 text-gray-500 flex-1">{activity.summary}</p>
+                    <div className="mt-4 pt-3 border-t border-gray-100/80 flex justify-end">
+                      <span className="inline-flex items-center gap-1 bg-gray-300 text-gray-500 text-xs font-semibold px-3.5 py-1.5 rounded-full">
                         곧 출시 →
                       </span>
                     </div>
@@ -398,6 +378,7 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 ))}
               </div>
             </section>
+
           </div>
         </div>
       </div>
