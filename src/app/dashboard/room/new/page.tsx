@@ -228,6 +228,52 @@ function LevelEditor({
   );
 }
 
+const COMING_SOON_ACTIVITIES: {
+  emoji: string;
+  tone: string;
+  label: string;
+  badge: string;
+  summary: string;
+  effect: string;
+}[] = [
+  {
+    emoji: "🔬",
+    tone: "from-cyan-50 via-white to-sky-50",
+    label: "[과학] 관찰하고 추론하기",
+    badge: "실험 관찰 글쓰기",
+    summary:
+      "본 것(관찰) → 생각한 것(추론) → 궁금한 것(질문) 3단계 틀로 과학적 사고를 글로 옮기는 활동",
+    effect: "단순 사실 나열을 넘어 과학적 사고력 훈련",
+  },
+  {
+    emoji: "🎭",
+    tone: "from-violet-50 via-white to-purple-50",
+    label: "[사회] 입장 바꿔 생각하기",
+    badge: "역할 대입 글쓰기",
+    summary:
+      "사회·역사 속 인물이 되어 '내가 만약 ~라면?' 가정 아래 상황·선택·이유를 논리적으로 쓰는 활동",
+    effect: "공감 능력과 비판적 사고력을 동시에 성장",
+  },
+  {
+    emoji: "🔢",
+    tone: "from-yellow-50 via-white to-amber-50",
+    label: "[수학] 풀이 과정 설명하기",
+    badge: "문장제 문제 정복",
+    summary:
+      "답이 아닌 '어떻게 풀었나, 왜 이 식을 세웠나'를 친구에게 설명하듯 글로 쓰는 활동",
+    effect: "수학 개념 이해도를 스스로 점검하는 메타인지 훈련",
+  },
+  {
+    emoji: "🪞",
+    tone: "from-green-50 via-white to-emerald-50",
+    label: "[도덕/국어] 마음 거울 비추기",
+    badge: "감정·가치 글쓰기",
+    summary:
+      "오늘 배려·정직·용기 등 특정 가치와 연결된 순간을 포착해 당시 마음 상태를 구체적으로 묘사하는 활동",
+    effect: "어휘력 향상과 정서 조절 능력 발달",
+  },
+];
+
 function ActivitySelectionScreen({ classId }: { classId: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -246,13 +292,14 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
           </div>
 
           <div className="p-6 sm:p-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {/* 사용 가능한 활동 */}
             {activityDefinitions.map((activity) => {
               const meta = ACTIVITY_META[activity.id];
               return (
                 <Link
                   key={activity.id}
                   href={`/dashboard/room/new?class_id=${classId}&activity_type=${activity.id}`}
-                  className={`rounded-3xl border border-gray-200 bg-gradient-to-br ${meta.tone} p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-200`}
+                  className={`flex flex-col rounded-3xl border border-gray-200 bg-gradient-to-br ${meta.tone} p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-200`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span className="text-4xl">{meta.emoji}</span>
@@ -261,14 +308,35 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                     </span>
                   </div>
                   <h2 className="mt-5 text-xl font-bold text-gray-800">{activity.label}</h2>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">{meta.summary}</p>
-                  <div className="mt-5 flex items-center justify-between">
+                  <p className="mt-2 text-sm leading-6 text-gray-600 flex-1">{meta.summary}</p>
+                  <div className="mt-5 pt-4 border-t border-gray-100/80 flex items-center justify-between">
                     <span className="text-xs font-medium text-gray-400">{activity.description}</span>
                     <span className="text-sm font-semibold text-indigo-600">선택하기 →</span>
                   </div>
                 </Link>
               );
             })}
+
+            {/* 준비 중인 활동 */}
+            {COMING_SOON_ACTIVITIES.map((activity) => (
+              <div
+                key={activity.label}
+                className={`flex flex-col rounded-3xl border border-gray-200/70 bg-gradient-to-br ${activity.tone} p-6 opacity-60 cursor-not-allowed`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-4xl">{activity.emoji}</span>
+                  <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-amber-500 shadow-sm">
+                    준비 중
+                  </span>
+                </div>
+                <h2 className="mt-5 text-xl font-bold text-gray-800">{activity.label}</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-600 flex-1">{activity.summary}</p>
+                <div className="mt-5 pt-4 border-t border-gray-100/80 flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-400">{activity.effect}</span>
+                  <span className="text-sm font-semibold text-gray-400">곧 출시 →</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
