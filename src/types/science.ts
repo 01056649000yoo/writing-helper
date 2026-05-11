@@ -3,7 +3,18 @@
 // =====================================================
 
 export type SenseType = "sight" | "smell" | "hearing" | "touch";
-export type VariableCardType = "temperature" | "amount" | "material" | "time";
+export type VariableCardType =
+  | "temperature"   // 온도
+  | "amount"        // 양
+  | "material"      // 재질
+  | "time"          // 시간
+  | "light"         // 빛
+  | "length"        // 길이·크기
+  | "concentration" // 농도
+  | "shape"         // 모양
+  | "distance"      // 거리
+  | "weight"        // 무게
+  | "water";        // 물
 export type QuestionType = "variable" | "principle" | "extend";
 export type ScienceReaction = "agree" | "differ" | "discovery";
 export type ScienceStep = 1 | 2 | 3 | 4; // 4 = 완료
@@ -40,10 +51,17 @@ export const PRESET_MEASUREMENTS: MeasurementUnit[] = [
 ];
 
 export const VARIABLE_CARD_META: Record<VariableCardType, { emoji: string; label: string; placeholder: string }> = {
-  temperature: { emoji: "🌡", label: "온도를 바꾼다면?",   placeholder: "온도를 높이면 어떻게 될까요?" },
-  amount:      { emoji: "⚖️", label: "양을 바꾼다면?",    placeholder: "양을 반으로 줄이면 어떻게 될까요?" },
-  material:    { emoji: "🧱", label: "재질을 바꾼다면?",   placeholder: "유리 대신 플라스틱이면 어떻게 될까요?" },
-  time:        { emoji: "⏱", label: "시간을 바꾼다면?",   placeholder: "더 오래 두면 어떻게 될까요?" },
+  temperature:   { emoji: "🌡️", label: "온도를 바꾼다면?",    placeholder: "온도를 높이면 어떻게 달라질까요?" },
+  amount:        { emoji: "⚖️",  label: "양을 바꾼다면?",      placeholder: "양을 반으로 줄이면 어떻게 달라질까요?" },
+  material:      { emoji: "🧱",  label: "재질을 바꾼다면?",    placeholder: "유리 대신 플라스틱을 쓰면 어떻게 달라질까요?" },
+  time:          { emoji: "⏱️",  label: "시간을 바꾼다면?",    placeholder: "더 오래 두면 어떻게 달라질까요?" },
+  light:         { emoji: "☀️",  label: "빛을 바꾼다면?",      placeholder: "빛을 완전히 차단하면 어떻게 달라질까요?" },
+  length:        { emoji: "📏",  label: "길이·크기를 바꾼다면?", placeholder: "길이를 두 배로 늘리면 어떻게 달라질까요?" },
+  concentration: { emoji: "🧪",  label: "농도를 바꾼다면?",    placeholder: "물의 양을 늘려 농도를 낮추면 어떻게 달라질까요?" },
+  shape:         { emoji: "🔷",  label: "모양을 바꾼다면?",    placeholder: "모양을 다르게 바꾸면 어떻게 달라질까요?" },
+  distance:      { emoji: "📐",  label: "거리를 바꾼다면?",    placeholder: "거리를 가깝게 하면 어떻게 달라질까요?" },
+  weight:        { emoji: "🏋️",  label: "무게를 바꾼다면?",    placeholder: "더 무거운 것을 사용하면 어떻게 달라질까요?" },
+  water:         { emoji: "💧",  label: "물을 바꾼다면?",      placeholder: "물의 양을 늘리거나 줄이면 어떻게 달라질까요?" },
 };
 
 export const SENSE_META: Record<SenseType, { emoji: string; label: string }> = {

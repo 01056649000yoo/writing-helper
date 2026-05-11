@@ -13,7 +13,10 @@ import {
 } from "@/types/science";
 
 const ALL_SENSES: SenseType[] = ["sight", "smell", "hearing", "touch"];
-const ALL_VARIABLES: VariableCardType[] = ["temperature", "amount", "material", "time"];
+const ALL_VARIABLES: VariableCardType[] = [
+  "temperature", "amount", "material", "time",
+  "light", "length", "concentration", "shape", "distance", "weight", "water",
+];
 
 function Toggle({
   name,
