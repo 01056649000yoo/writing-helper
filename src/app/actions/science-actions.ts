@@ -159,14 +159,61 @@ export async function getActiveScienceRoom(roomId: string): Promise<ScienceRoom 
 }
 
 // ─────────────────────────────────────────
-// 학생: 세션 생성
+// 학생: 입장 검증 + 세션 생성 (기존 있으면 재사용)
 // ─────────────────────────────────────────
-export async function createScienceSession(
+export async function verifyScienceStudent(
   roomId: string,
   studentNumber: number,
   studentName: string,
-): Promise<{ sessionId: string } | { error: string }> {
+): Promise<{ sessionId: string; currentStep: number } | { error: string }> {
+  if (!roomId || roomId.length > 100) return { error: "잘못된 요청입니다." };
+  if (!Number.isInteger(studentNumber) || studentNumber < 1 || studentNumber > 100)
+    return { error: "출석 번호는 1~100 사이여야 합니다." };
+  if (!studentName || studentName.trim().length === 0 || studentName.length > 50)
+    return { error: "이름을 올바르게 입력해주세요." };
+
   const admin = createSupabaseAdminClient();
+
+  // 방 확인
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("science_rooms")
+    .select("id, is_active, expires_at, class_id")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room) return { error: "활동 방을 찾을 수 없습니다." };
+  if (!room.is_active) return { error: "이미 종료된 활동입니다." };
+  if (room.expires_at && new Date(room.expires_at) < new Date())
+    return { error: "활동 시간이 만료됐습니다." };
+
+  // 학생 명단 검증 (class_students)
+  if (room.class_id) {
+    const { data: cs } = await admin
+      .schema("writing_helper")
+      .from("class_students")
+      .select("id")
+      .eq("class_id", room.class_id)
+      .eq("student_number", studentNumber)
+      .eq("student_name", studentName)
+      .maybeSingle();
+
+    if (!cs) return { error: "번호나 이름이 명단과 다릅니다.\n선생님께 확인 후 다시 입력해주세요." };
+  }
+
+  // 기존 세션 재사용
+  const { data: existing } = await admin
+    .schema("writing_helper")
+    .from("science_sessions")
+    .select("id, current_step")
+    .eq("room_id", roomId)
+    .eq("student_number", studentNumber)
+    .eq("student_name", studentName)
+    .maybeSingle();
+
+  if (existing) return { sessionId: existing.id, currentStep: existing.current_step };
+
+  // 새 세션 생성
   const { data, error } = await admin
     .schema("writing_helper")
     .from("science_sessions")
@@ -175,7 +222,26 @@ export async function createScienceSession(
     .single();
 
   if (error) return { error: error.message };
-  return { sessionId: data.id };
+  return { sessionId: data.id, currentStep: 1 };
+}
+
+// ─────────────────────────────────────────
+// 교사: 학급별 과학 활동 목록
+// ─────────────────────────────────────────
+export async function getClassScienceRooms(classId: string): Promise<ScienceRoom[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .schema("writing_helper")
+    .from("science_rooms")
+    .select("*")
+    .eq("class_id", classId)
+    .eq("teacher_id", user.id)
+    .order("created_at", { ascending: false });
+
+  return (data ?? []).map(rowToScienceRoom);
 }
 
 // ─────────────────────────────────────────

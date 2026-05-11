@@ -245,7 +245,7 @@ const COMING_SOON_ACTIVITIES: {
     summary:
       "본 것(관찰) → 생각한 것(추론) → 궁금한 것(질문) 3단계 틀로 과학적 사고를 글로 옮기는 활동",
     effect: "단순 사실 나열을 넘어 과학적 사고력 훈련",
-    href: "/dashboard/science/new",
+    href: "__science__",   // classId 포함 href는 렌더 시 동적으로 결정
   },
   {
     emoji: "🎭",
@@ -363,11 +363,14 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {COMING_SOON_ACTIVITIES.map((activity) =>
-                  activity.href ? (
+                {COMING_SOON_ACTIVITIES.map((activity) => {
+                  const resolvedHref = activity.href === "__science__"
+                    ? (classId ? `/dashboard/science/new?class_id=${classId}` : null)
+                    : (activity.href ?? null);
+                  return resolvedHref ? (
                     <Link
                       key={activity.label}
-                      href={activity.href}
+                      href={resolvedHref}
                       className={`flex flex-col rounded-2xl border border-cyan-200 bg-gradient-to-br ${activity.tone} p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -403,8 +406,8 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                         </span>
                       </div>
                     </div>
-                  )
-                )}
+                  );
+                })}
               </div>
             </section>
 

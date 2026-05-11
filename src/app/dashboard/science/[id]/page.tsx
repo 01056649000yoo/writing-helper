@@ -101,8 +101,11 @@ export default async function ScienceRoomDashboard({
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-sky-100 p-6">
       <div className="max-w-6xl mx-auto pt-8 pb-16 space-y-6">
         {/* back */}
-        <Link href="/dashboard" className="text-cyan-600 text-sm hover:underline">
-          ← 대시보드로
+        <Link
+          href={room.class_id ? `/dashboard/class/${room.class_id}` : "/dashboard"}
+          className="text-cyan-600 text-sm hover:underline"
+        >
+          ← {room.class_id ? "학급으로" : "대시보드로"}
         </Link>
 
         {/* header card */}

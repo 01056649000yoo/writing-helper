@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClass, getClassStudents, getClassRooms } from "@/app/actions/class-actions";
+import { getClassScienceRooms } from "@/app/actions/science-actions";
 import { DeleteClassButton } from "./delete-button";
 import { DeleteRoomButton } from "./delete-room-button";
 import { RosterManager } from "./roster-manager";
@@ -8,10 +9,11 @@ import { DraftSessionsPanel } from "./draft-sessions-panel";
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [cls, students, rooms] = await Promise.all([
+  const [cls, students, rooms, scienceRooms] = await Promise.all([
     getClass(id),
     getClassStudents(id),
     getClassRooms(id),
+    getClassScienceRooms(id),
   ]);
 
   if (!cls) notFound();
@@ -29,10 +31,16 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
             <h1 className="text-xl font-bold text-gray-800">🏫 {cls.name}</h1>
             <span className="text-sm bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-medium">{cls.grade_level}</span>
           </div>
-          <Link href={`/dashboard/room/new?class_id=${id}`}
-            className="px-6 py-3 bg-indigo-500 text-white rounded-xl font-semibold text-base hover:bg-indigo-600 transition-colors">
-            + 새 활동 시작하기
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href={`/dashboard/room/new?class_id=${id}`}
+              className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl font-semibold text-sm hover:bg-indigo-600 transition-colors">
+              + 글쓰기 활동
+            </Link>
+            <Link href={`/dashboard/science/new?class_id=${id}`}
+              className="px-5 py-2.5 bg-cyan-500 text-white rounded-xl font-semibold text-sm hover:bg-cyan-600 transition-colors">
+              🔬 과학 활동
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -103,6 +111,34 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                       <DeleteRoomButton roomId={room.id} />
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 과학 활동 세션 */}
+          {scienceRooms.length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 mb-4">🔬 과학 관찰·추론 활동 ({scienceRooms.length})</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {scienceRooms.map(room => (
+                  <Link key={room.id} href={`/dashboard/science/${room.id}`}
+                    className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-cyan-100 flex flex-col">
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="text-2xl">🔬</span>
+                      {room.is_active ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          진행 중
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">종료</span>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
+                    <p className="text-sm text-gray-500 mt-1 flex-1 line-clamp-1">{room.topic}</p>
+                    <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
+                  </Link>
                 ))}
               </div>
             </div>

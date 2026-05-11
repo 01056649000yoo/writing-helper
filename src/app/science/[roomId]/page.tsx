@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, startTransition } from "react";
 import {
   getActiveScienceRoom,
-  createScienceSession,
+  verifyScienceStudent,
   saveScienceStep1,
   saveScienceStep2,
   saveScienceStep3,
@@ -650,11 +650,13 @@ export default function ScienceActivityPage({
       return;
     }
     setLoading(true);
-    const result = await createScienceSession(roomId, Number(studentNumber), studentName.trim());
+    setError("");
+    const result = await verifyScienceStudent(roomId, Number(studentNumber), studentName.trim());
     if ("error" in result) {
       setError(result.error);
     } else {
       setSessionId(result.sessionId);
+      setCurrentStep(result.currentStep);
       setEntered(true);
     }
     setLoading(false);
@@ -680,46 +682,61 @@ export default function ScienceActivityPage({
   if (!entered) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-sky-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 space-y-6">
-          <div className="text-center">
-            <div className="text-5xl mb-3">🔬</div>
-            <h1 className="text-xl font-bold text-gray-800">{room?.title ?? "과학 관찰 활동"}</h1>
-            {room?.topic && <p className="text-sm text-gray-400 mt-1">{room.topic}</p>}
+        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-3">🔬</div>
+            <h1 className="text-2xl font-bold text-gray-800">{room?.title ?? "과학 관찰 활동"}</h1>
+            <p className="text-gray-500 mt-2 text-sm">내 번호와 이름을 입력하고 활동을 시작해요</p>
+            {room?.topic && (
+              <div className="mt-4 rounded-2xl px-4 py-3 text-sm bg-cyan-50 text-cyan-700">
+                오늘 주제: <strong>{room.topic}</strong>
+              </div>
+            )}
+            {room?.instructions && (
+              <p className="text-xs text-gray-400 mt-3 leading-relaxed">{room.instructions}</p>
+            )}
           </div>
 
-          {room?.instructions && (
-            <div className="bg-cyan-50 rounded-2xl p-4 text-sm text-cyan-700 leading-relaxed">
-              {room.instructions}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">출석 번호</label>
+              <input
+                type="number"
+                value={studentNumber}
+                onChange={(e) => setStudentNumber(e.target.value)}
+                min={1} max={100}
+                className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-2xl font-bold text-center text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-cyan-400"
+                placeholder="15"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+              <input
+                type="text"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                autoComplete="off"
+                className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl text-xl font-bold text-center text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-cyan-400"
+                placeholder="홍길동"
+                onKeyDown={(e) => e.key === "Enter" && void handleEnter()}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+              <p className="text-2xl mb-2">⚠️</p>
+              <p className="text-red-600 text-sm whitespace-pre-line font-medium">{error}</p>
             </div>
           )}
 
-          <div className="space-y-3">
-            <input
-              type="number"
-              value={studentNumber}
-              onChange={(e) => setStudentNumber(e.target.value)}
-              placeholder="번호"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
-            />
-            <input
-              type="text"
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-              placeholder="이름"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
-              onKeyDown={(e) => e.key === "Enter" && handleEnter()}
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
           <button
             type="button"
-            onClick={handleEnter}
+            onClick={() => void handleEnter()}
             disabled={loading || !room}
-            className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-40 text-white font-bold rounded-2xl transition-all"
+            className="mt-6 w-full py-4 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-40 text-white font-bold text-lg rounded-2xl transition-colors"
           >
-            {loading ? "입장 중…" : !room ? "활동을 불러오는 중…" : "활동 시작하기 →"}
+            {loading ? "확인 중..." : !room ? "활동을 불러오는 중…" : "활동 시작하기 🚀"}
           </button>
         </div>
       </div>

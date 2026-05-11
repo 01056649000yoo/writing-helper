@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createScienceRoom } from "@/app/actions/science-actions";
 import {
   SENSE_META,
@@ -78,16 +78,41 @@ function CheckCard({
   );
 }
 
-export default function NewScienceRoomPage() {
+export default function NewScienceRoomPageWrapper() {
+  return (
+    <Suspense>
+      <NewScienceRoomPage />
+    </Suspense>
+  );
+}
+
+function NewScienceRoomPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const classId = searchParams.get("class_id") ?? "";
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!classId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-sky-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl shadow-lg p-10 text-center max-w-sm">
+          <p className="text-4xl mb-4">⚠️</p>
+          <p className="text-gray-700 font-semibold">학급을 선택한 뒤 활동을 만들어야 합니다.</p>
+          <Link href="/dashboard" className="inline-block mt-5 text-cyan-600 hover:underline text-sm">
+            ← 대시보드로
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
+    fd.set("class_id", classId);
     const result = await createScienceRoom(fd);
     if ("error" in result) {
       setError(result.error ?? "오류가 발생했습니다.");
@@ -100,8 +125,8 @@ export default function NewScienceRoomPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-sky-100 p-6">
       <div className="max-w-2xl mx-auto pt-8 pb-16">
-        <Link href="/dashboard" className="text-cyan-600 text-sm hover:underline">
-          ← 대시보드로
+        <Link href={`/dashboard/class/${classId}`} className="text-cyan-600 text-sm hover:underline">
+          ← 학급으로
         </Link>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
