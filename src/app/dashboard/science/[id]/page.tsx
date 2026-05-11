@@ -10,6 +10,7 @@ import {
   getScienceRoomReviews,
 } from "@/app/actions/science-actions";
 import ScienceMonitorPanel from "./monitor-panel";
+import QRCodeSection from "@/app/dashboard/room/[id]/qr-section";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -146,24 +147,9 @@ export default async function ScienceRoomDashboard({
             </div>
           </div>
 
-          {/* join url */}
+          {/* join url + QR */}
           {room.is_active && (
-            <div className="mt-5 flex items-center gap-3 bg-cyan-50 border border-cyan-100 rounded-2xl px-4 py-3">
-              <span className="text-xs font-semibold text-cyan-700">
-                학생 접속 주소
-              </span>
-              <code className="flex-1 text-sm text-cyan-900 font-mono break-all">
-                {joinUrl}
-              </code>
-              <a
-                href={joinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 text-xs font-semibold text-cyan-700 hover:text-cyan-900 bg-white border border-cyan-200 px-3 py-1.5 rounded-xl transition"
-              >
-                열기 →
-              </a>
-            </div>
+            <QRCodeSection roomUrl={joinUrl} />
           )}
         </div>
 
