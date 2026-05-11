@@ -245,7 +245,7 @@ const COMING_SOON_ACTIVITIES: {
     summary:
       "본 것(관찰) → 생각한 것(추론) → 궁금한 것(질문) 3단계 틀로 과학적 사고를 글로 옮기는 활동",
     effect: "단순 사실 나열을 넘어 과학적 사고력 훈련",
-    href: "__science__",   // classId 포함 href는 렌더 시 동적으로 결정
+    // href: "__science__",  // 출시 후 활성화
   },
   {
     emoji: "🎭",
