@@ -47,6 +47,8 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   const protocol = isLocalhost ? "http" : forwardedProto || "https";
   const sessionJoinUrl = `${protocol}://${host}/room/${id}`;
   const shortUrl = room.short_code ? `${protocol}://${host}/s/${room.short_code}` : null;
+  // eslint-disable-next-line react-hooks/purity
+  const renderNow = Date.now();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -87,7 +89,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
                   </span>
                 )}
                 {room.expires_at && room.is_active && (
-                  <ExpiryBadge expiresAt={room.expires_at} />
+                  <ExpiryBadge expiresAt={room.expires_at} now={renderNow} />
                 )}
                 {room.expires_at && !room.is_active && (
                   <span className="text-sm bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg font-medium">
@@ -116,8 +118,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   );
 }
 
-function ExpiryBadge({ expiresAt }: { expiresAt: string }) {
-  const now = Date.now();
+function ExpiryBadge({ expiresAt, now }: { expiresAt: string; now: number }) {
   const exp = new Date(expiresAt).getTime();
   const diffMs = exp - now;
 

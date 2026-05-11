@@ -423,27 +423,36 @@ export default function LiveStudentPanel({
   const [questionVotingResults, setQuestionVotingResults] = useState<QuestionVotingRanking>(initialQuestionVotingResults);
   const [oneLineShareResults, setOneLineShareResults] = useState<OneLineShareResults>(initialOneLineShareResults);
 
-  async function fetchSessions() {
-    const data = await getRoomSessions(roomId);
-    setSessions((data as Session[]) ?? []);
-
-    if (activityType === "question_generator") {
-      const questionData = await getQuestionGeneratorRoomResults(roomId);
-      setQuestionResults((questionData as QuestionResult[]) ?? []);
-    } else if (activityType === "question_voting") {
-      const votingData = await getQuestionVotingRoomResults(roomId);
-      setQuestionVotingResults(votingData ?? []);
-    } else if (activityType === "one_line_share") {
-      const oneLineData = await getOneLineShareRoomResults(roomId);
-      setOneLineShareResults(oneLineData ?? []);
-    }
-  }
-
   useEffect(() => {
-    fetchSessions();
-    if (!isActive) return;
-    const interval = setInterval(fetchSessions, 4000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    const run = async () => {
+      const data = await getRoomSessions(roomId);
+      if (cancelled) return;
+      setSessions((data as Session[]) ?? []);
+
+      if (activityType === "question_generator") {
+        const questionData = await getQuestionGeneratorRoomResults(roomId);
+        if (cancelled) return;
+        setQuestionResults((questionData as QuestionResult[]) ?? []);
+      } else if (activityType === "question_voting") {
+        const votingData = await getQuestionVotingRoomResults(roomId);
+        if (cancelled) return;
+        setQuestionVotingResults(votingData ?? []);
+      } else if (activityType === "one_line_share") {
+        const oneLineData = await getOneLineShareRoomResults(roomId);
+        if (cancelled) return;
+        setOneLineShareResults(oneLineData ?? []);
+      }
+    };
+
+    void run();
+    if (!isActive) return () => { cancelled = true; };
+    const interval = setInterval(() => void run(), 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [roomId, isActive, activityType]);
 
   const doneSessions = sessions.filter(s => s.status === "done");

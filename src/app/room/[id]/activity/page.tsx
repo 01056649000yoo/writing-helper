@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   setStudentLevel,
@@ -96,13 +96,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     if (!roomId) return;
 
     if (!sessionId) {
-      setError("학생 세션 정보를 찾지 못했습니다. 입장 화면에서 다시 시도해주세요.");
-      setPageLoading(false);
+      startTransition(() => {
+        setError("학생 세션 정보를 찾지 못했습니다. 입장 화면에서 다시 시도해주세요.");
+        setPageLoading(false);
+      });
       return;
     }
 
     let active = true;
-    setPageLoading(true);
+    startTransition(() => setPageLoading(true));
 
     getStudentRoomQuestions(sessionId, roomId).then((data) => {
       if (!active) return;

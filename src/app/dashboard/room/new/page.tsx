@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -1488,9 +1488,11 @@ function useActivityDraft<T>(storageKey: string, initialState: T) {
 
   useEffect(() => {
     const { draft: nextDraft } = readActivityDraft(storageKey, initialState);
-    setDraft(nextDraft);
     autosaveEnabledRef.current = true;
-    setAutosaveEnabled(true);
+    startTransition(() => {
+      setDraft(nextDraft);
+      setAutosaveEnabled(true);
+    });
   }, [initialState, storageKey]);
 
   useEffect(() => {

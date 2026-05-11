@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Answer } from "@/types";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/app/actions/auth-actions";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
@@ -269,7 +270,7 @@ export default async function TeacherResultPage({
           <div>
             <h2 className="font-bold text-gray-700 mb-3">💬 학생 답변 내용</h2>
             <div className="space-y-3">
-              {(session.answers as any[]).map((a: any, i: number) => (
+              {(session.answers as Answer[]).map((a: Answer, i: number) => (
                 <div key={i} className="bg-gray-50 rounded-xl p-4">
                   <p className="text-xs text-gray-500 mb-1">Q. {a.question}</p>
                   <p className="text-sm text-gray-800 font-medium">→ {a.answer}</p>

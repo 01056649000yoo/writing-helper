@@ -30,8 +30,8 @@ export async function generateQuestionsPreview(formData: FormData): Promise<{ qu
   const profile = await getTeacherProfile();
   if (!profile?.vault_secret_id) return { error: "GPT API 키를 먼저 설정해주세요." };
 
-  let topic = String(formData.get("topic") ?? "").trim();
-  let topicDescription = String(formData.get("topic_description") ?? "").trim();
+  const topic = String(formData.get("topic") ?? "").trim();
+  const topicDescription = String(formData.get("topic_description") ?? "").trim();
   const subjectType = String(formData.get("subject_type")) as SubjectType;
   const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
   const outlineDepth = (String(formData.get("outline_depth")) || "simple") as OutlineDepth;
