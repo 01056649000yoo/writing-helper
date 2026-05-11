@@ -34,6 +34,20 @@ export default function LoginPageClient() {
             <MiniFeatureCard emoji="✍️" title="질문 카드 만들기" desc="마음에 드는 카드를 골라 나만의 질문 생성" />
             <MiniFeatureCard emoji="✅" title="질문 고르기" desc="친구들의 좋은 질문에 투표하기" />
             <MiniFeatureCard emoji="📱" title="한줄 모아" desc="실시간 생각 공유와 모아보기" />
+
+            <div className="pt-2">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex-1 h-px bg-white/20" />
+                <span className="text-xs font-semibold text-indigo-200 tracking-wider uppercase">교과 연계 글쓰기</span>
+                <div className="flex-1 h-px bg-white/20" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SubjectCard emoji="🔬" subject="과학" title="관찰하고 추론하기" />
+                <SubjectCard emoji="🎭" subject="사회" title="입장 바꿔 생각하기" />
+                <SubjectCard emoji="🔢" subject="수학" title="풀이 과정 설명하기" />
+                <SubjectCard emoji="🪞" subject="도덕·국어" title="마음 거울 비추기" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -133,6 +147,18 @@ function MiniFeatureCard({ emoji, title, desc }: { emoji: string; title: string;
       <div>
         <h3 className="text-lg font-bold text-white mb-1">{title}</h3>
         <p className="text-sm text-indigo-100 opacity-80 leading-snug">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+function SubjectCard({ emoji, subject, title }: { emoji: string; subject: string; title: string }) {
+  return (
+    <div className="flex items-start gap-2.5 bg-white/10 rounded-xl p-3 cursor-default">
+      <span className="text-xl shrink-0">{emoji}</span>
+      <div>
+        <p className="text-[10px] font-semibold text-indigo-200 mb-0.5">{subject}</p>
+        <p className="text-xs font-medium text-white leading-snug">{title}</p>
       </div>
     </div>
   );
