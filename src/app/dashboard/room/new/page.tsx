@@ -309,9 +309,10 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                   </div>
                   <h2 className="mt-5 text-xl font-bold text-gray-800">{activity.label}</h2>
                   <p className="mt-2 text-sm leading-6 text-gray-600 flex-1">{meta.summary}</p>
-                  <div className="mt-5 pt-4 border-t border-gray-100/80 flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-400">{activity.description}</span>
-                    <span className="text-sm font-semibold text-indigo-600">선택하기 →</span>
+                  <div className="mt-5 pt-4 border-t border-gray-100/80 flex justify-end">
+                    <span className="inline-flex items-center gap-1.5 bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-full group-hover:bg-indigo-700 transition-colors">
+                      선택하기 →
+                    </span>
                   </div>
                 </Link>
               );
@@ -331,9 +332,10 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 </div>
                 <h2 className="mt-5 text-xl font-bold text-gray-800">{activity.label}</h2>
                 <p className="mt-2 text-sm leading-6 text-gray-600 flex-1">{activity.summary}</p>
-                <div className="mt-5 pt-4 border-t border-gray-100/80 flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-400">{activity.effect}</span>
-                  <span className="text-sm font-semibold text-gray-400">곧 출시 →</span>
+                <div className="mt-5 pt-4 border-t border-gray-100/80 flex justify-end">
+                  <span className="inline-flex items-center gap-1.5 bg-gray-300 text-gray-500 text-sm font-semibold px-4 py-2 rounded-full">
+                    곧 출시 →
+                  </span>
                 </div>
               </div>
             ))}
