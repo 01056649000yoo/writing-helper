@@ -20,20 +20,29 @@ import type {
 type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
 
 function parseOutline(text: string) {
-  const sections: { title: string; content: string }[] = [];
-  const blocks = text.split(/(?=📝)/);
+  const sections: { title: string; keywords: string; hint: string }[] = [];
+  // 새 형식(✏️)과 구형식(📝) 모두 지원
+  const isNewFormat = text.includes("✏️");
+  const splitPattern = isNewFormat ? /(?=✏️)/ : /(?=📝)/;
+  const blocks = text.split(splitPattern);
   for (const block of blocks) {
     const trimmed = block.trim();
     if (!trimmed) continue;
-    const firstLine = trimmed.indexOf("\n");
-    const title = trimmed.slice(0, firstLine === -1 ? undefined : firstLine).replace("📝", "").trim();
-    const body = firstLine === -1 ? "" : trimmed.slice(firstLine + 1).trim();
-    const content = body
-      .split("\n")
-      .map((line) => line.replace(/^[•\-*]\s*/, "").trim())
-      .filter(Boolean)
-      .join("\n");
-    if (title) sections.push({ title, content });
+    const lines = trimmed.split("\n").map((l) => l.trim());
+    const headerLine = lines[0].replace(/^[✏️📝]\s*/, "").trim();
+
+    if (isNewFormat) {
+      // "처음 | 키워드1 · 키워드2" 형식
+      const pipeIdx = headerLine.indexOf("|");
+      const title = pipeIdx === -1 ? headerLine : headerLine.slice(0, pipeIdx).trim();
+      const keywords = pipeIdx === -1 ? headerLine : headerLine.slice(pipeIdx + 1).trim();
+      const hintLine = lines.find((l) => l.startsWith("(") && l.endsWith(")")) ?? "";
+      if (title) sections.push({ title, keywords, hint: hintLine });
+    } else {
+      // 구형식 호환
+      const body = lines.slice(1).filter(Boolean).map((l) => l.replace(/^[•\-*]\s*/, "").trim()).join("\n");
+      if (headerLine) sections.push({ title: headerLine, keywords: body, hint: "" });
+    }
   }
   return sections;
 }
@@ -434,11 +443,14 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               sections.map((section, index) => (
                 <div key={index} className={`p-5 ${index < sections.length - 1 ? "border-b border-gray-100" : ""}`}>
                   <p className="text-xs font-bold text-orange-500 uppercase tracking-wide mb-2">
-                    {section.title}
+                    ✏️ {section.title}
                   </p>
-                  <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">
-                    {section.content}
+                  <p className="text-gray-800 text-sm font-semibold leading-relaxed">
+                    {section.keywords}
                   </p>
+                  {section.hint && (
+                    <p className="text-gray-400 text-xs mt-1 leading-relaxed">{section.hint}</p>
+                  )}
                 </div>
               ))
             ) : (
