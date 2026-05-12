@@ -154,7 +154,7 @@ function QuestionCard({
             onChange={(e) =>
               onChange({
                 ...q,
-                choices: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
+                choices: e.target.value.split("\n"),
               })
             }
             rows={Math.max(10, (q.choices?.length ?? 0) + 1)}
@@ -571,7 +571,12 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("grade_level", formFields.grade_level);
     fd.set("outline_depth", formFields.outline_depth);
     fd.set("duration_hours", formFields.duration_hours);
-    fd.set("question_sets_json", JSON.stringify(questionSets));
+    const cleanedQuestionSets = {
+      low: { questions: questionSets.low.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
+      mid: { questions: questionSets.mid.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
+      high: { questions: questionSets.high.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
+    };
+    fd.set("question_sets_json", JSON.stringify(cleanedQuestionSets));
 
     draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
