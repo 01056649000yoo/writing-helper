@@ -36,10 +36,6 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl font-semibold text-sm hover:bg-indigo-600 transition-colors">
               + 글쓰기 활동
             </Link>
-            <Link href={`/dashboard/science/new?class_id=${id}`}
-              className="px-5 py-2.5 bg-cyan-500 text-white rounded-xl font-semibold text-sm hover:bg-cyan-600 transition-colors">
-              🔬 과학 활동
-            </Link>
           </div>
         </div>
       </header>
