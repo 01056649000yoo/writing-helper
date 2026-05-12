@@ -201,7 +201,7 @@ function LevelEditor({
       {
         step: questions.length + 1,
         question: "",
-        type: level === "high" ? "input" : level === "mid" ? "card+input" : "card",
+        type: level === "high" ? "input" : "card+input",
         choices: level !== "high" ? ["", ""] : undefined,
       },
     ]);
