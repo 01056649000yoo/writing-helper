@@ -42,6 +42,7 @@ export type OutlineBuilderConfig = {
   outlineDepth: OutlineDepth;
   questionSets: QuestionSets | null;
   questionsGeneratedAt: string | null;
+  generateDraft: boolean;
 };
 
 export type OutlineBuilderSubmission = {

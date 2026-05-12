@@ -112,12 +112,14 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     }
 
     const questionsGeneratedAt = new Date().toISOString();
+    const generateDraft = formData.get("generate_draft") === "on";
     activityConfig = {
       subjectType,
       gradeLevel,
       outlineDepth,
       questionSets,
       questionsGeneratedAt,
+      generateDraft,
     };
     baseRoomPayload.question_sets = questionSets;
     baseRoomPayload.questions_generated_at = questionsGeneratedAt;

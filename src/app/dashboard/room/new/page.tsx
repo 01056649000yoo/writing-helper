@@ -36,6 +36,7 @@ type OutlineBuilderDraft = {
   grade_level: string;
   outline_depth: string;
   duration_hours: string;
+  generate_draft: boolean;
 };
 
 type QuestionGeneratorDraft = {
@@ -513,6 +514,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     grade_level: "중학년",
     outline_depth: "simple",
     duration_hours: "4",
+    generate_draft: false,
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<OutlineBuilderDraft>(
     buildDraftStorageKey(classId, "outline_builder"),
@@ -526,6 +528,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     grade_level: string;
     outline_depth: string;
     duration_hours: string;
+    generate_draft: boolean;
   } | null>(null);
   const [questionSets, setQuestionSets] = useState<QuestionSets | null>(null);
 
@@ -542,6 +545,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
       grade_level: draft.grade_level,
       outline_depth: draft.outline_depth,
       duration_hours: draft.duration_hours,
+      generate_draft: draft.generate_draft,
     });
 
     const result = await generateQuestionsPreview(fd);
@@ -571,6 +575,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("grade_level", formFields.grade_level);
     fd.set("outline_depth", formFields.outline_depth);
     fd.set("duration_hours", formFields.duration_hours);
+    fd.set("generate_draft", formFields.generate_draft ? "on" : "");
     const cleanedQuestionSets = {
       low: { questions: questionSets.low.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
       mid: { questions: questionSets.mid.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
@@ -801,6 +806,19 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
           value={draft.duration_hours}
           onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
         />
+
+        <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/70">
+          <input
+            type="checkbox"
+            checked={draft.generate_draft}
+            onChange={(e) => setDraft((prev) => ({ ...prev, generate_draft: e.target.checked }))}
+            className="text-indigo-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gray-800">고쳐쓰기용 초안 함께 생성하기</p>
+            <p className="text-xs text-gray-400 mt-1">체크하면 키워드 개요 외에 AI 초안도 함께 만들어줍니다. 기본값: 개요만 제공</p>
+          </div>
+        </label>
 
         {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
 

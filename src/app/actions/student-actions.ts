@@ -367,7 +367,7 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
       const { data: room } = await admin
         .schema("writing_helper")
         .from("rooms")
-        .select("topic, topic_description, subject_type, grade_level, outline_depth, teacher_id")
+        .select("topic, topic_description, subject_type, grade_level, outline_depth, teacher_id, activity_config")
         .eq("id", item.room_id)
         .maybeSingle();
 
@@ -393,16 +393,20 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
         session?.level ?? "mid",
         item.answers
       );
-      const draft = await generateDraftFromAnswers(
-        apiKey,
-        room!.topic,
-        room!.topic_description ?? "",
-        room!.subject_type,
-        room!.grade_level,
-        room!.outline_depth,
-        session?.level ?? "mid",
-        item.answers
-      );
+
+      const activityConfig = room?.activity_config as { generateDraft?: boolean } | null;
+      const draft = activityConfig?.generateDraft
+        ? await generateDraftFromAnswers(
+            apiKey,
+            room!.topic,
+            room!.topic_description ?? "",
+            room!.subject_type,
+            room!.grade_level,
+            room!.outline_depth,
+            session?.level ?? "mid",
+            item.answers
+          )
+        : null;
 
       // 결과 저장
       await admin

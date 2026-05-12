@@ -119,12 +119,11 @@ export async function generateOutline(
 ): Promise<string> {
   const client = createOpenAIClient(apiKey);
 
-  const levelDesc = { low: "글쓰기가 어려운", mid: "보통 수준의", high: "글을 잘 쓰는" }[level] ?? "보통 수준의";
   const depthDesc = outlineDepth === "simple"
-    ? "처음/중간/끝 (3단계, 단계별 1~2문장)"
+    ? "처음/중간/끝 (3단계)"
     : outlineDepth === "medium"
-    ? "처음/중간1/중간2/끝 (4단계, 단계별 2~3문장)"
-    : "처음/중간1/중간2/중간3/끝 (5단계, 단계별 3~4문장)";
+    ? "처음/중간1/중간2/끝 (4단계)"
+    : "처음/중간1/중간2/중간3/끝 (5단계)";
   const gradeDesc = { "저학년": "1~2학년", "중학년": "3~4학년", "고학년": "5~6학년" }[gradeLevel];
 
   const answersText = answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join("\n\n");
@@ -132,39 +131,57 @@ export async function generateOutline(
     ? `"${topic}" (${topicDescription.trim()})`
     : `"${topic}"`;
 
+  // 수준별 키워드 추출 방식 설정
+  const levelConfig = {
+    low: {
+      keywordCount: "4~5개",
+      guide: `- 각 키워드 바로 뒤에 대괄호로 짧은 설명을 붙여주세요.
+  예) 운동장[좁아서 답답하다], 축구[제일 좋아하는 운동], 쉬는 시간[기다려진다]
+- 학생이 단어만 봐도 무엇을 쓸지 바로 떠올릴 수 있도록 구체적으로 써주세요.
+- 쉽고 친근한 단어를 사용하세요.`,
+    },
+    mid: {
+      keywordCount: "3~4개",
+      guide: `- 설명 없이 핵심 단어만 쉼표로 나열하세요.
+  예) 운동장, 축구, 좁음, 건의
+- 학생이 스스로 단어 사이를 연결해 문장을 만들 수 있는 구체적인 단어를 고르세요.`,
+    },
+    high: {
+      keywordCount: "2~3개",
+      guide: `- 함축적이고 추상적인 핵심어를 사용하세요.
+  예) 공간 부족, 갈등, 해결 방안
+- 단어와 단어 사이의 논리적 흐름을 학생 스스로 구성하게 합니다.`,
+    },
+  }[level as "low" | "mid" | "high"] ?? {
+    keywordCount: "3~4개",
+    guide: "- 핵심 단어만 쉼표로 나열하세요.",
+  };
+
   const prompt = `
-초등학교 ${gradeDesc} ${levelDesc} 학생이 ${topicContext}을 주제로 ${subjectType}을 씁니다.
+초등학교 ${gradeDesc} 학생이 ${topicContext}을 주제로 ${subjectType}을 씁니다.
 
 학생이 답한 내용:
 ${answersText}
 
-위 내용을 바탕으로 ${depthDesc} 구조의 글쓰기 개요를 만들어주세요.
+위 학생의 답변에서 핵심 단어를 추출해 ${depthDesc} 구조의 키워드 개요를 만들어주세요.
 
 [절대 규칙]
-- 완성된 문장으로 쓰지 마세요. 개요는 글을 쓰기 위한 메모이지 글 자체가 아닙니다.
-- 각 항목은 "~했다", "~이다" 같은 서술형 종결 문장이 되면 안 됩니다.
-- 반드시 짧은 구(句), 키워드, 명사형 표현으로만 작성하세요.
-  예) ❌ "친구들과 함께 공을 차며 즐거운 시간을 보냈다."
-      ✅ "• 친구들과 공차기 → 웃음, 땀"
-- 각 단계마다 불릿(•)으로 3~5개 항목을 나열하세요.
-- 학생이 이 개요를 보고 스스로 문장을 완성할 수 있도록 핵심 단어와 방향만 제시하세요.
-- ${gradeDesc} 수준에 맞는 쉬운 단어 사용
-- 학생이 답한 내용을 최대한 반영
+- 문장을 절대 쓰지 마세요. 단어(키워드)만 나열합니다.
+- "~했다", "~이다" 등 서술형 종결어미를 쓰면 안 됩니다.
+- 각 단계에서 학생 답변을 대표하는 핵심 단어 ${levelConfig.keywordCount}를 추출하세요.
+- 단어는 쉼표(,)로 구분하세요.
+- 학생이 답한 내용을 최대한 반영하세요.
+${levelConfig.guide}
 
-아래 형식으로 작성해주세요 (단계 수는 ${depthDesc}에 맞게):
+아래 형식으로만 작성하세요 (단계 수는 ${depthDesc}에 맞게):
 📝 처음
-• (키워드/구)
-• (키워드/구)
-• (키워드/구)
+(키워드1, 키워드2, 키워드3)
 
 📝 중간
-• (키워드/구)
-• (키워드/구)
-• (키워드/구)
+(키워드1, 키워드2, 키워드3)
 
 📝 끝
-• (키워드/구)
-• (키워드/구)
+(키워드1, 키워드2)
 `;
 
   const response = await client.chat.completions.create({
