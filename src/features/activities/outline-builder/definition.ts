@@ -18,6 +18,7 @@ export const outlineBuilderDefinition: ActivityDefinition<
     outlineDepth: "simple",
     questionSets: null,
     questionsGeneratedAt: null,
+    generateDraft: false,
   }),
   validateConfig: (input) => {
     const value = { ...outlineBuilderDefinition.createDefaultConfig(), ...(isRecord(input) ? input : {}) };
