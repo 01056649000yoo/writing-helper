@@ -1,15 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updatePassword } from "@/app/actions/auth-actions";
+import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+
+    async function hydrateRecoverySession() {
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const hashError = hashParams.get("error_description");
+
+      if (hashError) {
+        setError(hashError.replaceAll("+", " "));
+        return;
+      }
+
+      if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) {
+          setError("재설정 링크를 확인하지 못했습니다. 메일을 다시 받아주세요.");
+          return;
+        }
+
+        window.history.replaceState(null, "", window.location.pathname);
+        setReady(true);
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        setReady(true);
+        return;
+      }
+
+      setError("재설정 링크가 유효하지 않거나 만료되었습니다. 메일을 다시 받아주세요.");
+    }
+
+    void hydrateRecoverySession();
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,6 +86,10 @@ export default function ResetPasswordPage() {
         {success ? (
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-sm leading-relaxed text-emerald-700">
             비밀번호가 변경되었습니다. 잠시 후 로그인 화면으로 이동합니다.
+          </div>
+        ) : !ready ? (
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm leading-relaxed text-slate-600">
+            {error || "재설정 링크를 확인하는 중입니다."}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
