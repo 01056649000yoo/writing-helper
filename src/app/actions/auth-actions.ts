@@ -3,33 +3,52 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, createSupabaseAdminClient } from "@/lib/supabase-server";
 
-export async function signUp(formData: FormData): Promise<{ error?: string; success?: boolean; email?: string }> {
+type AuthResult = { error?: string; success?: boolean; email?: string };
+
+function isValidSchoolName(schoolName: string) {
+  return schoolName.length >= 2 && schoolName.length <= 60;
+}
+
+export async function signUp(formData: FormData): Promise<AuthResult> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const name = String(formData.get("name") ?? "").trim();
+  const schoolName = String(formData.get("schoolName") ?? "").trim();
 
-  if (!email || !password || !name) return { error: "모든 항목을 입력해주세요." };
+  if (!email || !password || !name || !schoolName) return { error: "모든 항목을 입력해주세요." };
   if (password.length < 6) return { error: "비밀번호는 6자 이상이어야 합니다." };
+  if (!isValidSchoolName(schoolName)) return { error: "학교 이름을 2자 이상 60자 이하로 입력해주세요." };
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signUp({
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+    email_confirm: true,
+    user_metadata: {
+      name,
+      school_name: schoolName,
     },
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.message.toLowerCase().includes("already")) {
+      return { error: "이미 가입된 이메일입니다." };
+    }
+    return { error: error.message };
+  }
   if (!data.user) return { error: "회원가입에 실패했습니다." };
 
-  const admin = createSupabaseAdminClient();
-  await admin
+  const insertProfile = await admin
     .schema("writing_helper")
     .from("teacher_profiles")
     .insert({ user_id: data.user.id, name });
+  if (insertProfile.error) return { error: "교사 정보를 저장하지 못했습니다." };
 
-  return { success: true, email };
+  const supabase = await createSupabaseServerClient();
+  const signInResult = await supabase.auth.signInWithPassword({ email, password });
+  if (signInResult.error) return { error: "가입은 완료됐지만 자동 로그인에 실패했습니다. 로그인 화면에서 다시 로그인해주세요." };
+
+  return { success: true };
 }
 
 export async function signIn(_prevState: unknown, formData: FormData): Promise<{ error?: string }> {
@@ -50,6 +69,38 @@ export async function signOut() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+export async function requestPasswordReset(formData: FormData): Promise<AuthResult> {
+  const email = String(formData.get("email") ?? "").trim();
+
+  if (!email) return { error: "이메일을 입력해주세요." };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
+  });
+
+  if (error) return { error: "비밀번호 재설정 메일을 보내지 못했습니다." };
+
+  return { success: true, email };
+}
+
+export async function updatePassword(formData: FormData): Promise<AuthResult> {
+  const password = String(formData.get("password") ?? "");
+  const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
+
+  if (!password || !passwordConfirm) return { error: "새 비밀번호를 모두 입력해주세요." };
+  if (password.length < 6) return { error: "비밀번호는 6자 이상이어야 합니다." };
+  if (password !== passwordConfirm) return { error: "비밀번호 확인이 일치하지 않습니다." };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) return { error: "비밀번호를 변경하지 못했습니다. 메일 링크를 다시 열어 시도해주세요." };
+
+  await supabase.auth.signOut();
+  return { success: true };
 }
 
 export async function getCurrentUser() {

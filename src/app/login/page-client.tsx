@@ -74,7 +74,7 @@ export default function LoginPageClient() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <label className="block text-sm font-semibold text-gray-700">비밀번호</label>
-                  <Link href="#" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">
+                  <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">
                     비밀번호 찾기
                   </Link>
                 </div>
