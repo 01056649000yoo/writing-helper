@@ -17,7 +17,9 @@ export default function ResetPasswordPage() {
     const supabase = createSupabaseBrowserClient();
 
     async function hydrateRecoverySession() {
+      const searchParams = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const code = searchParams.get("code");
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
       const hashError = hashParams.get("error_description");
@@ -34,6 +36,19 @@ export default function ResetPasswordPage() {
         });
 
         if (sessionError) {
+          setError("재설정 링크를 확인하지 못했습니다. 메일을 다시 받아주세요.");
+          return;
+        }
+
+        window.history.replaceState(null, "", window.location.pathname);
+        setReady(true);
+        return;
+      }
+
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (exchangeError) {
           setError("재설정 링크를 확인하지 못했습니다. 메일을 다시 받아주세요.");
           return;
         }

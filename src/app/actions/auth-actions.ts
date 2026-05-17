@@ -78,7 +78,7 @@ export async function requestPasswordReset(formData: FormData): Promise<AuthResu
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`,
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
   });
 
   if (error) return { error: "비밀번호 재설정 메일을 보내지 못했습니다." };
