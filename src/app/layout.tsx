@@ -34,7 +34,10 @@ export default function RootLayout({
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <div className="flex-1">{children}</div>
         <footer className="border-t border-slate-200 bg-white/80 px-4 py-4 text-center text-xs text-slate-500 backdrop-blur-sm">
-          상호명: 끄적끄적아지트 · 운영책임자: 유승현 · 문의: yshgg@naver.com
+          상호명: 끄적끄적아지트 · 운영책임자: 유승현 · 문의:{" "}
+          <a className="font-medium text-slate-600 underline-offset-2 hover:underline" href="mailto:yshgg@naver.com">
+            yshgg@naver.com
+          </a>
         </footer>
       </body>
     </html>
