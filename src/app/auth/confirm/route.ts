@@ -8,9 +8,10 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const rawNext = searchParams.get("next") ?? "/dashboard";
   const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
+  const appOrigin = process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin;
 
   if (!tokenHash || !type) {
-    return NextResponse.redirect(new URL("/login?error=missing_token", request.url));
+    return NextResponse.redirect(new URL("/login?error=missing_token", appOrigin));
   }
 
   const supabase = await createSupabaseServerClient();
@@ -21,9 +22,9 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url)
+      new URL(`/login?error=${encodeURIComponent(error.message)}`, appOrigin)
     );
   }
 
-  return NextResponse.redirect(new URL(next, request.url));
+  return NextResponse.redirect(new URL(next, appOrigin));
 }
