@@ -126,15 +126,18 @@ export default function LoginPageClient() {
                   회원가입
                 </Link>
               </p>
-              <p className="mt-3 text-sm text-gray-400">
-                <a
-                  href="https://xn--9y2br3k43n.kr"
-                  className="font-medium text-gray-500 underline-offset-4 hover:text-indigo-600 hover:underline"
-                >
-                  끄적끄적아지트로 이동
-                </a>
-              </p>
             </div>
+
+            <a
+              href="https://xn--9y2br3k43n.kr"
+              className="mt-6 flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50 px-5 py-4 text-left transition-colors hover:border-sky-200 hover:bg-sky-100"
+            >
+              <span>
+                <span className="block text-sm font-bold text-sky-900">끄적끄적아지트로 이동</span>
+                <span className="mt-1 block text-xs text-sky-700">기존 아지트 서비스로 돌아가기</span>
+              </span>
+              <span className="text-lg font-semibold text-sky-700">→</span>
+            </a>
 
             <p className="text-center text-xs text-gray-300 mt-8 font-medium">
               v2.1.0 • AZIT WRITING LAB • {BUILD_LABEL}
