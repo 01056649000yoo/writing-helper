@@ -126,6 +126,14 @@ export default function LoginPageClient() {
                   회원가입
                 </Link>
               </p>
+              <p className="mt-3 text-sm text-gray-400">
+                <a
+                  href="https://xn--9y2br3k43n.kr"
+                  className="font-medium text-gray-500 underline-offset-4 hover:text-indigo-600 hover:underline"
+                >
+                  끄적끄적아지트로 이동
+                </a>
+              </p>
             </div>
 
             <p className="text-center text-xs text-gray-300 mt-8 font-medium">
