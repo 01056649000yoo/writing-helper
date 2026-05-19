@@ -10,6 +10,10 @@ export default function LoginPageClient() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-white flex items-center justify-center p-4 md:p-10">
+      <div className="fixed bottom-4 right-4 z-50 rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-xs font-bold text-slate-600 shadow-lg backdrop-blur">
+        {BUILD_LABEL}
+      </div>
+
       <div className="w-full max-w-6xl bg-white rounded-[2.5rem] md:rounded-[3.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] overflow-hidden flex flex-col md:flex-row min-h-[600px] md:min-h-[750px]">
         <div className="w-full md:w-5/12 bg-indigo-600 p-10 md:p-16 text-white flex flex-col relative overflow-hidden">
           <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-50" />
