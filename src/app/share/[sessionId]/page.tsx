@@ -26,17 +26,14 @@ function parseOutline(text: string) {
 
 export default async function SharePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
-  searchParams: Promise<{ n?: string; name?: string }>;
 }) {
   const { sessionId } = await params;
-  const { n, name } = await searchParams;
 
   const admin = createSupabaseAdminClient();
 
-  // 세션 기본 정보 조회
+  // 세션 기본 정보 조회 — sessionId 자체가 추측 불가능한 UUID 토큰이므로 추가 인증 없이 결과를 보여줌
   const { data: session } = await admin
     .schema("writing_helper")
     .from("student_sessions")
@@ -56,75 +53,7 @@ export default async function SharePage({
     );
   }
 
-  // 인증 전: 번호+이름 입력 폼
-  const studentNumber = Number(n ?? "");
-  const studentName = (name ?? "").trim();
-  const verified =
-    studentNumber === session.student_number &&
-    studentName === session.student_name;
-  const attempted = n !== undefined || name !== undefined;
-
-  if (!verified) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm">
-          <div className="text-center mb-6">
-            <div className="text-5xl mb-3">📋</div>
-            <h1 className="text-xl font-bold text-gray-800">내 개요 보기</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              번호와 이름을 입력하면 내 글쓰기 개요를 볼 수 있어요
-            </p>
-          </div>
-
-          {/* GET 방식 폼 — JS 없이도 동작 */}
-          <form method="GET" action="" className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                학생 번호
-              </label>
-              <input
-                name="n"
-                type="number"
-                required
-                inputMode="numeric"
-                placeholder="예) 5"
-                defaultValue={n ?? ""}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-orange-300"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                이름
-              </label>
-              <input
-                name="name"
-                type="text"
-                required
-                placeholder="예) 홍길동"
-                defaultValue={name ?? ""}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-orange-300"
-              />
-            </div>
-
-            {attempted && !verified && (
-              <p className="text-red-500 text-sm bg-red-50 px-4 py-3 rounded-xl">
-                번호나 이름이 맞지 않아요. 다시 확인해보세요.
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-4 bg-orange-400 text-white rounded-xl font-bold text-base hover:bg-orange-500 active:scale-95 transition-all"
-            >
-              📖 내 개요 보기
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // 인증 성공: 결과 조회
+  // 결과 조회
   const [{ data: queue }, { data: room }] = await Promise.all([
     admin
       .schema("writing_helper")
