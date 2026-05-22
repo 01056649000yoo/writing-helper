@@ -235,6 +235,37 @@ export async function getScienceRoomStudents(roomId: string): Promise<RoomStuden
 // ─────────────────────────────────────────
 // 교사: 방 종료
 // ─────────────────────────────────────────
+export async function deleteScienceRoom(roomId: string): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+
+  // 종료된 활동만 삭제 허용
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("science_rooms")
+    .select("is_active, class_id, teacher_id")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room) return { error: "과학 활동을 찾을 수 없습니다." };
+  if (room.teacher_id !== user.id) return { error: "권한이 없습니다." };
+  if (room.is_active) return { error: "진행 중인 활동은 삭제할 수 없습니다. 먼저 종료해주세요." };
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("science_rooms")
+    .delete()
+    .eq("id", roomId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  if (room.class_id) revalidatePath(`/dashboard/class/${room.class_id}`);
+  return {};
+}
+
 export async function closeScienceRoom(roomId: string) {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };

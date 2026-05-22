@@ -2,10 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClass, getClassStudents, getClassRooms } from "@/app/actions/class-actions";
 import { getClassScienceRooms } from "@/app/actions/science-actions";
+import { TRACK_META } from "@/types/science";
 import { DeleteClassButton } from "./delete-button";
 import { DeleteRoomButton } from "./delete-room-button";
+import { DeleteScienceRoomButton } from "./delete-science-room-button";
 import { RosterManager } from "./roster-manager";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
+
+type UnifiedRoom =
+  | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; is_active: boolean; created_at: string }
+  | { kind: "science"; id: string; title: string; topic: string; inquiry_track: "basic" | "integrated" | null; is_active: boolean; created_at: string };
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,8 +24,29 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
 
   if (!cls) notFound();
 
-  const activeRooms = rooms.filter(r => r.is_active);
-  const closedRooms = rooms.filter(r => !r.is_active);
+  const unified: UnifiedRoom[] = [
+    ...rooms.map((r): UnifiedRoom => ({
+      kind: "writing",
+      id: r.id,
+      title: r.title,
+      topic: r.topic,
+      subject_type: r.subject_type ?? null,
+      is_active: r.is_active,
+      created_at: r.created_at,
+    })),
+    ...scienceRooms.map((r): UnifiedRoom => ({
+      kind: "science",
+      id: r.id,
+      title: r.title,
+      topic: r.topic,
+      inquiry_track: r.inquiryTrack,
+      is_active: r.is_active,
+      created_at: r.created_at,
+    })),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const activeRooms = unified.filter((r) => r.is_active);
+  const closedRooms = unified.filter((r) => !r.is_active);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -34,7 +61,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
           <div className="flex items-center gap-2">
             <Link href={`/dashboard/room/new?class_id=${id}`}
               className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl font-semibold text-sm hover:bg-indigo-600 transition-colors">
-              + 글쓰기 활동
+              + 활동 만들기
             </Link>
           </div>
         </div>
@@ -55,7 +82,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
 
-        {/* 활동 세션 목록 */}
+        {/* 활동 세션 목록 — 글쓰기 + 과학 통합 */}
         <div className="lg:col-span-2 space-y-7">
           <DraftSessionsPanel classId={id} />
 
@@ -71,22 +98,8 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                {activeRooms.map(room => (
-                  <Link key={room.id} href={`/dashboard/room/${room.id}`}
-                    className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-indigo-100">
-                    <div className="flex items-start justify-between mb-3">
-                      <span className="text-2xl">{subjectEmoji(room.subject_type)}</span>
-                      <span className="text-sm bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">진행 중</span>
-                    </div>
-                    <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1">주제: {room.topic}</p>
-                    <div className="flex gap-2 mt-2.5">
-                      {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
-                        <span className="text-sm bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded">{room.subject_type}</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
-                  </Link>
+                {activeRooms.map((room) => (
+                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="active" />
                 ))}
               </div>
             )}
@@ -96,45 +109,8 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
             <div>
               <h2 className="text-lg font-bold text-gray-800 mb-4">⚫ 종료된 활동 세션 ({closedRooms.length})</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {closedRooms.map(room => (
-                  <div key={room.id} className="relative bg-white/60 rounded-2xl hover:bg-white transition-colors opacity-70 hover:opacity-100">
-                    <Link href={`/dashboard/room/${room.id}`} className="block p-6">
-                      <h3 className="font-semibold text-gray-700 text-base">{room.title}</h3>
-                      <p className="text-sm text-gray-500 mt-1">주제: {room.topic}</p>
-                      <p className="text-sm text-gray-400 mt-1.5">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
-                    </Link>
-                    <div className="absolute top-3 right-3">
-                      <DeleteRoomButton roomId={room.id} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 과학 활동 세션 */}
-          {scienceRooms.length > 0 && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-4">🔬 과학 관찰·추론 활동 ({scienceRooms.length})</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {scienceRooms.map(room => (
-                  <Link key={room.id} href={`/dashboard/science/${room.id}`}
-                    className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-cyan-100 flex flex-col">
-                    <div className="flex items-start justify-between mb-3">
-                      <span className="text-2xl">🔬</span>
-                      {room.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          진행 중
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">종료</span>
-                      )}
-                    </div>
-                    <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1 flex-1 line-clamp-1">{room.topic}</p>
-                    <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
-                  </Link>
+                {closedRooms.map((room) => (
+                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="closed" />
                 ))}
               </div>
             </div>
@@ -145,7 +121,79 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
   );
 }
 
-function subjectEmoji(type: string) {
+function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | "closed" }) {
+  const href = room.kind === "writing" ? `/dashboard/room/${room.id}` : `/dashboard/science/${room.id}`;
+  const isActive = status === "active";
+
+  if (status === "closed") {
+    return (
+      <div className="relative bg-white/60 rounded-2xl hover:bg-white transition-colors opacity-70 hover:opacity-100">
+        <Link href={href} className="block p-6">
+          <div className="flex items-start justify-between mb-2">
+            <span className="text-2xl">{cardEmoji(room)}</span>
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{kindLabel(room)}</span>
+          </div>
+          <h3 className="font-semibold text-gray-700 text-base">{room.title}</h3>
+          <p className="text-sm text-gray-500 mt-1">주제: {room.topic}</p>
+          <p className="text-sm text-gray-400 mt-1.5">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
+        </Link>
+        <div className="absolute top-3 right-3">
+          {room.kind === "writing"
+            ? <DeleteRoomButton roomId={room.id} />
+            : <DeleteScienceRoomButton roomId={room.id} />}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href}
+      className={`bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent ${
+        room.kind === "science" ? "hover:border-cyan-100" : "hover:border-indigo-100"
+      }`}>
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-2xl">{cardEmoji(room)}</span>
+        {isActive ? (
+          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+            room.kind === "science" ? "text-emerald-700 bg-emerald-50" : "text-green-700 bg-green-100"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${room.kind === "science" ? "bg-emerald-500" : "bg-green-500"}`} />
+            진행 중
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">종료</span>
+        )}
+      </div>
+      <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
+      <p className="text-sm text-gray-500 mt-1 line-clamp-1">주제: {room.topic}</p>
+      <div className="flex gap-2 mt-2.5 flex-wrap">
+        <span className={`text-xs px-2.5 py-1 rounded-full ${
+          room.kind === "science" ? "bg-cyan-50 text-cyan-700" : "bg-indigo-50 text-indigo-600"
+        }`}>
+          {kindLabel(room)}
+        </span>
+        {room.kind === "writing" && room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
+          <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
+        )}
+      </div>
+      <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
+    </Link>
+  );
+}
+
+function kindLabel(room: UnifiedRoom): string {
+  if (room.kind === "writing") return "글쓰기";
+  if (room.inquiry_track) return `과학 · ${TRACK_META[room.inquiry_track].label}`;
+  return "과학";
+}
+
+function cardEmoji(room: UnifiedRoom): string {
+  if (room.kind === "science") return "🔬";
+  return subjectEmoji(room.subject_type);
+}
+
+function subjectEmoji(type: string | null) {
+  if (!type) return "✏️";
   const map: Record<string, string> = {
     "생활문": "📖", "일기": "📓", "편지": "✉️", "독서감상문": "📚",
     "기행문": "🗺️", "관찰기록문": "🔬", "이야기 글": "🌈",
