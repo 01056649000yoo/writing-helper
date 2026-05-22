@@ -270,12 +270,14 @@ const COMING_SOON_ACTIVITIES: {
   },
   {
     emoji: "🪞",
-    tone: "from-green-50 via-white to-emerald-50",
-    label: "[도덕/국어] 마음 거울 비추기",
+    tone: "from-rose-50 via-white to-pink-50",
+    label: "[도덕] 마음 거울 비추기",
     badge: "감정·가치 글쓰기",
     summary:
-      "오늘 배려·정직·용기 등 특정 가치와 연결된 순간을 포착해 당시 마음 상태를 구체적으로 묘사하는 활동",
+      "감정·가치를 떠올리고 다짐·실천 계획까지 풀어내는 도덕과 글쓰기 활동",
     effect: "어휘력 향상과 정서 조절 능력 발달",
+    href: "__morals__",
+    status: "testing",
   },
 ];
 
@@ -360,7 +362,9 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 {COMING_SOON_ACTIVITIES.map((activity) => {
                   const resolvedHref = activity.href === "__science__"
                     ? (classId ? `/dashboard/science/new?class_id=${classId}` : null)
-                    : (activity.href ?? null);
+                    : activity.href === "__morals__"
+                      ? (classId ? `/dashboard/morals/new?class_id=${classId}` : null)
+                      : (activity.href ?? null);
                   const isTesting = activity.status === "testing";
                   return resolvedHref ? (
                     <Link

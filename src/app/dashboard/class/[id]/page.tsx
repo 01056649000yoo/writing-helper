@@ -2,24 +2,29 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClass, getClassStudents, getClassRooms } from "@/app/actions/class-actions";
 import { getClassScienceRooms } from "@/app/actions/science-actions";
+import { getClassMoralsRooms } from "@/app/actions/morals-actions";
 import { TRACK_META } from "@/types/science";
+import { MORALS_TRACK_META } from "@/types/morals";
 import { DeleteClassButton } from "./delete-button";
 import { DeleteRoomButton } from "./delete-room-button";
 import { DeleteScienceRoomButton } from "./delete-science-room-button";
+import { DeleteMoralsRoomButton } from "./delete-morals-room-button";
 import { RosterManager } from "./roster-manager";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
 
 type UnifiedRoom =
   | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; is_active: boolean; created_at: string }
-  | { kind: "science"; id: string; title: string; topic: string; inquiry_track: "basic" | "integrated" | null; is_active: boolean; created_at: string };
+  | { kind: "science"; id: string; title: string; topic: string; inquiry_track: "basic" | "integrated" | null; is_active: boolean; created_at: string }
+  | { kind: "morals"; id: string; title: string; topic: string; track: "reflection" | "judgement"; is_active: boolean; created_at: string };
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [cls, students, rooms, scienceRooms] = await Promise.all([
+  const [cls, students, rooms, scienceRooms, moralsRooms] = await Promise.all([
     getClass(id),
     getClassStudents(id),
     getClassRooms(id),
     getClassScienceRooms(id),
+    getClassMoralsRooms(id),
   ]);
 
   if (!cls) notFound();
@@ -40,6 +45,15 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       title: r.title,
       topic: r.topic,
       inquiry_track: r.inquiryTrack,
+      is_active: r.is_active,
+      created_at: r.created_at,
+    })),
+    ...moralsRooms.map((r): UnifiedRoom => ({
+      kind: "morals",
+      id: r.id,
+      title: r.title,
+      topic: r.topic,
+      track: r.track,
       is_active: r.is_active,
       created_at: r.created_at,
     })),
@@ -68,21 +82,15 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       </header>
 
       <main className="max-w-7xl mx-auto px-10 py-8 grid grid-cols-1 lg:grid-cols-3 gap-7">
-        {/* 학생 명단 */}
         <div className="lg:col-span-1">
           <div className="space-y-4">
-            <RosterManager
-              classId={id}
-              students={students}
-              rosterLocked={activeRooms.length > 0}
-            />
+            <RosterManager classId={id} students={students} rosterLocked={activeRooms.length > 0} />
             <div className="bg-white rounded-2xl shadow-sm p-7">
               <DeleteClassButton classId={id} />
             </div>
           </div>
         </div>
 
-        {/* 활동 세션 목록 — 글쓰기 + 과학 통합 */}
         <div className="lg:col-span-2 space-y-7">
           <DraftSessionsPanel classId={id} />
 
@@ -122,8 +130,17 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
 }
 
 function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | "closed" }) {
-  const href = room.kind === "writing" ? `/dashboard/room/${room.id}` : `/dashboard/science/${room.id}`;
+  const href =
+    room.kind === "writing" ? `/dashboard/room/${room.id}` :
+    room.kind === "science" ? `/dashboard/science/${room.id}` :
+    `/dashboard/morals/${room.id}`;
   const isActive = status === "active";
+
+  function deleteBtn() {
+    if (room.kind === "writing") return <DeleteRoomButton roomId={room.id} />;
+    if (room.kind === "science") return <DeleteScienceRoomButton roomId={room.id} />;
+    return <DeleteMoralsRoomButton roomId={room.id} />;
+  }
 
   if (status === "closed") {
     return (
@@ -135,9 +152,7 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
           </div>
           <p className="text-sm text-gray-500 mt-1">주제: {room.topic}</p>
           <div className="flex gap-2 mt-2.5 flex-wrap">
-            <span className={`text-xs px-2.5 py-1 rounded-full ${
-              room.kind === "science" ? "bg-cyan-50 text-cyan-700" : "bg-gray-100 text-gray-500"
-            }`}>
+            <span className={`text-xs px-2.5 py-1 rounded-full ${kindChipColor(room)}`}>
               {kindLabel(room)}
             </span>
             {room.kind === "writing" && room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
@@ -146,11 +161,7 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
           </div>
           <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
         </Link>
-        <div className="absolute top-3 right-3">
-          {room.kind === "writing"
-            ? <DeleteRoomButton roomId={room.id} />
-            : <DeleteScienceRoomButton roomId={room.id} />}
-        </div>
+        <div className="absolute top-3 right-3">{deleteBtn()}</div>
       </div>
     );
   }
@@ -158,15 +169,15 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
   return (
     <Link href={href}
       className={`bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent ${
-        room.kind === "science" ? "hover:border-cyan-100" : "hover:border-indigo-100"
+        room.kind === "science" ? "hover:border-cyan-100" :
+        room.kind === "morals" ? "hover:border-rose-100" :
+        "hover:border-indigo-100"
       }`}>
       <div className="flex items-start justify-between mb-3">
         <span className="text-2xl">{cardEmoji(room)}</span>
         {isActive ? (
-          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
-            room.kind === "science" ? "text-emerald-700 bg-emerald-50" : "text-green-700 bg-green-100"
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${room.kind === "science" ? "bg-emerald-500" : "bg-green-500"}`} />
+          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${activeBadgeColor(room)}`}>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${activeDotColor(room)}`} />
             진행 중
           </span>
         ) : (
@@ -176,9 +187,7 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
       <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
       <p className="text-sm text-gray-500 mt-1 line-clamp-1">주제: {room.topic}</p>
       <div className="flex gap-2 mt-2.5 flex-wrap">
-        <span className={`text-xs px-2.5 py-1 rounded-full ${
-          room.kind === "science" ? "bg-cyan-50 text-cyan-700" : "bg-indigo-50 text-indigo-600"
-        }`}>
+        <span className={`text-xs px-2.5 py-1 rounded-full ${kindChipColor(room)}`}>
           {kindLabel(room)}
         </span>
         {room.kind === "writing" && room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
@@ -192,12 +201,31 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
 
 function kindLabel(room: UnifiedRoom): string {
   if (room.kind === "writing") return "글쓰기";
-  if (room.inquiry_track) return `과학 · ${TRACK_META[room.inquiry_track].label}`;
-  return "과학";
+  if (room.kind === "science") return room.inquiry_track ? `과학 · ${TRACK_META[room.inquiry_track].label}` : "과학";
+  return `도덕 · ${MORALS_TRACK_META[room.track].label}`;
+}
+
+function kindChipColor(room: UnifiedRoom): string {
+  if (room.kind === "science") return "bg-cyan-50 text-cyan-700";
+  if (room.kind === "morals") return "bg-rose-50 text-rose-700";
+  return "bg-indigo-50 text-indigo-600";
+}
+
+function activeBadgeColor(room: UnifiedRoom): string {
+  if (room.kind === "science") return "text-emerald-700 bg-emerald-50";
+  if (room.kind === "morals") return "text-rose-700 bg-rose-50";
+  return "text-green-700 bg-green-100";
+}
+
+function activeDotColor(room: UnifiedRoom): string {
+  if (room.kind === "science") return "bg-emerald-500";
+  if (room.kind === "morals") return "bg-rose-500";
+  return "bg-green-500";
 }
 
 function cardEmoji(room: UnifiedRoom): string {
   if (room.kind === "science") return "🔬";
+  if (room.kind === "morals") return "🪞";
   return subjectEmoji(room.subject_type);
 }
 

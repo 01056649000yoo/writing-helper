@@ -24,14 +24,22 @@ const WRITING_EMOJI: Record<ActivityType, string> = {
   one_line_share: "💬",
 };
 
-const SCIENCE_LABEL = "과학 탐구 글쓰기";
-const SCIENCE_EMOJI = "🔬";
+const SUBJECT_LABEL: Record<"science" | "morals", string> = {
+  science: "과학 탐구 글쓰기",
+  morals: "도덕 가치 글쓰기",
+};
+const SUBJECT_EMOJI: Record<"science" | "morals", string> = {
+  science: "🔬",
+  morals: "🪞",
+};
 
 function labelFor(slug: DraftActivitySlug): string {
-  return slug === "science" ? SCIENCE_LABEL : WRITING_LABEL[slug];
+  if (slug === "science" || slug === "morals") return SUBJECT_LABEL[slug];
+  return WRITING_LABEL[slug];
 }
 function emojiFor(slug: DraftActivitySlug): string {
-  return slug === "science" ? SCIENCE_EMOJI : WRITING_EMOJI[slug];
+  if (slug === "science" || slug === "morals") return SUBJECT_EMOJI[slug];
+  return WRITING_EMOJI[slug];
 }
 
 function getDraftTitle(draft: ActivityDraftSummary) {
@@ -43,9 +51,8 @@ function getDraftTitle(draft: ActivityDraftSummary) {
 }
 
 function hrefFor(draft: ActivityDraftSummary): string {
-  if (draft.kind === "science") {
-    return `/dashboard/science/new?class_id=${draft.classId}`;
-  }
+  if (draft.kind === "science") return `/dashboard/science/new?class_id=${draft.classId}`;
+  if (draft.kind === "morals") return `/dashboard/morals/new?class_id=${draft.classId}`;
   return `/dashboard/room/new?class_id=${draft.classId}&activity_type=${draft.activitySlug}`;
 }
 
