@@ -279,163 +279,134 @@ const COMING_SOON_ACTIVITIES: {
   },
 ];
 
-type UnifiedActivityItem =
-  | {
-      key: string;
-      kind: "writing";
-      emoji: string;
-      tone: string;
-      label: string;
-      summary: string;
-      href: string;
-      status: "ready";
-    }
-  | {
-      key: string;
-      kind: "subject";
-      emoji: string;
-      tone: string;
-      label: string;
-      summary: string;
-      href: string | null;
-      status: "testing" | "soon";
-    };
-
 function ActivitySelectionScreen({ classId }: { classId: string }) {
-  const writingItems: UnifiedActivityItem[] = activityDefinitions.map((activity) => {
-    const meta = ACTIVITY_META[activity.id];
-    return {
-      key: activity.id,
-      kind: "writing",
-      emoji: meta.emoji,
-      tone: meta.tone,
-      label: activity.label,
-      summary: meta.summary,
-      href: `/dashboard/room/new?class_id=${classId}&activity_type=${activity.id}`,
-      status: "ready",
-    };
-  });
-
-  const subjectItems: UnifiedActivityItem[] = COMING_SOON_ACTIVITIES.map((activity) => {
-    const resolvedHref =
-      activity.href === "__science__"
-        ? (classId ? `/dashboard/science/new?class_id=${classId}` : null)
-        : (activity.href ?? null);
-    const status: "testing" | "soon" = activity.status === "testing" ? "testing" : "soon";
-    return {
-      key: activity.label,
-      kind: "subject",
-      emoji: activity.emoji,
-      tone: activity.tone,
-      label: activity.label,
-      summary: activity.summary,
-      href: resolvedHref,
-      status,
-    };
-  });
-
-  // 작동 가능한 활동(준비된 것 + 테스트 중) → 준비 중
-  const items: UnifiedActivityItem[] = [
-    ...writingItems,
-    ...subjectItems.filter((s) => s.status === "testing"),
-    ...subjectItems.filter((s) => s.status === "soon"),
-  ];
-  const readyCount = items.filter((i) => i.status !== "soon").length;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-6xl mx-auto pt-8 pb-16">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-7xl mx-auto py-4">
         <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="text-indigo-500 text-sm hover:underline">
           ← {classId ? "학급으로" : "대시보드로"}
         </Link>
 
-        <div className="mt-6 bg-white rounded-[32px] shadow-xl border border-white/70 overflow-hidden">
+        <div className="mt-3 bg-white rounded-3xl shadow-xl border border-white/70 overflow-hidden">
           {/* 헤더 */}
-          <div className="px-8 py-8 bg-gradient-to-r from-slate-50 via-white to-indigo-50 border-b border-gray-100">
-            <p className="text-sm font-semibold text-indigo-600">Step 1</p>
-            <h1 className="mt-2 text-3xl font-bold text-gray-800">어떤 활동을 시작할까요?</h1>
-            <p className="mt-2 text-base text-gray-500">
-              질문·투표·공유 같은 핵심 활동부터 과학·사회·수학·도덕 같은 교과 연계 활동까지 한곳에서 고를 수 있어요.
-            </p>
+          <div className="px-6 py-4 bg-gradient-to-r from-slate-50 via-white to-indigo-50 border-b border-gray-100">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-xs font-semibold text-indigo-600">Step 1</p>
+                <h1 className="mt-0.5 text-xl font-bold text-gray-800">어떤 활동을 시작할까요?</h1>
+              </div>
+              <p className="text-xs text-gray-400">활동을 고르면 각 활동에 맞는 설정 화면이 열립니다</p>
+            </div>
           </div>
 
-          {/* 통합 그리드 */}
-          <section className="p-6 sm:p-8">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🧰</span>
-                <h2 className="text-base font-bold text-gray-800">글쓰기 활동</h2>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600">
-                  바로 사용 {readyCount}개
-                </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
-                  준비 중 {items.length - readyCount}개
-                </span>
-              </div>
-            </div>
+          {/* 좌우 2-파트 레이아웃 */}
+          <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.map((item) => {
-                if (item.status === "soon") {
+            {/* ── 파트 1: 글쓰기 활동 꾸러미 ── */}
+            <section className="flex-1 p-5">
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-lg">📦</span>
+                  <h2 className="text-sm font-bold text-gray-800 truncate">글쓰기 활동 꾸러미</h2>
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600">
+                    {activityDefinitions.length}개
+                  </span>
+                </div>
+                <span className="shrink-0 text-[11px] font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">바로 사용</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {activityDefinitions.map((activity) => {
+                  const meta = ACTIVITY_META[activity.id];
                   return (
-                    <div
-                      key={item.key}
-                      className={`flex flex-col rounded-2xl border border-gray-200/80 bg-gradient-to-br ${item.tone} p-5 opacity-55 cursor-not-allowed`}
+                    <Link
+                      key={activity.id}
+                      href={`/dashboard/room/new?class_id=${classId}&activity_type=${activity.id}`}
+                      className={`flex flex-col rounded-2xl border border-gray-200 bg-gradient-to-br ${meta.tone} p-4 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-200`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-3xl">{item.emoji}</span>
-                        <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-semibold text-amber-500 shadow-sm">
+                        <span className="text-2xl">{meta.emoji}</span>
+                        <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-gray-400 shadow-sm">
+                          플러그인
+                        </span>
+                      </div>
+                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
+                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{meta.summary}</p>
+                      <div className="mt-3 pt-2 border-t border-gray-100/80 flex justify-end">
+                        <span className="inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
+                          선택 →
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* ── 파트 2: 과목별 글쓰기 활동 ── */}
+            <section className="flex-1 p-5 bg-gray-50/60">
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-lg">📚</span>
+                  <h2 className="text-sm font-bold text-gray-800 truncate">과목별 글쓰기 활동</h2>
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600">
+                    {COMING_SOON_ACTIVITIES.length}개
+                  </span>
+                </div>
+                <span className="shrink-0 text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">교과 연계</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {COMING_SOON_ACTIVITIES.map((activity) => {
+                  const resolvedHref = activity.href === "__science__"
+                    ? (classId ? `/dashboard/science/new?class_id=${classId}` : null)
+                    : (activity.href ?? null);
+                  const isTesting = activity.status === "testing";
+                  return resolvedHref ? (
+                    <Link
+                      key={activity.label}
+                      href={resolvedHref}
+                      className={`flex flex-col rounded-2xl border bg-gradient-to-br ${activity.tone} p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${isTesting ? "border-amber-200" : "border-cyan-200"}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-2xl">{activity.emoji}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm ${isTesting ? "bg-amber-400" : "bg-cyan-500"}`}>
+                          {isTesting ? "테스트 중" : "NEW"}
+                        </span>
+                      </div>
+                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
+                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{activity.summary}</p>
+                      <div className={`mt-3 pt-2 flex justify-end ${isTesting ? "border-t border-amber-100/80" : "border-t border-cyan-100/80"}`}>
+                        <span className={`inline-flex items-center gap-1 text-white text-[11px] font-semibold px-3 py-1 rounded-full ${isTesting ? "bg-amber-400" : "bg-cyan-500"}`}>
+                          선택 →
+                        </span>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div
+                      key={activity.label}
+                      className={`flex flex-col rounded-2xl border border-gray-200/80 bg-gradient-to-br ${activity.tone} p-4 opacity-55 cursor-not-allowed`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-2xl">{activity.emoji}</span>
+                        <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-500 shadow-sm">
                           준비 중
                         </span>
                       </div>
-                      <h3 className="mt-4 text-base font-bold text-gray-800">{item.label}</h3>
-                      <p className="mt-1.5 text-xs leading-5 text-gray-500 flex-1">{item.summary}</p>
-                      <div className="mt-4 pt-3 border-t border-gray-100/80 flex justify-end">
-                        <span className="inline-flex items-center gap-1 bg-gray-300 text-gray-500 text-xs font-semibold px-3.5 py-1.5 rounded-full">
+                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
+                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{activity.summary}</p>
+                      <div className="mt-3 pt-2 border-t border-gray-100/80 flex justify-end">
+                        <span className="inline-flex items-center gap-1 bg-gray-300 text-gray-500 text-[11px] font-semibold px-3 py-1 rounded-full">
                           곧 출시 →
                         </span>
                       </div>
                     </div>
                   );
-                }
+                })}
+              </div>
+            </section>
 
-                const badgeLabel = item.status === "testing" ? "테스트 중" : item.kind === "subject" ? "교과 연계" : "플러그인";
-                const badgeColor =
-                  item.status === "testing"
-                    ? "bg-amber-400 text-white"
-                    : item.kind === "subject"
-                      ? "bg-cyan-500 text-white"
-                      : "bg-white/90 text-gray-400";
-                const borderHover =
-                  item.kind === "subject"
-                    ? "border-cyan-100 hover:border-cyan-200"
-                    : "border-gray-200 hover:border-indigo-200";
-                const buttonColor = item.kind === "subject" ? "bg-cyan-500 hover:bg-cyan-600" : "bg-indigo-600 hover:bg-indigo-700";
-
-                return (
-                  <Link
-                    key={item.key}
-                    href={item.href!}
-                    className={`flex flex-col rounded-2xl border bg-gradient-to-br ${item.tone} p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${borderHover}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-3xl">{item.emoji}</span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold shadow-sm ${badgeColor}`}>
-                        {badgeLabel}
-                      </span>
-                    </div>
-                    <h3 className="mt-4 text-base font-bold text-gray-800">{item.label}</h3>
-                    <p className="mt-1.5 text-xs leading-5 text-gray-500 flex-1">{item.summary}</p>
-                    <div className="mt-4 pt-3 border-t border-gray-100/80 flex justify-end">
-                      <span className={`inline-flex items-center gap-1 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full ${buttonColor}`}>
-                        선택하기 →
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
+          </div>
         </div>
       </div>
     </div>
