@@ -623,8 +623,12 @@ function DataTransformStep({ settings, initial, onSubmit, isLast }: SkillStepPro
   const [shape, setShape] = useState<DataTransformShape>(defaultShape);
   const [headers, setHeaders] = useState<string[]>(initial?.tableHeaders ?? ["조작 변인", "종속 변인"]);
   const [rows, setRows] = useState<string[][]>(initial?.tableRows ?? [["", ""], ["", ""], ["", ""]]);
-  const [chartData, setChartData] = useState(initial?.chartData ?? [{ label: "", value: 0 }, { label: "", value: 0 }, { label: "", value: 0 }]);
+  const [chartData, setChartData] = useState<Array<{ label: string; value: string }>>(
+    initial?.chartData?.map((p) => ({ label: p.label, value: String(p.value) })) ??
+      [{ label: "", value: "" }, { label: "", value: "" }, { label: "", value: "" }]
+  );
   const [photoData, setPhotoData] = useState(initial?.photoData ?? "");
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   function addRow() { setRows((p) => [...p, headers.map(() => "")]); }
   function updateCell(ri: number, ci: number, v: string) {
@@ -633,9 +637,9 @@ function DataTransformStep({ settings, initial, onSubmit, isLast }: SkillStepPro
   function updateHeader(ci: number, v: string) {
     setHeaders((p) => p.map((h, i) => i === ci ? v : h));
   }
-  function addChartPoint() { setChartData((p) => [...p, { label: "", value: 0 }]); }
+  function addChartPoint() { setChartData((p) => [...p, { label: "", value: "" }]); }
   function updateChart(idx: number, field: "label" | "value", v: string) {
-    setChartData((p) => p.map((d, i) => i === idx ? { ...d, [field]: field === "value" ? Number(v) || 0 : v } : d));
+    setChartData((p) => p.map((d, i) => i === idx ? { ...d, [field]: v } : d));
   }
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -644,6 +648,11 @@ function DataTransformStep({ settings, initial, onSubmit, isLast }: SkillStepPro
     const reader = new FileReader();
     reader.onload = () => setPhotoData(String(reader.result ?? ""));
     reader.readAsDataURL(file);
+  }
+
+  function removePhoto() {
+    setPhotoData("");
+    if (photoInputRef.current) photoInputRef.current.value = "";
   }
 
   const canProceed = shape === "table"
@@ -710,9 +719,25 @@ function DataTransformStep({ settings, initial, onSubmit, isLast }: SkillStepPro
 
       {settings.allowPhotoUpload && (
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-gray-600">📷 결과 사진 (선택)</p>
-          <input type="file" accept="image/*" onChange={handlePhoto}
-            className="text-xs text-gray-500" />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-gray-600">📷 결과 사진 (선택)</p>
+            {photoData && (
+              <button
+                type="button"
+                onClick={removePhoto}
+                className="text-xs font-semibold text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg"
+              >
+                🗑 사진 삭제
+              </button>
+            )}
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handlePhoto}
+            className="text-xs text-gray-500"
+          />
           {photoData && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photoData} alt="결과 사진" className="max-w-full rounded-xl border border-gray-200" />
@@ -724,7 +749,9 @@ function DataTransformStep({ settings, initial, onSubmit, isLast }: SkillStepPro
         shape,
         tableHeaders: shape === "table" ? headers : undefined,
         tableRows: shape === "table" ? rows : undefined,
-        chartData: shape !== "table" ? chartData : undefined,
+        chartData: shape !== "table"
+          ? chartData.map((d) => ({ label: d.label, value: Number(d.value) || 0 }))
+          : undefined,
         photoData,
       })} label={isLast ? "자료 제출하기 🎉" : "다음 단계로 →"} />
     </div>
