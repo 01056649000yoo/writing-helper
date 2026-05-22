@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/app/actions/auth-actions";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import { StudentResultQr } from "./student-result-qr";
+import { OutlineDraftEditor } from "./outline-draft-editor";
 import { buildOneLineShareBoard } from "@/lib/one-line-share";
 import { parseOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
@@ -129,23 +130,12 @@ export default async function TeacherResultPage({
           </div>
 
           {!isQuestionGenerator && !isQuestionVoting && resultPayload.outline && (
-            <div className="grid gap-4">
-              <div className="bg-indigo-50 rounded-2xl p-6">
-                <h2 className="font-bold text-indigo-800 mb-3">📝 완성된 글쓰기 개요</h2>
-                <pre className="whitespace-pre-wrap text-gray-700 text-sm leading-relaxed font-sans">
-                  {resultPayload.outline}
-                </pre>
-              </div>
-
-              {resultPayload.draft && (
-                <div className="bg-emerald-50 rounded-2xl p-6">
-                  <h2 className="font-bold text-emerald-800 mb-3">✍️ 고쳐쓰기용 초고</h2>
-                  <pre className="whitespace-pre-wrap text-gray-700 text-sm leading-7 font-sans">
-                    {resultPayload.draft}
-                  </pre>
-                </div>
-              )}
-            </div>
+            <OutlineDraftEditor
+              roomId={id}
+              sessionId={sessionId}
+              initialOutline={resultPayload.outline}
+              initialDraft={resultPayload.draft}
+            />
           )}
 
           {isQuestionGenerator && questionSubmission && (
