@@ -12,13 +12,27 @@ import type {
   MeasurementEntry,
   VariableCardType,
   ScienceStep,
+  InquiryTrack,
+  SkillKey,
+  SkillSettings,
+  SkillData,
 } from "@/types/science";
+import type { RoomStudent } from "@/types";
+import { SKILL_META, TRACK_META } from "@/types/science";
 
 // ─────────────────────────────────────────
 // 헬퍼: DB row → ScienceRoom
 // ─────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToScienceRoom(row: any): ScienceRoom {
+  const inquiryTrack: InquiryTrack | null =
+    row.inquiry_track === "basic" || row.inquiry_track === "integrated"
+      ? row.inquiry_track
+      : null;
+  const enabledSkills: SkillKey[] = Array.isArray(row.enabled_skills)
+    ? (row.enabled_skills as string[]).filter((s): s is SkillKey => s in SKILL_META)
+    : [];
+
   return {
     id: row.id,
     teacher_id: row.teacher_id,
@@ -26,6 +40,9 @@ function rowToScienceRoom(row: any): ScienceRoom {
     title: row.title,
     topic: row.topic,
     instructions: row.instructions,
+    inquiryTrack,
+    enabledSkills,
+    skillSettings: (row.skill_settings ?? {}) as SkillSettings,
     config: {
       useBeforeAfter: row.use_before_after,
       enabledSenses: row.enabled_senses ?? [],
@@ -47,6 +64,36 @@ function rowToScienceRoom(row: any): ScienceRoom {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToScienceSession(row: any): ScienceSession {
+  const completedSkills: SkillKey[] = Array.isArray(row.completed_skills)
+    ? (row.completed_skills as string[]).filter((s): s is SkillKey => s in SKILL_META)
+    : [];
+
+  return {
+    id: row.id,
+    room_id: row.room_id,
+    student_number: row.student_number,
+    student_name: row.student_name,
+    skillData: (row.skill_data ?? {}) as SkillData,
+    completedSkills,
+    before_state: row.before_state ?? "",
+    after_state: row.after_state ?? "",
+    sense_tags: (row.sense_tags ?? []) as SenseTag[],
+    measurements: (row.measurements ?? []) as MeasurementEntry[],
+    drawing_data: row.drawing_data ?? "",
+    inference_text: row.inference_text ?? "",
+    counter_text: row.counter_text ?? "",
+    question_type: row.question_type ?? "",
+    question_text: row.question_text ?? "",
+    ai_summary: row.ai_summary ?? "",
+    current_step: row.current_step as ScienceStep,
+    status: row.status,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
 // ─────────────────────────────────────────
 // 교사: 방 생성
 // ─────────────────────────────────────────
@@ -56,10 +103,40 @@ export async function createScienceRoom(formData: FormData) {
 
   const admin = createSupabaseAdminClient();
 
-  const enabledMeasurements = formData.getAll("enabled_measurements") as string[];
-  const enabledSenses = formData.getAll("enabled_senses") as string[];
-  const enabledVariableCards = formData.getAll("enabled_variable_cards") as string[];
+  const inquiryTrackRaw = String(formData.get("inquiry_track") ?? "");
+  const inquiryTrack: InquiryTrack | null =
+    inquiryTrackRaw === "basic" || inquiryTrackRaw === "integrated" ? inquiryTrackRaw : null;
+
+  if (!inquiryTrack) return { error: "탐구 과정(기초/통합)을 선택해주세요." };
+
+  const enabledSkillsRaw = formData.getAll("enabled_skills").map(String);
+  const allowedSkillsForTrack = new Set<SkillKey>(TRACK_META[inquiryTrack].skills);
+  const enabledSkills = enabledSkillsRaw.filter(
+    (s): s is SkillKey => (s in SKILL_META) && allowedSkillsForTrack.has(s as SkillKey),
+  );
+
+  if (enabledSkills.length === 0) {
+    return { error: "탐구 활동을 1개 이상 선택해주세요." };
+  }
+
+  let skillSettings: SkillSettings = {};
+  const skillSettingsRaw = String(formData.get("skill_settings_json") ?? "").trim();
+  if (skillSettingsRaw) {
+    try {
+      skillSettings = JSON.parse(skillSettingsRaw) as SkillSettings;
+    } catch {
+      return { error: "세부 설정 데이터가 올바르지 않습니다." };
+    }
+  }
+
   const durationHours = Math.min(Math.max(Number(formData.get("duration_hours") ?? 4), 1), 48);
+
+  // 호환을 위해 legacy 컬럼도 신규 설정에서 파생하여 채워준다.
+  const obs = skillSettings.observation;
+  const meas = skillSettings.measurement;
+  const inf = skillSettings.inference;
+  const vc = skillSettings.variable_control;
+  const comm = skillSettings.communication;
 
   const { data, error } = await admin
     .schema("writing_helper")
@@ -70,16 +147,20 @@ export async function createScienceRoom(formData: FormData) {
       title: String(formData.get("title") ?? "").trim(),
       topic: String(formData.get("topic") ?? "").trim(),
       instructions: String(formData.get("instructions") ?? "").trim(),
-      use_before_after: formData.get("use_before_after") === "on",
-      enabled_senses: enabledSenses,
-      enabled_measurements: enabledMeasurements,
-      custom_measurement_label: String(formData.get("custom_measurement_label") ?? "").trim(),
-      use_drawing: formData.get("use_drawing") === "on",
-      use_inference_template: formData.get("use_inference_template") === "on",
-      use_counter_argument: formData.get("use_counter_argument") === "on",
-      enabled_variable_cards: enabledVariableCards,
-      use_peer_review: formData.get("use_peer_review") === "on",
-      use_ai_summary: formData.get("use_ai_summary") === "on",
+      inquiry_track: inquiryTrack,
+      enabled_skills: enabledSkills,
+      skill_settings: skillSettings,
+      // legacy mirrors (있는 값만)
+      use_before_after: obs?.useBeforeAfter ?? false,
+      enabled_senses: obs?.enabledSenses ?? [],
+      enabled_measurements: (meas?.enabledMeasurements ?? []).map((m) => `${m.label}|${m.unit}`),
+      custom_measurement_label: "",
+      use_drawing: obs?.useDrawing ?? false,
+      use_inference_template: inf?.useTemplate ?? false,
+      use_counter_argument: inf?.useCounterArgument ?? false,
+      enabled_variable_cards: vc?.enabledVariableCards ?? [],
+      use_peer_review: comm?.usePeerReview ?? false,
+      use_ai_summary: comm?.useAiSummary ?? false,
       is_active: true,
       expires_at: new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString(),
     })
@@ -122,6 +203,33 @@ export async function getScienceRoom(roomId: string): Promise<ScienceRoom | null
     .single();
 
   return data ? rowToScienceRoom(data) : null;
+}
+
+export async function getScienceRoomStudents(roomId: string): Promise<RoomStudent[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("science_rooms")
+    .select("class_id, teacher_id")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== user.id) return [];
+
+  if (room.class_id) {
+    const { data } = await admin
+      .schema("writing_helper")
+      .from("class_students")
+      .select("*")
+      .eq("class_id", room.class_id)
+      .order("student_number");
+    return (data ?? []).map((student) => ({ ...student, room_id: roomId }));
+  }
+
+  return [];
 }
 
 // ─────────────────────────────────────────
@@ -256,17 +364,57 @@ export async function getScienceSession(sessionId: string): Promise<ScienceSessi
     .eq("id", sessionId)
     .single();
 
-  if (!data) return null;
-  return {
-    ...data,
-    sense_tags: (data.sense_tags ?? []) as SenseTag[],
-    measurements: (data.measurements ?? []) as MeasurementEntry[],
-    current_step: data.current_step as ScienceStep,
-  };
+  return data ? rowToScienceSession(data) : null;
 }
 
 // ─────────────────────────────────────────
-// 학생: 1단계(관찰) 저장
+// 학생: 스킬별 데이터 저장 (신규)
+// ─────────────────────────────────────────
+export async function saveScienceSkill<K extends SkillKey>(
+  sessionId: string,
+  skill: K,
+  data: NonNullable<SkillData[K]>,
+  options?: { markComplete?: boolean; finalizeSession?: boolean },
+) {
+  const admin = createSupabaseAdminClient();
+
+  // 현재 skill_data 와 completed_skills 가져와서 머지
+  const { data: row, error: readErr } = await admin
+    .schema("writing_helper")
+    .from("science_sessions")
+    .select("skill_data, completed_skills")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (readErr) return { error: readErr.message };
+  if (!row) return { error: "세션을 찾을 수 없습니다." };
+
+  const skillData = { ...((row.skill_data ?? {}) as SkillData), [skill]: data };
+  let completedSkills = (row.completed_skills ?? []) as string[];
+  if (options?.markComplete && !completedSkills.includes(skill)) {
+    completedSkills = [...completedSkills, skill];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updatePayload: Record<string, any> = {
+    skill_data: skillData,
+    completed_skills: completedSkills,
+  };
+  if (options?.finalizeSession) {
+    updatePayload.status = "done";
+  }
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("science_sessions")
+    .update(updatePayload)
+    .eq("id", sessionId);
+
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+// ─────────────────────────────────────────
+// 학생: 1단계(관찰) 저장 — legacy
 // ─────────────────────────────────────────
 export async function saveScienceStep1(
   sessionId: string,
@@ -297,7 +445,7 @@ export async function saveScienceStep1(
 }
 
 // ─────────────────────────────────────────
-// 학생: 2단계(추론) 저장
+// 학생: 2단계(추론) 저장 — legacy
 // ─────────────────────────────────────────
 export async function saveScienceStep2(
   sessionId: string,
@@ -319,7 +467,7 @@ export async function saveScienceStep2(
 }
 
 // ─────────────────────────────────────────
-// 학생: 3단계(질문) 저장 + 완료
+// 학생: 3단계(질문) 저장 + 완료 — legacy
 // ─────────────────────────────────────────
 export async function saveScienceStep3(
   sessionId: string,
@@ -386,12 +534,7 @@ export async function getScienceRoomSessions(roomId: string): Promise<ScienceSes
     .eq("room_id", roomId)
     .order("created_at", { ascending: true });
 
-  return (data ?? []).map((row) => ({
-    ...row,
-    sense_tags: (row.sense_tags ?? []) as SenseTag[],
-    measurements: (row.measurements ?? []) as MeasurementEntry[],
-    current_step: row.current_step as ScienceStep,
-  }));
+  return (data ?? []).map(rowToScienceSession);
 }
 
 export async function getScienceRoomReviews(roomId: string): Promise<ScienceReview[]> {
