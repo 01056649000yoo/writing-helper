@@ -129,13 +129,22 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
     return (
       <div className="relative bg-white/60 rounded-2xl hover:bg-white transition-colors opacity-70 hover:opacity-100">
         <Link href={href} className="block p-6">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-2xl">{cardEmoji(room)}</span>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{kindLabel(room)}</span>
+          <div className="flex items-start gap-3 mb-2 pr-16">
+            <span className="text-2xl shrink-0">{cardEmoji(room)}</span>
+            <h3 className="font-semibold text-gray-700 text-base leading-snug">{room.title}</h3>
           </div>
-          <h3 className="font-semibold text-gray-700 text-base">{room.title}</h3>
           <p className="text-sm text-gray-500 mt-1">주제: {room.topic}</p>
-          <p className="text-sm text-gray-400 mt-1.5">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
+          <div className="flex gap-2 mt-2.5 flex-wrap">
+            <span className={`text-xs px-2.5 py-1 rounded-full ${
+              room.kind === "science" ? "bg-cyan-50 text-cyan-700" : "bg-gray-100 text-gray-500"
+            }`}>
+              {kindLabel(room)}
+            </span>
+            {room.kind === "writing" && room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
+              <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
+            )}
+          </div>
+          <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
         </Link>
         <div className="absolute top-3 right-3">
           {room.kind === "writing"
