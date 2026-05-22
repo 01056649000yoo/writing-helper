@@ -7,29 +7,46 @@ import {
   clearActivityDraft,
   listActivityDraftsForClass,
   type ActivityDraftSummary,
+  type DraftActivitySlug,
 } from "@/lib/activity-drafts";
 
-const ACTIVITY_LABEL: Record<ActivityType, string> = {
+const WRITING_LABEL: Record<ActivityType, string> = {
   outline_builder: "글 개요 짜기",
   question_generator: "질문 만들기",
   question_voting: "좋은 질문 고르기",
   one_line_share: "한줄모아",
 };
 
-const ACTIVITY_EMOJI: Record<ActivityType, string> = {
+const WRITING_EMOJI: Record<ActivityType, string> = {
   outline_builder: "📝",
   question_generator: "❓",
   question_voting: "🗳️",
   one_line_share: "💬",
 };
 
-function getDraftTitle(draft: ActivityDraftSummary) {
-  if (draft.activityType === "question_voting") {
-    const base = draft.sourceRoomTopic || draft.sourceRoomTitle || draft.topic;
-    return base ? `${base} 질문 고르기` : ACTIVITY_LABEL[draft.activityType];
-  }
+const SCIENCE_LABEL = "과학 탐구 글쓰기";
+const SCIENCE_EMOJI = "🔬";
 
-  return draft.topic || ACTIVITY_LABEL[draft.activityType];
+function labelFor(slug: DraftActivitySlug): string {
+  return slug === "science" ? SCIENCE_LABEL : WRITING_LABEL[slug];
+}
+function emojiFor(slug: DraftActivitySlug): string {
+  return slug === "science" ? SCIENCE_EMOJI : WRITING_EMOJI[slug];
+}
+
+function getDraftTitle(draft: ActivityDraftSummary) {
+  if (draft.activitySlug === "question_voting") {
+    const base = draft.sourceRoomTopic || draft.sourceRoomTitle || draft.topic;
+    return base ? `${base} 질문 고르기` : labelFor(draft.activitySlug);
+  }
+  return draft.topic || labelFor(draft.activitySlug);
+}
+
+function hrefFor(draft: ActivityDraftSummary): string {
+  if (draft.kind === "science") {
+    return `/dashboard/science/new?class_id=${draft.classId}`;
+  }
+  return `/dashboard/room/new?class_id=${draft.classId}&activity_type=${draft.activitySlug}`;
 }
 
 export function DraftSessionsPanel({ classId }: { classId: string }) {
@@ -54,16 +71,16 @@ export function DraftSessionsPanel({ classId }: { classId: string }) {
       <div className="grid gap-4 sm:grid-cols-2">
         {drafts.map((draft) => (
           <div key={draft.storageKey} className="relative bg-white rounded-2xl p-6 shadow-sm border border-amber-100">
-            <Link href={`/dashboard/room/new?class_id=${classId}&activity_type=${draft.activityType}`} className="block">
+            <Link href={hrefFor(draft)} className="block">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-2xl">{ACTIVITY_EMOJI[draft.activityType]}</span>
+                <span className="text-2xl">{emojiFor(draft.activitySlug)}</span>
                 <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">초안</span>
               </div>
               <h3 className="font-bold text-gray-800 text-base">
                 {getDraftTitle(draft)}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
-                활동: {ACTIVITY_LABEL[draft.activityType]}
+                활동: {labelFor(draft.activitySlug)}
               </p>
               {draft.topicDescription && (
                 <p className="text-sm text-gray-400 mt-2 line-clamp-2">{draft.topicDescription}</p>

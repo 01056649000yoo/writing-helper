@@ -1,16 +1,22 @@
 import type { ActivityType } from "@/features/activities/types";
 
 export const DRAFT_STORAGE_PREFIX = "writing-helper:activity-draft:v1";
+export const SCIENCE_DRAFT_SLUG = "science";
 
 type StoredDraft<T> = {
   data: T;
   savedAt: number;
 };
 
+export type DraftActivitySlug = ActivityType | typeof SCIENCE_DRAFT_SLUG;
+export type DraftKind = "writing" | "science";
+
 export type ActivityDraftSummary = {
   storageKey: string;
   classId: string;
-  activityType: ActivityType;
+  kind: DraftKind;
+  /** writing 활동 타입이거나 'science' */
+  activitySlug: DraftActivitySlug;
   topic: string;
   topicDescription: string;
   sourceRoomTitle: string;
@@ -18,8 +24,21 @@ export type ActivityDraftSummary = {
   savedAt: number | null;
 };
 
-export function buildDraftStorageKey(classId: string, activityType: ActivityType) {
-  return `${DRAFT_STORAGE_PREFIX}:${classId || "no-class"}:${activityType}`;
+const WRITING_ACTIVITY_SLUGS: ReadonlySet<string> = new Set<ActivityType>([
+  "outline_builder",
+  "question_generator",
+  "question_voting",
+  "one_line_share",
+]);
+
+function classifySlug(slug: string): { kind: DraftKind; activitySlug: DraftActivitySlug } | null {
+  if (slug === SCIENCE_DRAFT_SLUG) return { kind: "science", activitySlug: SCIENCE_DRAFT_SLUG };
+  if (WRITING_ACTIVITY_SLUGS.has(slug)) return { kind: "writing", activitySlug: slug as ActivityType };
+  return null;
+}
+
+export function buildDraftStorageKey(classId: string, activitySlug: DraftActivitySlug) {
+  return `${DRAFT_STORAGE_PREFIX}:${classId || "no-class"}:${activitySlug}`;
 }
 
 export function clearActivityDraft(storageKey: string) {
@@ -83,7 +102,10 @@ export function listActivityDraftsForClass(classId: string): ActivityDraftSummar
 
     try {
       const parsed = JSON.parse(raw) as unknown;
-      const activityType = key.slice(prefix.length) as ActivityType;
+      const slug = key.slice(prefix.length);
+      const classified = classifySlug(slug);
+      if (!classified) continue;
+
       const payload = isStoredDraft<Record<string, unknown>>(parsed)
         ? parsed
         : isRecord(parsed)
@@ -95,7 +117,8 @@ export function listActivityDraftsForClass(classId: string): ActivityDraftSummar
       drafts.push({
         storageKey: key,
         classId,
-        activityType,
+        kind: classified.kind,
+        activitySlug: classified.activitySlug,
         topic: typeof payload.data.topic === "string" ? payload.data.topic : "",
         topicDescription: typeof payload.data.topic_description === "string" ? payload.data.topic_description : "",
         sourceRoomTitle: typeof payload.data.source_room_title === "string" ? payload.data.source_room_title : "",

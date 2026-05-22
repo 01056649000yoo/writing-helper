@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createScienceRoom } from "@/app/actions/science-actions";
@@ -18,6 +18,28 @@ import {
   type SkillSettings,
   type DataTransformShape,
 } from "@/types/science";
+import { useActivityDraft } from "@/lib/use-activity-draft";
+import { buildDraftStorageKey, clearActivityDraft, SCIENCE_DRAFT_SLUG, persistActivityDraft } from "@/lib/activity-drafts";
+
+type ScienceDraft = {
+  title: string;
+  topic: string;
+  instructions: string;
+  duration_hours: string;
+  inquiry_track: InquiryTrack | null;
+  enabled_skills: SkillKey[];
+  skill_settings: SkillSettings;
+};
+
+const INITIAL_SCIENCE_DRAFT: ScienceDraft = {
+  title: "",
+  topic: "",
+  instructions: "",
+  duration_hours: "2",
+  inquiry_track: null,
+  enabled_skills: [],
+  skill_settings: {},
+};
 
 const ALL_SENSES: SenseType[] = ["sight", "smell", "hearing", "touch"];
 const ALL_VARIABLES: VariableCardType[] = [
@@ -128,19 +150,14 @@ function NewScienceRoomPage() {
   const classId = searchParams.get("class_id") ?? "";
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
-  // 기본 정보
-  const [title, setTitle] = useState("");
-  const [topic, setTopic] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [durationHours, setDurationHours] = useState("2");
+  const storageKey = useMemo(() => buildDraftStorageKey(classId, SCIENCE_DRAFT_SLUG), [classId]);
+  const [draft, setDraft, draftControls] = useActivityDraft<ScienceDraft>(storageKey, INITIAL_SCIENCE_DRAFT);
 
-  // 트랙 + 스킬 선택
-  const [track, setTrack] = useState<InquiryTrack | null>(null);
-  const [enabledSkills, setEnabledSkills] = useState<Set<SkillKey>>(new Set());
-  const [skillSettings, setSkillSettings] = useState<SkillSettings>({});
-
+  const { title, topic, instructions, duration_hours: durationHours, inquiry_track: track, enabled_skills: enabledSkills, skill_settings: skillSettings } = draft;
   const trackSkills: SkillKey[] = track ? [...TRACK_META[track].skills] : [];
+  const enabledSkillSet = useMemo(() => new Set(enabledSkills), [enabledSkills]);
 
   if (!classId) {
     return (
@@ -157,36 +174,34 @@ function NewScienceRoomPage() {
   }
 
   function selectTrack(next: InquiryTrack) {
-    setTrack(next);
     // 트랙 바뀌면 활성 스킬·세부 설정 초기화
-    setEnabledSkills(new Set());
-    setSkillSettings({});
+    setDraft((prev) => ({ ...prev, inquiry_track: next, enabled_skills: [], skill_settings: {} }));
   }
 
   function toggleSkill(skill: SkillKey) {
-    setEnabledSkills((prev) => {
-      const next = new Set(prev);
-      if (next.has(skill)) {
-        next.delete(skill);
-        setSkillSettings((s) => {
-          const copy = { ...s } as SkillSettings;
-          delete copy[skill];
-          return copy;
-        });
+    setDraft((prev) => {
+      const has = prev.enabled_skills.includes(skill);
+      const nextSkills = has ? prev.enabled_skills.filter((s) => s !== skill) : [...prev.enabled_skills, skill];
+      const nextSettings = { ...prev.skill_settings };
+      if (has) {
+        delete nextSettings[skill];
       } else {
-        next.add(skill);
-        setSkillSettings((s) => ({ ...s, [skill]: DEFAULT_SKILL_SETTINGS[skill] }));
+        nextSettings[skill] = DEFAULT_SKILL_SETTINGS[skill] as never;
       }
-      return next;
+      return { ...prev, enabled_skills: nextSkills, skill_settings: nextSettings };
     });
   }
 
-  // skill setting helpers (타입 안전한 부분 업데이트)
   function patchSetting<K extends SkillKey>(skill: K, patch: Partial<NonNullable<SkillSettings[K]>>) {
-    setSkillSettings((prev) => {
-      const current = (prev[skill] ?? DEFAULT_SKILL_SETTINGS[skill]) as NonNullable<SkillSettings[K]>;
-      return { ...prev, [skill]: { ...current, ...patch } };
+    setDraft((prev) => {
+      const current = (prev.skill_settings[skill] ?? DEFAULT_SKILL_SETTINGS[skill]) as NonNullable<SkillSettings[K]>;
+      return { ...prev, skill_settings: { ...prev.skill_settings, [skill]: { ...current, ...patch } } };
     });
+  }
+
+  function handleSaveDraftNow() {
+    persistActivityDraft(storageKey, draft);
+    setLastSavedAt(Date.now());
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -195,7 +210,7 @@ function NewScienceRoomPage() {
       setError("탐구 과정을 먼저 선택해주세요.");
       return;
     }
-    if (enabledSkills.size === 0) {
+    if (enabledSkills.length === 0) {
       setError("탐구 활동을 1개 이상 선택해주세요.");
       return;
     }
@@ -209,17 +224,26 @@ function NewScienceRoomPage() {
     fd.set("instructions", instructions);
     fd.set("duration_hours", durationHours);
     fd.set("inquiry_track", track);
-    // 활성 스킬을 트랙 순서대로 정렬해 넘긴다
-    trackSkills.filter((s) => enabledSkills.has(s)).forEach((s) => fd.append("enabled_skills", s));
+    trackSkills.filter((s) => enabledSkillSet.has(s)).forEach((s) => fd.append("enabled_skills", s));
     fd.set("skill_settings_json", JSON.stringify(skillSettings));
+
+    draftControls.suspendAutosave();
+    clearActivityDraft(storageKey);
 
     const result = await createScienceRoom(fd);
     if ("error" in result) {
+      // 실패 시 초안 복원
+      persistActivityDraft(storageKey, draft);
+      draftControls.resumeAutosave();
       setError(result.error ?? "오류가 발생했습니다.");
       setPending(false);
     } else {
       router.push(`/dashboard/science/${result.roomId}`);
     }
+  }
+
+  function updateField<K extends keyof ScienceDraft>(field: K, value: ScienceDraft[K]) {
+    setDraft((prev) => ({ ...prev, [field]: value }));
   }
 
   return (
@@ -235,11 +259,30 @@ function NewScienceRoomPage() {
             <div className="flex items-center gap-3 mb-2">
               <span className="text-3xl">🔬</span>
               <div>
-                <p className="text-xs font-semibold text-cyan-600">과목별 글쓰기 활동</p>
+                <p className="text-xs font-semibold text-cyan-600">교과 연계 글쓰기 활동</p>
                 <h1 className="text-2xl font-bold text-gray-800">과학 탐구 글쓰기</h1>
               </div>
             </div>
             <p className="text-sm text-gray-400 mt-1">학년·교육과정에 맞는 탐구 과정을 골라 단계를 설계합니다.</p>
+          </div>
+
+          {/* 초안 저장 안내 */}
+          <div className="bg-white/80 rounded-2xl border border-cyan-100 px-5 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-cyan-700">📝 자동 초안 저장</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {lastSavedAt
+                  ? `마지막 저장: ${new Date(lastSavedAt).toLocaleTimeString("ko-KR")}`
+                  : "5초마다 이 브라우저에 자동 저장돼요. 나갔다 돌아와도 이어서 만들 수 있어요."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveDraftNow}
+              className="text-xs font-semibold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 px-3 py-1.5 rounded-lg whitespace-nowrap"
+            >
+              지금 저장
+            </button>
           </div>
 
           {/* Step 1. 탐구 과정 선택 */}
@@ -256,7 +299,7 @@ function NewScienceRoomPage() {
                 <input
                   required
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => updateField("title", e.target.value)}
                   placeholder={track === "basic" ? "예) 그림자의 변화 관찰" : "예) 진자의 주기 실험"}
                   className={inputClass}
                 />
@@ -266,7 +309,7 @@ function NewScienceRoomPage() {
                 <input
                   required
                   value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
+                  onChange={(e) => updateField("topic", e.target.value)}
                   placeholder={track === "basic" ? "예) 시간에 따라 그림자가 어떻게 달라지는지 살펴봐요" : "예) 줄의 길이를 바꾸면 진자의 주기는 어떻게 변할까?"}
                   className={inputClass}
                 />
@@ -276,7 +319,7 @@ function NewScienceRoomPage() {
                 <textarea
                   rows={3}
                   value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
+                  onChange={(e) => updateField("instructions", e.target.value)}
                   placeholder="활동 시 학생들에게 보여줄 안내문을 적어주세요."
                   className={`${inputClass} resize-none`}
                 />
@@ -285,7 +328,7 @@ function NewScienceRoomPage() {
               <Field label="활동 시간">
                 <select
                   value={durationHours}
-                  onChange={(e) => setDurationHours(e.target.value)}
+                  onChange={(e) => updateField("duration_hours", e.target.value)}
                   className={inputClass}
                 >
                   <option value="1">1시간</option>
@@ -314,8 +357,8 @@ function NewScienceRoomPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {trackSkills.map((skill, idx) => {
                   const meta = SKILL_META[skill];
-                  const active = enabledSkills.has(skill);
-                  const orderIdx = trackSkills.filter((s) => enabledSkills.has(s)).indexOf(skill);
+                  const active = enabledSkillSet.has(skill);
+                  const orderIdx = trackSkills.filter((s) => enabledSkillSet.has(s)).indexOf(skill);
                   return (
                     <button
                       type="button"
@@ -349,7 +392,7 @@ function NewScienceRoomPage() {
           )}
 
           {/* Step 4. 각 활동 세부 설정 */}
-          {track && enabledSkills.size > 0 && (
+          {track && enabledSkills.length > 0 && (
             <div className="bg-white rounded-3xl shadow-lg border border-white/70 p-8 space-y-5">
               <div>
                 <h2 className="text-base font-bold text-gray-700 flex items-center gap-2">
@@ -359,7 +402,7 @@ function NewScienceRoomPage() {
               </div>
 
               <div className="space-y-4">
-                {trackSkills.filter((s) => enabledSkills.has(s)).map((skill, idx) => (
+                {trackSkills.filter((s) => enabledSkillSet.has(s)).map((skill, idx) => (
                   <SkillSettingsBlock
                     key={skill}
                     skill={skill}
@@ -380,7 +423,7 @@ function NewScienceRoomPage() {
 
           <button
             type="submit"
-            disabled={pending || !track || enabledSkills.size === 0}
+            disabled={pending || !track || enabledSkills.length === 0}
             className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-base rounded-2xl shadow-lg transition-all"
           >
             {pending ? "활동 만드는 중..." : "활동 시작하기 →"}
