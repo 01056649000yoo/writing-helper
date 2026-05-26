@@ -75,6 +75,27 @@ export default function QuestionSetEditorPage() {
     }
   }
 
+  function toggleAllInActiveBundle() {
+    if (!activeBundle) return;
+    const bundlePrompts = activeBundle.prompts;
+    const allSelected = bundlePrompts.every((p) => itemTextSet.has(p));
+    if (allSelected) {
+      // 현재 묶음의 모든 질문을 세트에서 제거
+      const removeSet = new Set(bundlePrompts);
+      setItems((prev) => prev.filter((i) => !removeSet.has(i.text)));
+    } else {
+      // 현재 묶음에서 누락된 질문을 모두 추가 (순서 유지)
+      const label = activeBundle.label;
+      setItems((prev) => {
+        const existingTexts = new Set(prev.map((i) => i.text));
+        const additions = bundlePrompts
+          .filter((p) => !existingTexts.has(p))
+          .map((text) => ({ text, source_label: label }));
+        return [...prev, ...additions];
+      });
+    }
+  }
+
   function removeAt(idx: number) {
     setItems((prev) => prev.filter((_, i) => i !== idx));
   }
@@ -207,11 +228,31 @@ export default function QuestionSetEditorPage() {
               ))}
             </div>
 
-            {activeBundle && (
-              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-                {activeBundle.prompts.map((prompt, i) => {
-                  const selected = itemTextSet.has(prompt);
-                  return (
+            {activeBundle && (() => {
+              const allSelected = activeBundle.prompts.length > 0 && activeBundle.prompts.every((p) => itemTextSet.has(p));
+              const selectedCount = activeBundle.prompts.filter((p) => itemTextSet.has(p)).length;
+              return (
+                <>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <p className="text-xs text-gray-500">
+                      이 묶음에서 <strong className="text-amber-700">{selectedCount}</strong> / {activeBundle.prompts.length}개 담음
+                    </p>
+                    <button
+                      type="button"
+                      onClick={toggleAllInActiveBundle}
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                        allSelected
+                          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                      }`}
+                    >
+                      {allSelected ? "✕ 모두 해제" : "✓ 모두 선택"}
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                    {activeBundle.prompts.map((prompt, i) => {
+                      const selected = itemTextSet.has(prompt);
+                      return (
                     <button
                       type="button"
                       key={i}
@@ -231,8 +272,10 @@ export default function QuestionSetEditorPage() {
                     </button>
                   );
                 })}
-              </div>
-            )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* 우측: 선택된 항목 + 직접 추가 */}
