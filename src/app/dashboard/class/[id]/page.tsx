@@ -11,6 +11,7 @@ import { DeleteScienceRoomButton } from "./delete-science-room-button";
 import { DeleteMoralsRoomButton } from "./delete-morals-room-button";
 import { RosterManager } from "./roster-manager";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
+import { ClosedRoomsTabs } from "./closed-rooms-tabs";
 
 type UnifiedRoom =
   | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; is_active: boolean; created_at: string; expires_at: string | null }
@@ -118,14 +119,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
           </div>
 
           {closedRooms.length > 0 && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-4">⚫ 종료된 활동 세션 ({closedRooms.length})</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {closedRooms.map((room) => (
-                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="closed" now={renderNow} />
-                ))}
-              </div>
-            </div>
+            <ClosedRoomsTabs closedRooms={closedRooms} now={renderNow} />
           )}
         </div>
       </main>

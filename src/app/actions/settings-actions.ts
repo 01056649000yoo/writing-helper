@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "./auth-actions";
 import { saveApiKey, hasApiKey, getApiKey } from "@/lib/vault";
-import { createOpenAIClient } from "@/lib/gpt";
+import { createOpenAIClient, generateAiRolesAndQuestions, type GeneratedRoleData } from "@/lib/gpt";
 import {
   getTeacherQuestionCardSettingsTree,
   getTeacherQuestionCardSets,
@@ -475,3 +475,94 @@ export async function deleteQuestionCardRole(id: string): Promise<{ error?: stri
   revalidatePath("/dashboard/room/new");
   return {};
 }
+
+export async function generateAiRolesAndCardsAction(
+  topic: string,
+  gradeLevel: string,
+  roleCount: number
+): Promise<{ roles?: GeneratedRoleData[]; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: profile } = await admin
+    .schema("writing_helper")
+    .from("teacher_profiles")
+    .select("vault_secret_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!profile?.vault_secret_id) {
+    return { error: "저장된 API 키가 없습니다. OpenAI API 키를 먼저 등록해주세요." };
+  }
+
+  const apiKey = await getApiKey(profile.vault_secret_id);
+  if (!apiKey) {
+    return { error: "API 키를 불러올 수 없습니다." };
+  }
+
+  try {
+    const roles = await generateAiRolesAndQuestions(apiKey, topic, gradeLevel, roleCount);
+    return { roles };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.";
+    return { error: msg };
+  }
+}
+
+export async function saveBulkQuestionRolesAndCards(
+  rolesData: GeneratedRoleData[]
+): Promise<{ error?: string; success?: boolean }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+
+  try {
+    for (const roleData of rolesData) {
+      const { data: roleResult, error: roleError } = await admin
+        .schema("writing_helper")
+        .from("question_card_roles")
+        .insert({
+          teacher_id: user.id,
+          label: roleData.label.trim(),
+          subtitle: roleData.subtitle.trim(),
+          description: roleData.description.trim(),
+          icon: roleData.icon.trim() || "🃏",
+          sort_order: 0,
+        })
+        .select("id")
+        .single();
+
+      if (roleError) {
+        throw new Error(`역할 '${roleData.label}' 저장 실패: ${roleError.message}`);
+      }
+
+      for (const cardSet of roleData.cardSets) {
+        const { error: cardError } = await admin
+          .schema("writing_helper")
+          .from("question_card_sets")
+          .insert({
+            teacher_id: user.id,
+            label: cardSet.label.trim(),
+            description: cardSet.description.trim(),
+            prompts: cardSet.prompts.map((p) => p.trim()).filter(Boolean),
+            role_id: roleResult.id,
+            sort_order: 0,
+          });
+
+        if (cardError) {
+          throw new Error(`카드 묶음 '${cardSet.label}' 저장 실패: ${cardError.message}`);
+        }
+      }
+    }
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/room/new");
+    return { success: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "일괄 저장 중 알 수 없는 오류가 발생했습니다.";
+    return { error: msg };
+  }
+}
+

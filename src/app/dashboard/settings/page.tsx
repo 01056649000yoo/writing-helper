@@ -8,7 +8,9 @@ import {
   getQuestionCardSettings,
   saveQuestionCardRole,
   saveQuestionCardSetting,
+  checkHasApiKey,
 } from "@/app/actions/settings-actions";
+import AiGenerationModal from "./ai-generation-modal";
 import type { QuestionCardRole, QuestionCardSet } from "@/features/activities/types";
 
 type EditableQuestionCardSet = {
@@ -42,8 +44,28 @@ export default function SettingsPage() {
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const [deletingRoleId, setDeletingRoleId] = useState<string | null>(null);
 
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+
+  function refreshSettings() {
+    setCardSettingsLoading(true);
+    getQuestionCardSettings().then((result) => {
+      if (result.error) {
+        setCardSettingsError(result.error);
+      } else {
+        setRoles(result.roles.map(toEditableRole));
+        setCardSets(result.cardSets.map(toEditableCardSet));
+      }
+      setCardSettingsLoading(false);
+    });
+  }
+
   useEffect(() => {
     let active = true;
+
+    checkHasApiKey().then((hasKey) => {
+      if (active) setHasApiKey(hasKey);
+    });
 
     getQuestionCardSettings().then((result) => {
       if (!active) return;
@@ -236,21 +258,46 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl p-8 space-y-5">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-xl font-bold text-gray-800">🧭 연구원 역할 트리</h2>
               <p className="text-sm text-gray-500 mt-1">
                 학생 질문 만들기에서 보이는 역할과 그 안의 질문 카드들을 여기서 관리합니다.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={addRole}
-              className="rounded-xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-600 whitespace-nowrap"
-            >
-              + 역할 추가
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAiModalOpen(true)}
+                disabled={!hasApiKey}
+                title={!hasApiKey ? "AI 기능을 사용하려면 먼저 대시보드에서 OpenAI API 키를 등록해주세요." : "AI가 주제에 꼭 맞는 역할을 자동으로 만들어줍니다."}
+                className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-100 flex items-center gap-1.5 whitespace-nowrap transition-all"
+              >
+                ✨ AI 역할 & 질문 생성
+              </button>
+              <button
+                type="button"
+                onClick={addRole}
+                className="rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700 whitespace-nowrap transition-colors"
+              >
+                + 역할 추가
+              </button>
+            </div>
           </div>
+
+          {!hasApiKey && (
+            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-xs text-amber-700 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span>💡</span>
+                <p>
+                  <strong>OpenAI API 키 등록 안내</strong>: AI로 역할과 질문을 자동 완성하는 스마트 비서 기능을 사용해 보세요! 대시보드에서 API 키를 등록하시면 활성화됩니다.
+                </p>
+              </div>
+              <Link href="/dashboard" className="shrink-0 font-bold hover:underline whitespace-nowrap text-amber-800">
+                등록하러 가기 →
+              </Link>
+            </div>
+          )}
 
           {cardSettingsError && (
             <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl">{cardSettingsError}</p>
@@ -475,6 +522,11 @@ export default function SettingsPage() {
               })}
             </div>
           )}
+      <AiGenerationModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        onSuccess={refreshSettings}
+      />
         </div>
       </div>
     </div>
