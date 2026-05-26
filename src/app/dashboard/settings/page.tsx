@@ -9,6 +9,7 @@ import {
   saveQuestionCardRole,
   saveQuestionCardSetting,
   checkHasApiKey,
+  resetDefaultQuestionCardSettings,
 } from "@/app/actions/settings-actions";
 import AiGenerationModal from "./ai-generation-modal";
 import type { QuestionCardRole, QuestionCardSet } from "@/features/activities/types";
@@ -46,6 +47,7 @@ export default function SettingsPage() {
 
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   function refreshSettings() {
     setCardSettingsLoading(true);
@@ -58,6 +60,22 @@ export default function SettingsPage() {
       }
       setCardSettingsLoading(false);
     });
+  }
+
+  async function handleResetDefaultRoles() {
+    if (!confirm("탐정, 마법사, 판사, 상담사 4개의 기본 역할을 원본 기본값으로 되돌릴까요?\n(직접 수정한 기본 역할 내용과 카드 질문이 기본값으로 초기화됩니다. 교사가 직접 추가한 커스텀 역할은 유지됩니다.)")) {
+      return;
+    }
+
+    setResetting(true);
+    setCardSettingsError("");
+    const result = await resetDefaultQuestionCardSettings();
+    if (result.error) {
+      setCardSettingsError(result.error);
+    } else {
+      refreshSettings();
+    }
+    setResetting(false);
   }
 
   useEffect(() => {
@@ -265,7 +283,16 @@ export default function SettingsPage() {
                 학생 질문 만들기에서 보이는 역할과 그 안의 질문 카드들을 여기서 관리합니다.
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+              <button
+                type="button"
+                onClick={handleResetDefaultRoles}
+                disabled={resetting}
+                className="rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-600 px-4 py-3 text-sm font-semibold whitespace-nowrap transition-all disabled:opacity-50"
+                title="탐정/마법사/판사/상담사 4개의 기본 역할을 원본 기본값으로 되돌립니다."
+              >
+                {resetting ? "재설정 중..." : "🔄 기본값 재설정"}
+              </button>
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}

@@ -439,24 +439,23 @@ export async function deleteQuestionCardRole(id: string): Promise<{ error?: stri
   if (!id) return { error: "삭제할 역할을 찾지 못했습니다." };
 
   const admin = createSupabaseAdminClient();
-  const { count, error: countError } = await admin
+
+  // 1. Delete associated card sets first to prevent orphaned datasets in the database
+  const { error: deleteSetsError } = await admin
     .schema("writing_helper")
     .from("question_card_sets")
-    .select("id", { count: "exact", head: true })
+    .delete()
     .eq("teacher_id", user.id)
     .eq("role_id", id);
 
-  if (countError) {
-    if (isMissingQuestionCardRolesTable(countError.message) || isMissingQuestionCardSetsTable(countError.message)) {
-      return { error: "질문 카드 역할 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
+  if (deleteSetsError) {
+    if (isMissingQuestionCardSetsTable(deleteSetsError.message)) {
+      return { error: "질문 카드 설정 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
     }
-    return { error: countError.message };
+    return { error: deleteSetsError.message };
   }
 
-  if ((count ?? 0) > 0) {
-    return { error: "이 역할 안에 아직 질문 카드가 있어요. 카드들을 다른 역할로 옮기거나 삭제한 뒤 역할을 지워주세요." };
-  }
-
+  // 2. Delete the role itself
   const { error } = await admin
     .schema("writing_helper")
     .from("question_card_roles")
@@ -562,6 +561,59 @@ export async function saveBulkQuestionRolesAndCards(
     return { success: true };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "일괄 저장 중 알 수 없는 오류가 발생했습니다.";
+    return { error: msg };
+  }
+}
+
+export async function resetDefaultQuestionCardSettings(): Promise<{ success?: boolean; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+
+  try {
+    const defaultRoleLabels = ["탐정 모드", "마법사 모드", "판사 모드", "상담사 모드"];
+
+    // 1. Fetch current roles matching the defaults to get their IDs
+    const { data: existingRoles, error: fetchRolesError } = await admin
+      .schema("writing_helper")
+      .from("question_card_roles")
+      .select("id")
+      .eq("teacher_id", user.id)
+      .in("label", defaultRoleLabels);
+
+    if (fetchRolesError) {
+      return { error: fetchRolesError.message };
+    }
+
+    const roleIdsToDelete = (existingRoles ?? []).map((r) => r.id);
+
+    if (roleIdsToDelete.length > 0) {
+      // 2. Delete card sets linked to these default roles
+      await admin
+        .schema("writing_helper")
+        .from("question_card_sets")
+        .delete()
+        .eq("teacher_id", user.id)
+        .in("role_id", roleIdsToDelete);
+
+      // 3. Delete the default roles themselves
+      await admin
+        .schema("writing_helper")
+        .from("question_card_roles")
+        .delete()
+        .eq("teacher_id", user.id)
+        .in("id", roleIdsToDelete);
+    }
+
+    // 4. Force recreate them from presets using the existing library function!
+    await getTeacherQuestionCardSettingsTree(admin, user.id);
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/room/new");
+    return { success: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "초기화 중 알 수 없는 오류가 발생했습니다.";
     return { error: msg };
   }
 }
