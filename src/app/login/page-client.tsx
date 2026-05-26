@@ -5,6 +5,18 @@ import Link from "next/link";
 import { signIn } from "@/app/actions/auth-actions";
 import { BUILD_LABEL } from "@/lib/build-version";
 
+const loginInputClass =
+  // 기본 스타일
+  "w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-base text-gray-900 " +
+  "focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-500 " +
+  "transition-all placeholder:text-gray-400 " +
+  // 브라우저 자동완성 시 배경이 노란색/흰색으로 바뀌는 것을 회색(bg-gray-50)으로 마스킹
+  "[&:-webkit-autofill]:[box-shadow:inset_0_0_0_1000px_rgb(249_250_251)] " +
+  "[&:-webkit-autofill]:[-webkit-text-fill-color:#111827] " +
+  "[&:-webkit-autofill:focus]:[box-shadow:inset_0_0_0_1000px_rgb(255_255_255)] " +
+  "[&:-webkit-autofill]:caret-gray-900 " +
+  "[&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]";
+
 export default function LoginPageClient() {
   const [state, formAction, pending] = useActionState(signIn, null);
 
@@ -88,7 +100,7 @@ export default function LoginPageClient() {
                   type="email"
                   required
                   autoComplete="email"
-                  className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-500 transition-all placeholder:text-gray-400"
+                  className={loginInputClass}
                   placeholder="teacher@school.kr"
                 />
               </div>
@@ -105,7 +117,7 @@ export default function LoginPageClient() {
                   type="password"
                   required
                   autoComplete="current-password"
-                  className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-500 transition-all placeholder:text-gray-400"
+                  className={loginInputClass}
                   placeholder="비밀번호 입력"
                 />
               </div>
