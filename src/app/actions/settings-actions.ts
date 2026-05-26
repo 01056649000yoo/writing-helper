@@ -6,11 +6,13 @@ import { getCurrentUser } from "./auth-actions";
 import { saveApiKey, hasApiKey, getApiKey } from "@/lib/vault";
 import { createOpenAIClient } from "@/lib/gpt";
 import {
+  getTeacherQuestionCardSettingsTree,
   getTeacherQuestionCardSets,
+  isMissingQuestionCardRolesTable,
   isMissingQuestionCardSetsTable,
   normalizeQuestionCardSetInput,
 } from "@/lib/question-card-sets";
-import type { QuestionCardSet, QuestionSet, QuestionSetItem } from "@/features/activities/types";
+import type { QuestionCardRole, QuestionCardSet, QuestionSet, QuestionSetItem } from "@/features/activities/types";
 
 export async function saveGptApiKey(formData: FormData): Promise<{ error?: string; success?: boolean }> {
   const user = await getCurrentUser();
@@ -76,17 +78,17 @@ export async function testApiKey(): Promise<{ ok: boolean; error?: string }> {
   }
 }
 
-export async function getQuestionCardSettings(): Promise<{ cardSets: QuestionCardSet[]; error?: string }> {
+export async function getQuestionCardSettings(): Promise<{ roles: QuestionCardRole[]; cardSets: QuestionCardSet[]; error?: string }> {
   const user = await getCurrentUser();
-  if (!user) return { cardSets: [], error: "로그인이 필요합니다." };
+  if (!user) return { roles: [], cardSets: [], error: "로그인이 필요합니다." };
 
   try {
     const admin = createSupabaseAdminClient();
-    const cardSets = await getTeacherQuestionCardSets(admin, user.id);
-    return { cardSets };
+    const settings = await getTeacherQuestionCardSettingsTree(admin, user.id);
+    return settings;
   } catch (error) {
     const message = error instanceof Error ? error.message : "질문 카드 설정을 불러오지 못했습니다.";
-    return { cardSets: [], error: message };
+    return { roles: [], cardSets: [], error: message };
   }
 }
 
@@ -95,6 +97,7 @@ export async function saveQuestionCardSetting(input: {
   label: string;
   description: string;
   prompts: string[];
+  roleId?: string | null;
   sortOrder: number;
 }): Promise<{ cardSet?: QuestionCardSet; error?: string }> {
   const user = await getCurrentUser();
@@ -110,6 +113,7 @@ export async function saveQuestionCardSetting(input: {
     label: normalized.label,
     description: normalized.description,
     prompts: normalized.prompts,
+    role_id: normalized.roleId ?? null,
     sort_order: Number.isFinite(input.sortOrder) ? Math.max(0, Math.trunc(input.sortOrder)) : 0,
   };
 
@@ -120,7 +124,7 @@ export async function saveQuestionCardSetting(input: {
       .update(payload)
       .eq("id", normalized.id)
       .eq("teacher_id", user.id)
-      .select("id, label, description, prompts")
+      .select("id, label, description, prompts, role_id")
       .maybeSingle();
 
     if (error) {
@@ -139,6 +143,7 @@ export async function saveQuestionCardSetting(input: {
             label: data.label,
             description: data.description,
             prompts: Array.isArray(data.prompts) ? data.prompts.filter((prompt): prompt is string => typeof prompt === "string") : [],
+            roleId: data.role_id ?? null,
           }
         : normalized,
     };
@@ -148,7 +153,7 @@ export async function saveQuestionCardSetting(input: {
     .schema("writing_helper")
     .from("question_card_sets")
     .insert(payload)
-    .select("id, label, description, prompts")
+    .select("id, label, description, prompts, role_id")
     .single();
 
   if (error) {
@@ -166,7 +171,79 @@ export async function saveQuestionCardSetting(input: {
       label: data.label,
       description: data.description,
       prompts: Array.isArray(data.prompts) ? data.prompts.filter((prompt): prompt is string => typeof prompt === "string") : [],
+      roleId: data.role_id ?? null,
     },
+  };
+}
+
+export async function saveQuestionCardRole(input: {
+  id?: string;
+  label: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  sortOrder: number;
+}): Promise<{ role?: QuestionCardRole; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const label = String(input.label ?? "").trim();
+  if (!label) return { error: "역할 이름을 입력해주세요." };
+
+  const admin = createSupabaseAdminClient();
+  const payload = {
+    teacher_id: user.id,
+    label,
+    subtitle: String(input.subtitle ?? "").trim(),
+    description: String(input.description ?? "").trim(),
+    icon: String(input.icon ?? "").trim() || "🃏",
+    sort_order: Number.isFinite(input.sortOrder) ? Math.max(0, Math.trunc(input.sortOrder)) : 0,
+  };
+
+  if (input.id) {
+    const { data, error } = await admin
+      .schema("writing_helper")
+      .from("question_card_roles")
+      .update(payload)
+      .eq("id", input.id)
+      .eq("teacher_id", user.id)
+      .select("id, label, subtitle, description, icon")
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingQuestionCardRolesTable(error.message)) {
+        return { error: "질문 카드 역할 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
+      }
+      return { error: error.message };
+    }
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/room/new");
+    return {
+      role: data
+        ? { id: data.id, label: data.label, subtitle: data.subtitle, description: data.description, icon: data.icon, cardSetIds: [] }
+        : undefined,
+    };
+  }
+
+  const { data, error } = await admin
+    .schema("writing_helper")
+    .from("question_card_roles")
+    .insert(payload)
+    .select("id, label, subtitle, description, icon")
+    .single();
+
+  if (error) {
+    if (isMissingQuestionCardRolesTable(error.message)) {
+      return { error: "질문 카드 역할 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/room/new");
+  return {
+    role: { id: data.id, label: data.label, subtitle: data.subtitle, description: data.description, icon: data.icon, cardSetIds: [] },
   };
 }
 
@@ -347,6 +424,49 @@ export async function deleteQuestionCardSetting(id: string): Promise<{ error?: s
   if (error) {
     if (isMissingQuestionCardSetsTable(error.message)) {
       return { error: "질문 카드 설정 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/room/new");
+  return {};
+}
+
+export async function deleteQuestionCardRole(id: string): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+  if (!id) return { error: "삭제할 역할을 찾지 못했습니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { count, error: countError } = await admin
+    .schema("writing_helper")
+    .from("question_card_sets")
+    .select("id", { count: "exact", head: true })
+    .eq("teacher_id", user.id)
+    .eq("role_id", id);
+
+  if (countError) {
+    if (isMissingQuestionCardRolesTable(countError.message) || isMissingQuestionCardSetsTable(countError.message)) {
+      return { error: "질문 카드 역할 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
+    }
+    return { error: countError.message };
+  }
+
+  if ((count ?? 0) > 0) {
+    return { error: "이 역할 안에 아직 질문 카드가 있어요. 카드들을 다른 역할로 옮기거나 삭제한 뒤 역할을 지워주세요." };
+  }
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("question_card_roles")
+    .delete()
+    .eq("id", id)
+    .eq("teacher_id", user.id);
+
+  if (error) {
+    if (isMissingQuestionCardRolesTable(error.message)) {
+      return { error: "질문 카드 역할 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
     }
     return { error: error.message };
   }

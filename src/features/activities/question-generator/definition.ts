@@ -1,11 +1,13 @@
 import type {
   ActivityDefinition,
+  QuestionCardRole,
   QuestionGeneratorConfig,
   QuestionGeneratorResult,
   QuestionGeneratorRoomResult,
   QuestionGeneratorSubmission,
 } from "../types";
 import { QUESTION_CARD_SETS } from "./question-card-sets";
+import { QUESTION_CARD_ROLE_PRESETS, normalizeQuestionCardLabel } from "./question-card-roles";
 
 export const questionGeneratorDefinition: ActivityDefinition<
   QuestionGeneratorConfig,
@@ -23,6 +25,7 @@ export const questionGeneratorDefinition: ActivityDefinition<
   createDefaultConfig: () => ({
     enabledCardSetIds: QUESTION_CARD_SETS.map((set) => set.id),
     cardSets: QUESTION_CARD_SETS,
+    roles: buildDefaultRoles(QUESTION_CARD_SETS),
     maxSelections: 1,
     guidance: "직접 질문을 만들거나 질문 카드를 골라 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
     requireReason: true,
@@ -41,6 +44,7 @@ export const questionGeneratorDefinition: ActivityDefinition<
       value: {
         enabledCardSetIds,
         cardSets,
+        roles: normalizeRoles(raw.roles, cardSets),
         maxSelections: clampNumber(raw.maxSelections, 1, 4, 1),
         guidance,
         requireReason: raw.requireReason !== false,
@@ -92,4 +96,41 @@ function normalizeCardSetIds(value: unknown, allowed: Set<string>): string[] {
     : [];
 
   return ids.length > 0 ? ids : Array.from(allowed);
+}
+
+function buildDefaultRoles(cardSets: QuestionGeneratorConfig["cardSets"]): QuestionCardRole[] {
+  return QUESTION_CARD_ROLE_PRESETS.map((preset, index) => ({
+    id: `default-role-${index + 1}`,
+    label: preset.label,
+    subtitle: preset.subtitle,
+    description: preset.description,
+    icon: preset.icon,
+    cardSetIds: cardSets
+      .filter((cardSet) => preset.cardSetLabels.includes(cardSet.label) || preset.cardSetLabels.includes(normalizeQuestionCardLabel(cardSet.label)))
+      .map((cardSet) => cardSet.id),
+  })).filter((role) => role.cardSetIds.length > 0);
+}
+
+function normalizeRoles(value: unknown, cardSets: QuestionGeneratorConfig["cardSets"]): QuestionCardRole[] {
+  const allowedCardSetIds = new Set(cardSets.map((cardSet) => cardSet.id));
+
+  if (!Array.isArray(value)) {
+    return buildDefaultRoles(cardSets);
+  }
+
+  const roles = value
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null && !Array.isArray(item))
+    .map((item, index): QuestionCardRole => ({
+      id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : `role-${index + 1}`,
+      label: typeof item.label === "string" ? item.label.trim() : "",
+      subtitle: typeof item.subtitle === "string" ? item.subtitle.trim() : "",
+      description: typeof item.description === "string" ? item.description.trim() : "",
+      icon: typeof item.icon === "string" && item.icon.trim() ? item.icon.trim() : "🃏",
+      cardSetIds: Array.isArray(item.cardSetIds)
+        ? item.cardSetIds.filter((cardSetId): cardSetId is string => typeof cardSetId === "string" && allowedCardSetIds.has(cardSetId))
+        : [],
+    }))
+    .filter((role) => role.label && role.cardSetIds.length > 0);
+
+  return roles.length > 0 ? roles : buildDefaultRoles(cardSets);
 }

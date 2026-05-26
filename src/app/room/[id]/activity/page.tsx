@@ -14,6 +14,7 @@ import {
 import { normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import type {
   OneLineShareConfig,
+  QuestionCardRole,
   QuestionCardSet,
   QuestionGeneratorConfig,
   QuestionGeneratorSubmission,
@@ -38,7 +39,7 @@ type Step =
 
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
 type QuestionBuildMode = "direct" | "card_remix";
-type ResearchRoleId = "detective" | "wizard" | "judge" | "counselor";
+type ResearchRoleId = string;
 
 type ResearchRole = {
   id: ResearchRoleId;
@@ -48,7 +49,7 @@ type ResearchRole = {
   icon: string;
   accentClassName: string;
   surfaceClassName: string;
-  categories: [string, string, string];
+  cardSetIds: string[];
 };
 
 const RESEARCH_ROLES: ResearchRole[] = [
@@ -60,7 +61,7 @@ const RESEARCH_ROLES: ResearchRole[] = [
     icon: "🕵️",
     accentClassName: "text-sky-700 bg-sky-100",
     surfaceClassName: "from-sky-50 to-cyan-100 ring-sky-200",
-    categories: ["관찰 카드", "이유 카드", "시간 카드"],
+    cardSetIds: ["observation", "reason", "time"],
   },
   {
     id: "wizard",
@@ -70,7 +71,7 @@ const RESEARCH_ROLES: ResearchRole[] = [
     icon: "🪄",
     accentClassName: "text-fuchsia-700 bg-fuchsia-100",
     surfaceClassName: "from-fuchsia-50 to-violet-100 ring-fuchsia-200",
-    categories: ["상상 카드", "반전 카드", "비유 카드"],
+    cardSetIds: ["imagination", "twist", "metaphor"],
   },
   {
     id: "judge",
@@ -80,7 +81,7 @@ const RESEARCH_ROLES: ResearchRole[] = [
     icon: "⚖️",
     accentClassName: "text-amber-700 bg-amber-100",
     surfaceClassName: "from-amber-50 to-orange-100 ring-amber-200",
-    categories: ["가치 카드", "해결 카드", "연결 카드"],
+    cardSetIds: ["value", "solution", "connection"],
   },
   {
     id: "counselor",
@@ -90,7 +91,7 @@ const RESEARCH_ROLES: ResearchRole[] = [
     icon: "💬",
     accentClassName: "text-emerald-700 bg-emerald-100",
     surfaceClassName: "from-emerald-50 to-teal-100 ring-emerald-200",
-    categories: ["마음 카드", "관점 카드", "감각 카드"],
+    cardSetIds: ["emotion", "perspective", "sense"],
   },
 ];
 
@@ -99,6 +100,39 @@ const QUESTION_WIZARD_STEPS = [
   { key: "question_set", label: "도구 선택" },
   { key: "question_rewrite", label: "질문 완성" },
 ] as const;
+
+function normalizeCategoryLabel(value: string) {
+  return value.replace(/\s+/g, "").replace(/카드$/u, "").trim().toLowerCase();
+}
+
+function buildRoleCardSetLabel(cardSet: QuestionCardSet) {
+  const normalized = cardSet.label.trim();
+  return normalized.endsWith("카드") ? normalized : `${normalized} 카드`;
+}
+
+function toUiRole(role: QuestionCardRole, enabledCardSets: QuestionCardSet[], fallbackIndex: number): ResearchRole | null {
+  const roleCardSetIds = role.cardSetIds.filter((cardSetId) => enabledCardSets.some((cardSet) => cardSet.id === cardSetId));
+  if (roleCardSetIds.length === 0) return null;
+
+  const fallback = RESEARCH_ROLES[fallbackIndex % RESEARCH_ROLES.length];
+  return {
+    id: role.id,
+    title: role.label,
+    subtitle: role.subtitle,
+    description: role.description,
+    icon: role.icon || fallback.icon,
+    accentClassName: fallback.accentClassName,
+    surfaceClassName: fallback.surfaceClassName,
+    cardSetIds: roleCardSetIds,
+  };
+}
+
+function roleCardPreviewLabels(roleCardSets: QuestionCardSet[], role: ResearchRole, enabledCardSets: QuestionCardSet[]) {
+  const source = roleCardSets.length > 0
+    ? roleCardSets
+    : enabledCardSets.filter((cardSet) => role.cardSetIds.includes(cardSet.id));
+  return source.map((cardSet) => buildRoleCardSetLabel(cardSet));
+}
 
 export default function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -147,19 +181,34 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     () => enabledCardSets.find((cardSet) => cardSet.id === selectedCardSetId) ?? null,
     [enabledCardSets, selectedCardSetId]
   );
+  const availableResearchRoles = useMemo(() => {
+    const configRoles = questionGeneratorConfig?.roles ?? [];
+    if (configRoles.length > 0) {
+      return configRoles
+        .map((role, index) => toUiRole(role, enabledCardSets, index))
+        .filter((role): role is ResearchRole => role !== null);
+    }
+
+    return RESEARCH_ROLES.map((role) => ({
+      ...role,
+      cardSetIds: enabledCardSets
+        .filter((cardSet) => role.cardSetIds.includes(cardSet.id) || role.cardSetIds.includes(normalizeCategoryLabel(cardSet.label)))
+        .map((cardSet) => cardSet.id),
+    })).filter((role) => role.cardSetIds.length > 0);
+  }, [enabledCardSets, questionGeneratorConfig?.roles]);
   const selectedResearchRole = useMemo(
-    () => RESEARCH_ROLES.find((role) => role.id === selectedResearchRoleId) ?? null,
-    [selectedResearchRoleId]
+    () => availableResearchRoles.find((role) => role.id === selectedResearchRoleId) ?? null,
+    [availableResearchRoles, selectedResearchRoleId]
   );
   const roleCardSets = useMemo(() => {
     if (!selectedResearchRole) return [];
-    return selectedResearchRole.categories
-      .map((category) => enabledCardSets.find((cardSet) => cardSet.label === category) ?? null)
+    return selectedResearchRole.cardSetIds
+      .map((cardSetId) => enabledCardSets.find((cardSet) => cardSet.id === cardSetId) ?? null)
       .filter((cardSet): cardSet is QuestionCardSet => cardSet !== null);
   }, [enabledCardSets, selectedResearchRole]);
   const activeRoleCardSet = useMemo(() => {
     if (!selectedResearchRole) return null;
-    return roleCardSets.find((cardSet) => cardSet.label === selectedCategoryLabel) ?? roleCardSets[0] ?? null;
+    return roleCardSets.find((cardSet) => buildRoleCardSetLabel(cardSet) === selectedCategoryLabel) ?? roleCardSets[0] ?? null;
   }, [roleCardSets, selectedCategoryLabel, selectedResearchRole]);
   const filteredPrompts = useMemo(() => {
     const promptSource = activeRoleCardSet ?? selectedCardSet;
@@ -177,13 +226,14 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   useEffect(() => {
     if (!selectedResearchRole) return;
     const nextCategory =
-      selectedResearchRole.categories.find((category) => enabledCardSets.some((cardSet) => cardSet.label === category))
-      ?? selectedResearchRole.categories[0];
+      roleCardSets[0];
 
     setSelectedCategoryLabel((prev) => (
-      prev && selectedResearchRole.categories.includes(prev) ? prev : nextCategory
+      prev && roleCardSets.some((cardSet) => buildRoleCardSetLabel(cardSet) === prev)
+        ? prev
+        : (nextCategory ? buildRoleCardSetLabel(nextCategory) : null)
     ));
-  }, [enabledCardSets, selectedResearchRole]);
+  }, [roleCardSets, selectedResearchRole]);
 
   useEffect(() => {
     if (!step) return;
@@ -440,7 +490,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             <div className="mt-6 grid grid-cols-2 gap-3 text-left text-sm">
               <div className="rounded-2xl bg-gray-50 p-4">
                 <p className="font-semibold text-gray-700">연구원 역할</p>
-                <p className="text-2xl font-bold text-sky-600 mt-1">{RESEARCH_ROLES.length}개</p>
+                <p className="text-2xl font-bold text-sky-600 mt-1">{availableResearchRoles.length}개</p>
               </div>
               <div className="rounded-2xl bg-gray-50 p-4">
                 <p className="font-semibold text-gray-700">완성할 질문</p>
@@ -514,7 +564,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             )}
 
             <div className="grid gap-4 md:grid-cols-2">
-              {RESEARCH_ROLES.map((role) => {
+              {availableResearchRoles.map((role) => {
                 const selected = selectedResearchRoleId === role.id;
                 return (
                   <button
@@ -543,9 +593,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     <h2 className="mt-4 text-xl font-bold text-gray-800">{role.title}</h2>
                     <p className="mt-3 text-sm text-gray-600 leading-relaxed">{role.description}</p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {role.categories.map((category) => (
-                        <span key={category} className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-black/5">
-                          {category}
+                      {roleCardPreviewLabels([], role, enabledCardSets).map((label) => (
+                        <span key={label} className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-black/5">
+                          {label}
                         </span>
                       ))}
                     </div>
@@ -626,15 +676,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
             <div className="rounded-3xl bg-white p-4 shadow-lg">
               <div className="flex flex-wrap gap-2">
-                {(selectedResearchRole?.categories ?? []).map((category) => {
-                  const hasCategory = roleCardSets.some((cardSet) => cardSet.label === category);
-                  const selected = selectedCategoryLabel === category;
+                {roleCardSets.map((cardSet) => {
+                  const label = buildRoleCardSetLabel(cardSet);
+                  const selected = selectedCategoryLabel === label;
                   return (
                     <button
-                      key={category}
+                      key={cardSet.id}
                       type="button"
                       onClick={() => {
-                        setSelectedCategoryLabel(category);
+                        setSelectedCategoryLabel(label);
                         setSelectedCardSetId(null);
                         setSelectedPrompt(null);
                         setRemixedQuestion("");
@@ -642,12 +692,10 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                         selected
                           ? "bg-sky-500 text-white"
-                          : hasCategory
-                            ? "bg-sky-50 text-sky-700 hover:bg-sky-100"
-                            : "bg-gray-100 text-gray-400"
+                          : "bg-sky-50 text-sky-700 hover:bg-sky-100"
                       }`}
                     >
-                      {category}
+                      {label}
                     </button>
                   );
                 })}
@@ -1333,6 +1381,7 @@ function normalizeQuestionGeneratorConfig(value: unknown): QuestionGeneratorConf
           prompts: Array.isArray(cardSet.prompts)
             ? cardSet.prompts.filter((prompt): prompt is string => typeof prompt === "string" && prompt.trim().length > 0)
             : [],
+          roleId: typeof cardSet.roleId === "string" && cardSet.roleId.trim() ? cardSet.roleId.trim() : null,
         }))
         .filter((cardSet) => cardSet.label && cardSet.prompts.length > 0)
     : [];
@@ -1340,10 +1389,26 @@ function normalizeQuestionGeneratorConfig(value: unknown): QuestionGeneratorConf
   const enabledCardSetIds = Array.isArray(raw.enabledCardSetIds)
     ? raw.enabledCardSetIds.filter((cardSetId): cardSetId is string => typeof cardSetId === "string" && allIds.has(cardSetId))
     : cardSets.map((cardSet) => cardSet.id);
+  const roles = Array.isArray(raw.roles)
+    ? raw.roles
+        .filter((role): role is Record<string, unknown> => typeof role === "object" && role !== null && !Array.isArray(role))
+        .map((role, index): QuestionCardRole => ({
+          id: typeof role.id === "string" && role.id.trim() ? role.id.trim() : `role-${index + 1}`,
+          label: typeof role.label === "string" ? role.label.trim() : "",
+          subtitle: typeof role.subtitle === "string" ? role.subtitle.trim() : "",
+          description: typeof role.description === "string" ? role.description.trim() : "",
+          icon: typeof role.icon === "string" && role.icon.trim() ? role.icon.trim() : "🃏",
+          cardSetIds: Array.isArray(role.cardSetIds)
+            ? role.cardSetIds.filter((cardSetId): cardSetId is string => typeof cardSetId === "string" && allIds.has(cardSetId))
+            : [],
+        }))
+        .filter((role) => role.label && role.cardSetIds.length > 0)
+    : [];
 
   return {
     enabledCardSetIds: enabledCardSetIds.length > 0 ? enabledCardSetIds : cardSets.map((cardSet) => cardSet.id),
     cardSets,
+    roles,
     maxSelections: normalizeSelectionCount(raw.maxSelections),
     guidance: typeof raw.guidance === "string" && raw.guidance.trim()
       ? raw.guidance.trim()

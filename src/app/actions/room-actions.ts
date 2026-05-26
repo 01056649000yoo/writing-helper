@@ -7,7 +7,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser, getTeacherProfile } from "./auth-actions";
 import { getApiKey } from "@/lib/vault";
 import { generateQuestionSets } from "@/lib/gpt";
-import { getTeacherQuestionCardSets } from "@/lib/question-card-sets";
+import { getTeacherQuestionCardSettingsTree, getTeacherQuestionCardSets } from "@/lib/question-card-sets";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
 import { buildOneLineShareBoard, includesConfiguredKeyword, normalizeKeywordText, normalizeOneLineShareConfig } from "@/lib/one-line-share";
@@ -185,7 +185,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
         requireReason: formData.get("require_reason") !== null,
       };
     } else {
-      const teacherCardSets = await getTeacherQuestionCardSets(admin, user.id);
+      const { cardSets: teacherCardSets, roles: teacherRoles } = await getTeacherQuestionCardSettingsTree(admin, user.id);
       const allowedIds = new Set(teacherCardSets.map((cardSet) => cardSet.id));
       const enabledCardSetIds = formData
         .getAll("enabled_card_set_ids")
@@ -199,6 +199,12 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       activityConfig = {
         enabledCardSetIds,
         cardSets: teacherCardSets.filter((cardSet) => enabledCardSetIds.includes(cardSet.id)),
+        roles: teacherRoles
+          .map((role) => ({
+            ...role,
+            cardSetIds: role.cardSetIds.filter((cardSetId) => enabledCardSetIds.includes(cardSetId)),
+          }))
+          .filter((role) => role.cardSetIds.length > 0),
         maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
         guidance,
         requireReason: formData.get("require_reason") !== null,

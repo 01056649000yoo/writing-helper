@@ -4,34 +4,49 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  deleteQuestionCardRole,
   deleteQuestionCardSetting,
   deleteQuestionSet,
   getQuestionCardSettings,
   getTeacherQuestionSets,
+  saveQuestionCardRole,
   saveQuestionCardSetting,
 } from "@/app/actions/settings-actions";
-import type { QuestionCardSet, QuestionSet } from "@/features/activities/types";
+import type { QuestionCardRole, QuestionCardSet, QuestionSet } from "@/features/activities/types";
 
 type EditableQuestionCardSet = {
   id: string;
   label: string;
   description: string;
   promptsText: string;
+  roleId: string | null;
   isNew?: boolean;
   expanded?: boolean;
+};
+
+type EditableQuestionCardRole = {
+  id: string;
+  label: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  cardSetIds: string[];
+  expanded?: boolean;
+  isNew?: boolean;
 };
 
 export default function SettingsPage() {
   const router = useRouter();
 
-  // 기본 카드 묶음 (지금까지의 기능)
+  const [roles, setRoles] = useState<EditableQuestionCardRole[]>([]);
   const [cardSets, setCardSets] = useState<EditableQuestionCardSet[]>([]);
-  const [cardSetsLoading, setCardSetsLoading] = useState(true);
-  const [cardSetsError, setCardSetsError] = useState("");
+  const [cardSettingsLoading, setCardSettingsLoading] = useState(true);
+  const [cardSettingsError, setCardSettingsError] = useState("");
   const [savingCardId, setSavingCardId] = useState<string | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
+  const [deletingRoleId, setDeletingRoleId] = useState<string | null>(null);
 
-  // 질문 세트 (교사 큐레이션)
   const [questionSets, setQuestionSets] = useState<QuestionSet[]>([]);
   const [questionSetsLoading, setQuestionSetsLoading] = useState(true);
   const [questionSetsError, setQuestionSetsError] = useState("");
@@ -42,9 +57,13 @@ export default function SettingsPage() {
 
     getQuestionCardSettings().then((result) => {
       if (!active) return;
-      if (result.error) setCardSetsError(result.error);
-      else setCardSets(result.cardSets.map(toEditableCardSet));
-      setCardSetsLoading(false);
+      if (result.error) {
+        setCardSettingsError(result.error);
+      } else {
+        setRoles(result.roles.map(toEditableRole));
+        setCardSets(result.cardSets.map(toEditableCardSet));
+      }
+      setCardSettingsLoading(false);
     });
 
     getTeacherQuestionSets().then((result) => {
@@ -62,70 +81,152 @@ export default function SettingsPage() {
     [cardSets]
   );
 
+  const roleCardSetCount = useMemo(
+    () => roles.reduce((count, role) => count + cardSets.filter((cardSet) => cardSet.roleId === role.id).length, 0),
+    [cardSets, roles],
+  );
+
+  function updateRole(id: string, patch: Partial<EditableQuestionCardRole>) {
+    setRoles((prev) => prev.map((role) => role.id === id ? { ...role, ...patch } : role));
+  }
+
   function updateCardSet(id: string, patch: Partial<EditableQuestionCardSet>) {
-    setCardSets((prev) => prev.map((cs) => cs.id === id ? { ...cs, ...patch } : cs));
+    setCardSets((prev) => prev.map((cardSet) => cardSet.id === id ? { ...cardSet, ...patch } : cardSet));
   }
 
-  function toggleExpand(id: string) {
-    setCardSets((prev) => prev.map((cs) => cs.id === id ? { ...cs, expanded: !cs.expanded } : cs));
+  function toggleRoleExpand(id: string) {
+    setRoles((prev) => prev.map((role) => role.id === id ? { ...role, expanded: !role.expanded } : role));
   }
 
-  function addCardSet() {
-    const nextIndex = cardSets.length + 1;
-    setCardSets((prev) => [
+  function addRole() {
+    const nextIndex = roles.length + 1;
+    setRoles((prev) => [
       ...prev,
       {
-        id: `draft-${Date.now()}`,
-        label: `새 카드 묶음 ${nextIndex}`,
+        id: `draft-role-${Date.now()}`,
+        label: `새 역할 ${nextIndex}`,
+        subtitle: "",
         description: "",
-        promptsText: "",
-        isNew: true,
+        icon: "🃏",
+        cardSetIds: [],
         expanded: true,
+        isNew: true,
       },
     ]);
   }
 
-  async function handleSaveCardSet(cs: EditableQuestionCardSet, index: number) {
-    setSavingCardId(cs.id);
-    setCardSetsError("");
+  function addCardSet(roleId: string) {
+    const role = roles.find((item) => item.id === roleId);
+    const nextIndex = cardSets.filter((cardSet) => cardSet.roleId === roleId).length + 1;
+
+    setCardSets((prev) => [
+      ...prev,
+      {
+        id: `draft-card-${Date.now()}`,
+        label: `${role?.label ?? "새 역할"} 카드 ${nextIndex}`,
+        description: "",
+        promptsText: "",
+        roleId,
+        isNew: true,
+        expanded: true,
+      },
+    ]);
+    setRoles((prev) => prev.map((item) => item.id === roleId ? { ...item, expanded: true } : item));
+  }
+
+  async function handleSaveRole(role: EditableQuestionCardRole, index: number) {
+    setSavingRoleId(role.id);
+    setCardSettingsError("");
+    const result = await saveQuestionCardRole({
+      id: role.isNew ? undefined : role.id,
+      label: role.label,
+      subtitle: role.subtitle,
+      description: role.description,
+      icon: role.icon,
+      sortOrder: index,
+    });
+
+    if (result.error || !result.role) {
+      setCardSettingsError(result.error ?? "질문 카드 역할을 저장하지 못했습니다.");
+      setSavingRoleId(null);
+      return;
+    }
+
+    setRoles((prev) => prev.map((item) => (
+      item.id === role.id
+        ? { ...item, ...toEditableRole(result.role!), isNew: false, expanded: false }
+        : item
+    )));
+    setCardSets((prev) => prev.map((cardSet) => (
+      cardSet.roleId === role.id ? { ...cardSet, roleId: result.role!.id } : cardSet
+    )));
+    setSavingRoleId(null);
+  }
+
+  async function handleDeleteRole(role: EditableQuestionCardRole) {
+    if (role.isNew) {
+      setCardSets((prev) => prev.filter((cardSet) => cardSet.roleId !== role.id));
+      setRoles((prev) => prev.filter((item) => item.id !== role.id));
+      return;
+    }
+    if (!confirm(`「${role.label}」 역할을 삭제할까요?`)) return;
+
+    setDeletingRoleId(role.id);
+    setCardSettingsError("");
+    const result = await deleteQuestionCardRole(role.id);
+    if (result.error) {
+      setCardSettingsError(result.error);
+      setDeletingRoleId(null);
+      return;
+    }
+
+    setRoles((prev) => prev.filter((item) => item.id !== role.id));
+    setDeletingRoleId(null);
+  }
+
+  async function handleSaveCardSet(cardSet: EditableQuestionCardSet, index: number) {
+    setSavingCardId(cardSet.id);
+    setCardSettingsError("");
     const result = await saveQuestionCardSetting({
-      id: cs.isNew ? undefined : cs.id,
-      label: cs.label,
-      description: cs.description,
-      prompts: cs.promptsText.split("\n").map((p) => p.trim()).filter(Boolean),
+      id: cardSet.isNew ? undefined : cardSet.id,
+      label: cardSet.label,
+      description: cardSet.description,
+      prompts: cardSet.promptsText.split("\n").map((prompt) => prompt.trim()).filter(Boolean),
+      roleId: cardSet.roleId,
       sortOrder: index,
     });
 
     if (result.error || !result.cardSet) {
-      setCardSetsError(result.error ?? "질문 카드 묶음을 저장하지 못했습니다.");
+      setCardSettingsError(result.error ?? "질문 카드를 저장하지 못했습니다.");
       setSavingCardId(null);
       return;
     }
 
-    const saved = result.cardSet;
-    setCardSets((prev) => prev.map((item) =>
-      item.id === cs.id
-        ? { ...toEditableCardSet(saved), isNew: false, expanded: false }
+    setCardSets((prev) => prev.map((item) => (
+      item.id === cardSet.id
+        ? { ...toEditableCardSet(result.cardSet!), isNew: false, expanded: false }
         : item
-    ));
+    )));
     setSavingCardId(null);
   }
 
-  async function handleDeleteCardSet(cs: EditableQuestionCardSet) {
-    if (cs.isNew) {
-      setCardSets((prev) => prev.filter((item) => item.id !== cs.id));
+  async function handleDeleteCardSet(cardSet: EditableQuestionCardSet) {
+    if (cardSet.isNew) {
+      setCardSets((prev) => prev.filter((item) => item.id !== cardSet.id));
       return;
     }
-    if (!confirm("이 카드 묶음을 삭제할까요?")) return;
-    setDeletingCardId(cs.id);
-    setCardSetsError("");
-    const result = await deleteQuestionCardSetting(cs.id);
+    if (!confirm(`「${cardSet.label}」 카드를 삭제할까요?`)) return;
+
+    setDeletingCardId(cardSet.id);
+    setCardSettingsError("");
+    const result = await deleteQuestionCardSetting(cardSet.id);
     if (result.error) {
-      setCardSetsError(result.error);
+      setCardSettingsError(result.error);
       setDeletingCardId(null);
       return;
     }
-    setCardSets((prev) => prev.filter((item) => item.id !== cs.id));
+
+    setCardSets((prev) => prev.filter((item) => item.id !== cardSet.id));
     setDeletingCardId(null);
   }
 
@@ -139,34 +240,33 @@ export default function SettingsPage() {
       setDeletingSetId(null);
       return;
     }
-    setQuestionSets((prev) => prev.filter((s) => s.id !== set.id));
+    setQuestionSets((prev) => prev.filter((item) => item.id !== set.id));
     setDeletingSetId(null);
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-4xl mx-auto pt-8 pb-16 space-y-6">
+      <div className="max-w-5xl mx-auto pt-8 pb-16 space-y-6">
         <div className="flex items-center justify-between gap-4">
           <Link href="/dashboard" className="text-indigo-500 text-base hover:underline">← 대시보드로</Link>
         </div>
 
-        {/* ─── 헤더 + 통계 ─── */}
         <div className="bg-white rounded-3xl shadow-xl p-8">
           <div className="text-5xl mb-3">🃏</div>
           <h1 className="text-2xl font-bold text-gray-800">질문 카드 설정</h1>
           <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-            기본 카드 묶음을 편집하거나, 여러 묶음을 조합해 나만의 <strong>질문 세트</strong>를 만들 수 있어요.
-            묶음을 통째로 골라 담거나, 질문을 다듬어서 세트로 만드는 두 가지 방법을 지원해요.
+            연구원 역할 아래에 질문 카드를 트리처럼 정리해 둘 수 있어요.
+            역할도 직접 만들고, 역할 안의 질문 카드도 추가하거나 수정해서 학생용 질문 만들기 흐름에 그대로 반영할 수 있습니다.
           </p>
 
-          <div className="grid gap-3 mt-6 grid-cols-3">
-            <Stat label="카드 묶음" value={`${cardSets.length}개`} tone="emerald" />
-            <Stat label="전체 질문" value={`${totalPrompts}개`} tone="sky" />
-            <Stat label="내 질문 세트" value={`${questionSets.length}개`} tone="amber" />
+          <div className="grid gap-3 mt-6 grid-cols-4">
+            <Stat label="연구원 역할" value={`${roles.length}개`} tone="emerald" />
+            <Stat label="역할별 카드" value={`${roleCardSetCount}개`} tone="sky" />
+            <Stat label="전체 질문" value={`${totalPrompts}개`} tone="amber" />
+            <Stat label="내 질문 세트" value={`${questionSets.length}개`} tone="indigo" />
           </div>
         </div>
 
-        {/* ─── 내 질문 세트 ─── */}
         <div className="bg-white rounded-3xl shadow-xl p-8 space-y-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -201,9 +301,7 @@ export default function SettingsPage() {
             </div>
           ) : questionSets.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-6 py-10 text-center">
-              <p className="text-sm text-amber-700">
-                아직 만든 세트가 없어요. 위의 버튼으로 첫 세트를 만들어 보세요.
-              </p>
+              <p className="text-sm text-amber-700">아직 만든 세트가 없어요. 위의 버튼으로 첫 세트를 만들어 보세요.</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -215,9 +313,7 @@ export default function SettingsPage() {
                       {set.items.length}개
                     </span>
                   </div>
-                  {set.description && (
-                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">{set.description}</p>
-                  )}
+                  {set.description && <p className="text-xs text-gray-500 mb-3 line-clamp-2">{set.description}</p>}
                   <div className="flex-1" />
                   <div className="flex gap-2 mt-3">
                     <button
@@ -242,116 +338,239 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* ─── 기본 카드 묶음 ─── */}
         <div className="bg-white rounded-3xl shadow-xl p-8 space-y-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">🎴 기본 카드 묶음</h2>
+              <h2 className="text-xl font-bold text-gray-800">🧭 연구원 역할 트리</h2>
               <p className="text-sm text-gray-500 mt-1">
-                질문 만들기 활동에서 통째로 선택해 쓸 수 있는 묶음들. 클릭해서 펼치면 편집할 수 있어요.
+                학생 질문 만들기에서 보이는 역할과 그 안의 질문 카드들을 여기서 관리합니다.
               </p>
             </div>
             <button
               type="button"
-              onClick={addCardSet}
-              className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 whitespace-nowrap"
+              onClick={addRole}
+              className="rounded-xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-600 whitespace-nowrap"
             >
-              + 카드 묶음 추가
+              + 역할 추가
             </button>
           </div>
 
-          {cardSetsError && (
-            <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl">{cardSetsError}</p>
+          {cardSettingsError && (
+            <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl">{cardSettingsError}</p>
           )}
 
-          {cardSetsLoading ? (
+          {cardSettingsLoading ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center text-gray-400">
-              질문 카드 설정을 불러오고 있어요...
+              질문 카드 역할을 불러오고 있어요...
             </div>
           ) : (
-            <div className="space-y-3">
-              {cardSets.map((cs, index) => {
-                const promptCount = cs.promptsText.split("\n").map((p) => p.trim()).filter(Boolean).length;
+            <div className="space-y-4">
+              {roles.map((role, roleIndex) => {
+                const roleCardSets = cardSets.filter((cardSet) => cardSet.roleId === role.id);
                 return (
-                  <div key={cs.id} className="rounded-2xl border border-gray-200 bg-gray-50/70 overflow-hidden">
-                    {/* Collapsed header */}
+                  <div key={role.id} className="rounded-3xl border border-indigo-100 bg-indigo-50/40 overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => toggleExpand(cs.id)}
-                      className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-gray-100/50 transition-colors"
+                      onClick={() => toggleRoleExpand(role.id)}
+                      className="w-full px-5 py-4 text-left hover:bg-indigo-50 transition-colors"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg shrink-0">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-800 truncate">
-                            {cs.label || "(이름 없음)"}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{cs.description || "설명 없음"}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex items-start gap-3">
+                          <span className="text-2xl">{role.icon || "🃏"}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-gray-800 truncate">{role.label || "(이름 없음)"}</p>
+                              {role.subtitle && (
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-600">
+                                  {role.subtitle}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 truncate">{role.description || "설명 없음"}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs bg-white border border-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">
-                          {promptCount}개
-                        </span>
-                        <span className={`text-gray-400 transition-transform ${cs.expanded ? "rotate-180" : ""}`}>▾</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs bg-white border border-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-semibold">
+                            카드 {roleCardSets.length}개
+                          </span>
+                          <span className={`text-gray-400 transition-transform ${role.expanded ? "rotate-180" : ""}`}>▾</span>
+                        </div>
                       </div>
                     </button>
 
-                    {/* Expanded editor */}
-                    {cs.expanded && (
-                      <div className="border-t border-gray-200 bg-white px-5 py-5 space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">묶음 이름</label>
-                          <input
-                            value={cs.label}
-                            onChange={(e) => updateCardSet(cs.id, { label: e.target.value })}
-                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                            placeholder="예) 상상 카드"
-                          />
+                    {role.expanded && (
+                      <div className="border-t border-indigo-100 bg-white px-5 py-5 space-y-5">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">역할 이름</label>
+                            <input
+                              value={role.label}
+                              onChange={(event) => updateRole(role.id, { label: event.target.value })}
+                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                              placeholder="예) 탐정 모드"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">아이콘</label>
+                            <input
+                              value={role.icon}
+                              onChange={(event) => updateRole(role.id, { icon: event.target.value })}
+                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                              placeholder="예) 🕵️"
+                            />
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">설명</label>
-                          <input
-                            value={cs.description}
-                            onChange={(e) => updateCardSet(cs.id, { description: e.target.value })}
-                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                            placeholder="예) 보이지 않는 이야기의 빈칸을 채워보는 질문 만들기"
-                          />
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">짧은 성격 설명</label>
+                            <input
+                              value={role.subtitle}
+                              onChange={(event) => updateRole(role.id, { subtitle: event.target.value })}
+                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                              placeholder="예) 사실/추론"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">역할 설명</label>
+                            <input
+                              value={role.description}
+                              onChange={(event) => updateRole(role.id, { description: event.target.value })}
+                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                              placeholder="학생에게 보여줄 역할 설명"
+                            />
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">질문 카드</label>
-                          <textarea
-                            value={cs.promptsText}
-                            onChange={(e) => updateCardSet(cs.id, { promptsText: e.target.value })}
-                            rows={8}
-                            className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-900 leading-6 focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-y"
-                            placeholder={"질문을 한 줄에 하나씩 적어주세요.\n예)\n이 일이 끝난 뒤에 주인공은 어디로 갔을까?"}
-                          />
-                          <p className="text-xs text-gray-400 mt-2">한 줄에 하나씩 저장됩니다.</p>
-                        </div>
-
-                        <div className="flex gap-2 pt-2">
+                        <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => handleSaveCardSet(cs, index)}
-                            disabled={savingCardId === cs.id}
-                            className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+                            onClick={() => handleSaveRole(role, roleIndex)}
+                            disabled={savingRoleId === role.id}
+                            className="rounded-xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
                           >
-                            {savingCardId === cs.id ? "저장 중..." : "저장"}
+                            {savingRoleId === role.id ? "저장 중..." : "역할 저장"}
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteCardSet(cs)}
-                            disabled={deletingCardId === cs.id}
+                            onClick={() => addCardSet(role.id)}
+                            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
+                          >
+                            + 카드 추가
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRole(role)}
+                            disabled={deletingRoleId === role.id}
                             className="rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
                           >
-                            {deletingCardId === cs.id ? "삭제 중..." : "삭제"}
+                            {deletingRoleId === role.id ? "삭제 중..." : "역할 삭제"}
                           </button>
                         </div>
+
+                        {roleCardSets.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-gray-200 px-5 py-8 text-center text-sm text-gray-400">
+                            아직 이 역할 아래 카드가 없어요. 위 버튼으로 첫 카드를 추가해보세요.
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {roleCardSets.map((cardSet, cardIndex) => {
+                              const promptCount = cardSet.promptsText.split("\n").map((prompt) => prompt.trim()).filter(Boolean).length;
+                              return (
+                                <div key={cardSet.id} className="rounded-2xl border border-gray-200 bg-gray-50/70 overflow-hidden">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCardSet(cardSet.id, { expanded: !cardSet.expanded })}
+                                    className="w-full px-5 py-4 text-left hover:bg-gray-100/60 transition-colors"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-bold text-gray-800 truncate">{cardSet.label || "(이름 없음)"}</p>
+                                        <p className="text-xs text-gray-400 mt-1 truncate">{cardSet.description || "설명 없음"}</p>
+                                      </div>
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-xs bg-white border border-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">
+                                          질문 {promptCount}개
+                                        </span>
+                                        <span className={`text-gray-400 transition-transform ${cardSet.expanded ? "rotate-180" : ""}`}>▾</span>
+                                      </div>
+                                    </div>
+                                  </button>
+
+                                  {cardSet.expanded && (
+                                    <div className="border-t border-gray-200 bg-white px-5 py-5 space-y-4">
+                                      <div className="grid gap-4 md:grid-cols-2">
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-700 mb-2">카드 이름</label>
+                                          <input
+                                            value={cardSet.label}
+                                            onChange={(event) => updateCardSet(cardSet.id, { label: event.target.value })}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            placeholder="예) 상상 카드"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-700 mb-2">소속 역할</label>
+                                          <select
+                                            value={cardSet.roleId ?? ""}
+                                            onChange={(event) => updateCardSet(cardSet.id, { roleId: event.target.value || null })}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                          >
+                                            <option value="">역할 없음</option>
+                                            {roles.map((option) => (
+                                              <option key={option.id} value={option.id}>{option.label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">설명</label>
+                                        <input
+                                          value={cardSet.description}
+                                          onChange={(event) => updateCardSet(cardSet.id, { description: event.target.value })}
+                                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                          placeholder="예) 보이지 않는 이야기의 빈칸을 채워보는 질문 만들기"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">질문 카드</label>
+                                        <textarea
+                                          value={cardSet.promptsText}
+                                          onChange={(event) => updateCardSet(cardSet.id, { promptsText: event.target.value })}
+                                          rows={8}
+                                          className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-900 leading-6 focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-y"
+                                          placeholder={"질문을 한 줄에 하나씩 적어주세요.\n예)\n이 일이 끝난 뒤에 주인공은 어디로 갔을까?"}
+                                        />
+                                        <p className="text-xs text-gray-400 mt-2">한 줄에 하나씩 저장됩니다.</p>
+                                      </div>
+
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSaveCardSet(cardSet, cardIndex)}
+                                          disabled={savingCardId === cardSet.id}
+                                          className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+                                        >
+                                          {savingCardId === cardSet.id ? "저장 중..." : "카드 저장"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteCardSet(cardSet)}
+                                          disabled={deletingCardId === cardSet.id}
+                                          className="rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+                                        >
+                                          {deletingCardId === cardSet.id ? "삭제 중..." : "카드 삭제"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -365,17 +584,20 @@ export default function SettingsPage() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone: "emerald" | "sky" | "amber" }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone: "emerald" | "sky" | "amber" | "indigo" }) {
   const toneClass = {
     emerald: "bg-emerald-50 text-emerald-700",
     sky: "bg-sky-50 text-sky-700",
     amber: "bg-amber-50 text-amber-700",
+    indigo: "bg-indigo-50 text-indigo-700",
   }[tone];
   const valueClass = {
     emerald: "text-emerald-900",
     sky: "text-sky-900",
     amber: "text-amber-900",
+    indigo: "text-indigo-900",
   }[tone];
+
   return (
     <div className={`rounded-2xl ${toneClass} px-4 py-4`}>
       <p className="text-xs font-semibold">{label}</p>
@@ -384,11 +606,25 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: "eme
   );
 }
 
+function toEditableRole(role: QuestionCardRole): EditableQuestionCardRole {
+  return {
+    id: role.id,
+    label: role.label,
+    subtitle: role.subtitle,
+    description: role.description,
+    icon: role.icon,
+    cardSetIds: role.cardSetIds,
+    expanded: false,
+  };
+}
+
 function toEditableCardSet(cardSet: QuestionCardSet): EditableQuestionCardSet {
   return {
     id: cardSet.id,
     label: cardSet.label,
     description: cardSet.description,
     promptsText: cardSet.prompts.join("\n"),
+    roleId: cardSet.roleId ?? null,
+    expanded: false,
   };
 }

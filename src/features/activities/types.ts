@@ -59,6 +59,16 @@ export type QuestionCardSet = {
   label: string;
   description: string;
   prompts: string[];
+  roleId?: string | null;
+};
+
+export type QuestionCardRole = {
+  id: string;
+  label: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  cardSetIds: string[];
 };
 
 /** 교사가 큐레이션한 질문 세트 — 여러 묶음에서 골라 만든 평면 질문 풀 */
@@ -77,6 +87,7 @@ export type QuestionSet = {
 export type QuestionGeneratorConfig = {
   enabledCardSetIds: string[];
   cardSets: QuestionCardSet[];
+  roles?: QuestionCardRole[];
   maxSelections: number;
   guidance: string;
   requireReason: boolean;
