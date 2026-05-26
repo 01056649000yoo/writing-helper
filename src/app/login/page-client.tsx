@@ -20,7 +20,13 @@ export default function LoginPageClient() {
           <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-blue-400 rounded-full blur-3xl opacity-30" />
 
           <div className="relative z-10">
-            <div className="text-5xl md:text-6xl mb-8">✏️</div>
+            <div className="flex items-start justify-between gap-3 mb-8">
+              <div className="text-5xl md:text-6xl">✏️</div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/95 text-amber-950 text-xs font-bold tracking-wider px-3 py-1.5 shadow-md ring-1 ring-amber-300/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-700 animate-pulse" />
+                BETA
+              </span>
+            </div>
             <h1 className="text-3xl md:text-4xl font-bold leading-tight mb-4">
               아지트
               <br />
@@ -57,9 +63,21 @@ export default function LoginPageClient() {
 
         <div className="w-full md:w-7/12 p-10 md:p-20 flex flex-col justify-center bg-white">
           <div className="max-w-md mx-auto w-full">
-            <div className="mb-12">
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">반갑습니다!</h2>
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-3xl font-bold text-gray-900">반갑습니다!</h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold tracking-wider px-2 py-0.5">
+                  BETA
+                </span>
+              </div>
               <p className="text-lg text-gray-500">교사 계정으로 로그인하여 시작하세요.</p>
+            </div>
+
+            <div className="mb-8 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
+              <span className="text-amber-500 text-base shrink-0 mt-0.5">🧪</span>
+              <p className="text-xs leading-relaxed text-amber-800">
+                <strong>지금은 베타 버전</strong>이에요. 기능을 만들어가며 함께 다듬는 중이라 일부 화면이 바뀌거나 점검 중일 수 있어요. 불편한 점은 언제든 알려주세요!
+              </p>
             </div>
 
             <form action={formAction} className="space-y-6">
@@ -133,7 +151,7 @@ export default function LoginPageClient() {
             </div>
 
             <a
-              href="https://xn--9y2br3k43n.kr"
+              href="https://xn--vz0ba242ncqcba79xhwx.site"
               className="mt-6 flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50 px-5 py-4 text-left transition-colors hover:border-sky-200 hover:bg-sky-100"
             >
               <span>
