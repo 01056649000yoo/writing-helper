@@ -13,6 +13,7 @@ import {
   normalizeQuestionCardSetInput,
 } from "@/lib/question-card-sets";
 import type { QuestionCardRole, QuestionCardSet, QuestionSet, QuestionSetItem } from "@/features/activities/types";
+import { normalizeQuestionCardLabel } from "@/features/activities/question-generator/question-card-roles";
 
 export async function saveGptApiKey(formData: FormData): Promise<{ error?: string; success?: boolean }> {
   const user = await getCurrentUser();
@@ -572,41 +573,72 @@ export async function resetDefaultQuestionCardSettings(): Promise<{ success?: bo
   const admin = createSupabaseAdminClient();
 
   try {
-    const defaultRoleLabels = ["탐정 모드", "마법사 모드", "판사 모드", "상담사 모드"];
-
-    // 1. Fetch current roles matching the defaults to get their IDs
-    const { data: existingRoles, error: fetchRolesError } = await admin
+    // 1. Fetch ALL roles for this teacher
+    const { data: allRoles, error: fetchRolesError } = await admin
       .schema("writing_helper")
       .from("question_card_roles")
-      .select("id")
-      .eq("teacher_id", user.id)
-      .in("label", defaultRoleLabels);
+      .select("id, label")
+      .eq("teacher_id", user.id);
 
     if (fetchRolesError) {
       return { error: fetchRolesError.message };
     }
 
-    const roleIdsToDelete = (existingRoles ?? []).map((r) => r.id);
+    // 2. Fetch ALL card sets for this teacher
+    const { data: allCardSets, error: fetchCardSetsError } = await admin
+      .schema("writing_helper")
+      .from("question_card_sets")
+      .select("id, label, role_id")
+      .eq("teacher_id", user.id);
 
-    if (roleIdsToDelete.length > 0) {
-      // 2. Delete card sets linked to these default roles
-      await admin
+    if (fetchCardSetsError) {
+      return { error: fetchCardSetsError.message };
+    }
+
+    // Define normalized default labels (case/whitespace insensitive matching)
+    const defaultRoleNormalized = ["탐정모드", "마법사모드", "판사모드", "상담사모드"];
+    const defaultCardSetNormalized = ["상상", "마음", "감각", "이유", "연결", "가치", "관점", "해결", "반전", "관찰", "비유", "시간"];
+
+    // 3. Filter roles and card sets to delete
+    const rolesToDelete = (allRoles ?? []).filter((r) => 
+      defaultRoleNormalized.includes(normalizeQuestionCardLabel(r.label))
+    );
+    const roleIdsToDelete = rolesToDelete.map((r) => r.id);
+
+    const cardSetsToDelete = (allCardSets ?? []).filter((c) => 
+      defaultCardSetNormalized.includes(normalizeQuestionCardLabel(c.label)) || 
+      (c.role_id && roleIdsToDelete.includes(c.role_id))
+    );
+    const cardSetIdsToDelete = cardSetsToDelete.map((c) => c.id);
+
+    // 4. Perform deletions in the DB
+    if (cardSetIdsToDelete.length > 0) {
+      const { error: deleteSetsError } = await admin
         .schema("writing_helper")
         .from("question_card_sets")
         .delete()
         .eq("teacher_id", user.id)
-        .in("role_id", roleIdsToDelete);
+        .in("id", cardSetIdsToDelete);
+      
+      if (deleteSetsError) {
+        return { error: `기본 카드 세트 삭제 실패: ${deleteSetsError.message}` };
+      }
+    }
 
-      // 3. Delete the default roles themselves
-      await admin
+    if (roleIdsToDelete.length > 0) {
+      const { error: deleteRolesError } = await admin
         .schema("writing_helper")
         .from("question_card_roles")
         .delete()
         .eq("teacher_id", user.id)
         .in("id", roleIdsToDelete);
+
+      if (deleteRolesError) {
+        return { error: `기본 역할 삭제 실패: ${deleteRolesError.message}` };
+      }
     }
 
-    // 4. Force recreate them from presets using the existing library function!
+    // 5. Force recreate them from presets using the existing library function!
     await getTeacherQuestionCardSettingsTree(admin, user.id);
 
     revalidatePath("/dashboard/settings");
