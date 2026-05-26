@@ -7,6 +7,117 @@ import {
   type SkillData,
   type SkillKey,
 } from "@/types/science";
+import { ScienceCopyButton } from "./copy-button";
+
+function serializeSkill(skill: SkillKey, data: NonNullable<SkillData[SkillKey]>): string {
+  switch (skill) {
+    case "observation": {
+      const d = data as NonNullable<SkillData["observation"]>;
+      const lines: string[] = [];
+      if (d.beforeState) lines.push(`처음: ${d.beforeState}`);
+      if (d.afterState) lines.push(`나중: ${d.afterState}`);
+      if (d.senseTags.length > 0) lines.push(`관찰: ${d.senseTags.map((t) => t.text).join(", ")}`);
+      return lines.join("\n");
+    }
+    case "classification": {
+      const d = data as NonNullable<SkillData["classification"]>;
+      return d.groupings.map((g) =>
+        `[${g.basis}]\n` + g.groups.filter((gr) => gr.items.length > 0).map((gr) => `  ${gr.name || "(이름 없음)"}: ${gr.items.join(", ")}`).join("\n")
+      ).join("\n\n");
+    }
+    case "measurement": {
+      const d = data as NonNullable<SkillData["measurement"]>;
+      return d.entries.map((e) => `${e.label}: ${e.values.filter(Boolean).join("/")}${e.unit}`).join("\n");
+    }
+    case "prediction": {
+      const d = data as NonNullable<SkillData["prediction"]>;
+      return d.reasoning ? `${d.prediction}\n근거: ${d.reasoning}` : d.prediction;
+    }
+    case "inference": {
+      const d = data as NonNullable<SkillData["inference"]>;
+      return d.counterText ? `${d.inferenceText}\n다른 가능성: ${d.counterText}` : d.inferenceText;
+    }
+    case "communication": return (data as NonNullable<SkillData["communication"]>).summary;
+    case "problem": return (data as NonNullable<SkillData["problem"]>).problemText;
+    case "hypothesis": {
+      const d = data as NonNullable<SkillData["hypothesis"]>;
+      return d.reasoning ? `${d.hypothesisText}\n근거: ${d.reasoning}` : d.hypothesisText;
+    }
+    case "variable_control": {
+      const d = data as NonNullable<SkillData["variable_control"]>;
+      return [`조작 변인: ${d.manipulated}`, d.controlled.length > 0 && `통제 변인: ${d.controlled.join(", ")}`, `종속 변인: ${d.dependent}`].filter(Boolean).join("\n");
+    }
+    case "data_transform": {
+      const d = data as NonNullable<SkillData["data_transform"]>;
+      if (d.shape === "table") {
+        const headers = d.tableHeaders ?? [];
+        const rows = d.tableRows ?? [];
+        return [headers.join(" | "), ...rows.map((r) => r.join(" | "))].join("\n");
+      }
+      return (d.chartData ?? []).map((p) => `${p.label}: ${p.value}`).join("\n");
+    }
+    case "data_interpret": {
+      const d = data as NonNullable<SkillData["data_interpret"]>;
+      const lines: string[] = [];
+      if (d.patterns.length > 0) lines.push(`규칙: ${d.patterns.join(", ")}`);
+      if (d.interpretation) lines.push(d.interpretation);
+      return lines.join("\n");
+    }
+    case "conclusion": {
+      const d = data as NonNullable<SkillData["conclusion"]>;
+      return [d.conclusionText, d.generalization && `일반화: ${d.generalization}`, d.followUp && `더 알아볼 점: ${d.followUp}`].filter(Boolean).join("\n");
+    }
+  }
+}
+
+function buildScienceShareText(opts: {
+  title: string;
+  topic: string;
+  studentNumber: number;
+  studentName: string;
+  track: InquiryTrack | null;
+  enabledSkills: SkillKey[];
+  skillData: SkillData;
+  // legacy fields
+  beforeState?: string;
+  afterState?: string;
+  senseTags?: Array<{ text: string }>;
+  measurements?: Array<{ label: string; value: string; unit: string }>;
+  inferenceText?: string;
+  counterText?: string;
+  questionText?: string;
+}): string {
+  const parts: string[] = [];
+  parts.push(`[과학 탐구 글쓰기] ${opts.title}`);
+  parts.push(`주제: ${opts.topic}`);
+  parts.push(`${opts.studentNumber}번 ${opts.studentName}`);
+  if (opts.track) parts.push(`트랙: ${TRACK_META[opts.track].label}`);
+  parts.push("");
+
+  const hasNew = opts.enabledSkills.some((s) => Boolean(opts.skillData[s]));
+  if (hasNew) {
+    for (const skill of opts.enabledSkills) {
+      const data = opts.skillData[skill];
+      if (!data) continue;
+      const meta = SKILL_META[skill];
+      const body = serializeSkill(skill, data);
+      if (!body) continue;
+      parts.push(`■ ${meta.label}`);
+      parts.push(body);
+      parts.push("");
+    }
+  } else {
+    if (opts.beforeState) parts.push(`처음: ${opts.beforeState}`);
+    if (opts.afterState) parts.push(`나중: ${opts.afterState}`);
+    if (opts.senseTags && opts.senseTags.length > 0) parts.push(`관찰: ${opts.senseTags.map((t) => t.text).join(", ")}`);
+    if (opts.measurements && opts.measurements.length > 0) parts.push(`측정: ${opts.measurements.map((m) => `${m.label} ${m.value}${m.unit}`).join(", ")}`);
+    if (opts.inferenceText) parts.push(`추론: ${opts.inferenceText}`);
+    if (opts.counterText) parts.push(`다른 가능성: ${opts.counterText}`);
+    if (opts.questionText) parts.push(`질문: ${opts.questionText}`);
+  }
+
+  return parts.join("\n").trim();
+}
 
 function isSkillKey(value: string): value is SkillKey {
   return value in SKILL_META;
@@ -264,6 +375,25 @@ export default async function ScienceSharePage({
             아직 활동이 완료되지 않은 기록입니다.
           </p>
         )}
+
+        <ScienceCopyButton
+          text={buildScienceShareText({
+            title: room?.title ?? "",
+            topic: room?.topic ?? "",
+            studentNumber: session.student_number,
+            studentName: session.student_name,
+            track: inquiryTrack,
+            enabledSkills,
+            skillData,
+            beforeState: session.before_state ?? "",
+            afterState: session.after_state ?? "",
+            senseTags: (Array.isArray(session.sense_tags) ? session.sense_tags : []) as Array<{ text: string }>,
+            measurements: (Array.isArray(session.measurements) ? session.measurements : []) as Array<{ label: string; value: string; unit: string }>,
+            inferenceText: session.inference_text ?? "",
+            counterText: session.counter_text ?? "",
+            questionText: session.question_text ?? "",
+          })}
+        />
       </div>
     </div>
   );

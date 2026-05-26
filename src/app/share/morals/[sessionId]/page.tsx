@@ -6,6 +6,86 @@ import {
   type MoralsSkillData,
   type MoralsSkillKey,
 } from "@/types/morals";
+import { MoralsCopyButton } from "./copy-button";
+
+function serializeMoralsSkill(skill: MoralsSkillKey, data: NonNullable<MoralsSkillData[MoralsSkillKey]>): string {
+  switch (skill) {
+    case "situation": {
+      const d = data as NonNullable<MoralsSkillData["situation"]>;
+      const meta = [d.when, d.where, d.who].filter(Boolean).join(" · ");
+      return [meta, d.summary].filter(Boolean).join("\n");
+    }
+    case "emotion": {
+      const d = data as NonNullable<MoralsSkillData["emotion"]>;
+      const tags = d.selected.map((s) => s.intensity ? `${s.label}(${s.intensity})` : s.label).join(", ");
+      return [tags, d.note].filter(Boolean).join("\n");
+    }
+    case "value_find": {
+      const d = data as NonNullable<MoralsSkillData["value_find"]>;
+      return d.reason ? `${d.values.join(", ")}\n근거: ${d.reason}` : d.values.join(", ");
+    }
+    case "perspective": {
+      const d = data as NonNullable<MoralsSkillData["perspective"]>;
+      return d.parties.map((p) => `[${p.role}]${p.feeling ? ` (${p.feeling})` : ""}\n${p.thought}`).join("\n\n");
+    }
+    case "resolution": {
+      const d = data as NonNullable<MoralsSkillData["resolution"]>;
+      return d.practicePartner ? `${d.resolution}\n함께 실천: ${d.practicePartner}` : d.resolution;
+    }
+    case "dilemma": {
+      const d = data as NonNullable<MoralsSkillData["dilemma"]>;
+      return [`${d.valueA} ↔ ${d.valueB}`, d.context].filter(Boolean).join("\n");
+    }
+    case "stakeholders": {
+      const d = data as NonNullable<MoralsSkillData["stakeholders"]>;
+      return d.parties.map((p) => `[${p.role}]${p.feeling ? ` 마음: ${p.feeling}` : ""}${p.need ? ` / 원하는 것: ${p.need}` : ""}`).join("\n");
+    }
+    case "principle": {
+      const d = data as NonNullable<MoralsSkillData["principle"]>;
+      return d.appliedPrinciples.map((p) => p.application ? `[${p.label}] ${p.application}` : `[${p.label}]`).join("\n");
+    }
+    case "consequence": {
+      const d = data as NonNullable<MoralsSkillData["consequence"]>;
+      return [d.shortTerm && `단기: ${d.shortTerm}`, d.longTerm && `장기: ${d.longTerm}`, d.impactSelf && `나에게: ${d.impactSelf}`, d.impactOthers && `상대·공동체에: ${d.impactOthers}`].filter(Boolean).join("\n");
+    }
+    case "action_plan": {
+      const d = data as NonNullable<MoralsSkillData["action_plan"]>;
+      const items = d.actions.map((a) => "- " + [a.when, a.what, a.how].filter(Boolean).join(" · ")).join("\n");
+      return d.obstacles ? `${items}\n\n방해 요인과 극복: ${d.obstacles}` : items;
+    }
+    case "self_review": {
+      const d = data as NonNullable<MoralsSkillData["self_review"]>;
+      return [d.progress && `진행: ${d.progress}`, d.adjustment && `보완: ${d.adjustment}`, d.feeling && `지금 마음: ${d.feeling}`].filter(Boolean).join("\n");
+    }
+  }
+}
+
+function buildMoralsShareText(opts: {
+  title: string;
+  topic: string;
+  studentNumber: number;
+  studentName: string;
+  track: MoralsTrack | null;
+  enabledSkills: MoralsSkillKey[];
+  skillData: MoralsSkillData;
+}): string {
+  const parts: string[] = [];
+  parts.push(`[도덕 가치 글쓰기] ${opts.title}`);
+  parts.push(`주제: ${opts.topic}`);
+  parts.push(`${opts.studentNumber}번 ${opts.studentName}`);
+  if (opts.track) parts.push(`트랙: ${MORALS_TRACK_META[opts.track].label}`);
+  parts.push("");
+  for (const skill of opts.enabledSkills) {
+    const data = opts.skillData[skill];
+    if (!data) continue;
+    const body = serializeMoralsSkill(skill, data);
+    if (!body) continue;
+    parts.push(`■ ${MORALS_SKILL_META[skill].label}`);
+    parts.push(body);
+    parts.push("");
+  }
+  return parts.join("\n").trim();
+}
 
 function isSkillKey(value: string): value is MoralsSkillKey {
   return value in MORALS_SKILL_META;
@@ -199,6 +279,18 @@ export default async function MoralsSharePage({ params }: { params: Promise<{ se
             );
           })}
         </div>
+
+        <MoralsCopyButton
+          text={buildMoralsShareText({
+            title: room?.title ?? "",
+            topic: room?.topic ?? "",
+            studentNumber: session.student_number,
+            studentName: session.student_name,
+            track,
+            enabledSkills,
+            skillData,
+          })}
+        />
 
         <p className="text-center text-xs text-gray-400">이 글을 보면서 다짐을 다시 떠올려 봐요 🌱</p>
       </div>
