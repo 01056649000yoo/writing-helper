@@ -22,6 +22,8 @@ export default function QuestionSetEditorPage() {
 
   const [bundles, setBundles] = useState<QuestionCardSet[]>([]);
   const [activeBundleId, setActiveBundleId] = useState<string | null>(null);
+  // 이미 한 번 본 묶음. 처음 클릭한 묶음만 자동으로 전체 담는다.
+  const [visitedBundles, setVisitedBundles] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,15 +37,18 @@ export default function QuestionSetEditorPage() {
       setLoading(true);
       const bundlesResult = await getQuestionCardSettings();
       if (!active) return;
+      let loadedBundles: QuestionCardSet[] = [];
       if (bundlesResult.error) {
         setError(bundlesResult.error);
       } else {
-        setBundles(bundlesResult.cardSets);
-        if (bundlesResult.cardSets.length > 0) {
-          setActiveBundleId((prev) => prev ?? bundlesResult.cardSets[0].id);
+        loadedBundles = bundlesResult.cardSets;
+        setBundles(loadedBundles);
+        if (loadedBundles.length > 0) {
+          setActiveBundleId((prev) => prev ?? loadedBundles[0].id);
         }
       }
 
+      let loadedItems: QuestionSetItem[] = [];
       if (!isNew) {
         const setResult = await getTeacherQuestionSet(id);
         if (!active) return;
@@ -53,12 +58,54 @@ export default function QuestionSetEditorPage() {
           setName(setResult.set.name);
           setDescription(setResult.set.description);
           setItems(setResult.set.items);
+          loadedItems = setResult.set.items;
         }
       }
+
+      // 기존 세트에 이미 담긴 묶음들은 "이미 본 묶음"으로 표시 → 자동 추가 방지
+      const loadedTexts = new Set(loadedItems.map((i) => i.text));
+      const visited = new Set<string>();
+      loadedBundles.forEach((b) => {
+        if (b.prompts.some((p) => loadedTexts.has(p))) visited.add(b.id);
+      });
+
+      // 새 세트 + 첫 묶음이 있으면 자동으로 그 묶음 전체를 기본 담기
+      if (isNew && loadedBundles[0]) {
+        const first = loadedBundles[0];
+        setItems(first.prompts.map((text) => ({ text, source_label: first.label })));
+        visited.add(first.id);
+      }
+      setVisitedBundles(visited);
+
       setLoading(false);
     })();
     return () => { active = false; };
   }, [id, isNew]);
+
+  function handleSelectBundle(bundleId: string) {
+    setActiveBundleId(bundleId);
+    if (visitedBundles.has(bundleId)) return;
+
+    const bundle = bundles.find((b) => b.id === bundleId);
+    if (!bundle) return;
+
+    setVisitedBundles((prev) => {
+      const next = new Set(prev);
+      next.add(bundleId);
+      return next;
+    });
+
+    // 이 묶음이 아직 비어 있을 때만 자동으로 전체 담기
+    setItems((prev) => {
+      const existing = new Set(prev.map((i) => i.text));
+      const bundleHasItems = bundle.prompts.some((p) => existing.has(p));
+      if (bundleHasItems) return prev;
+      const additions = bundle.prompts
+        .filter((p) => !existing.has(p))
+        .map((text) => ({ text, source_label: bundle.label }));
+      return [...prev, ...additions];
+    });
+  }
 
   const itemTextSet = useMemo(() => new Set(items.map((i) => i.text)), [items]);
 
@@ -209,24 +256,34 @@ export default function QuestionSetEditorPage() {
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              {bundles.map((b) => (
-                <button
-                  type="button"
-                  key={b.id}
-                  onClick={() => setActiveBundleId(b.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-                    activeBundle?.id === b.id
-                      ? "bg-amber-500 text-white border-amber-500"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-amber-300"
-                  }`}
-                >
-                  {b.label}
-                  <span className={`ml-1.5 text-[10px] ${activeBundle?.id === b.id ? "text-amber-100" : "text-gray-400"}`}>
-                    {b.prompts.length}
-                  </span>
-                </button>
-              ))}
+              {bundles.map((b) => {
+                const usedCount = b.prompts.filter((p) => itemTextSet.has(p)).length;
+                const isActive = activeBundle?.id === b.id;
+                return (
+                  <button
+                    type="button"
+                    key={b.id}
+                    onClick={() => handleSelectBundle(b.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                      isActive
+                        ? "bg-amber-500 text-white border-amber-500"
+                        : usedCount > 0
+                          ? "bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-300"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-amber-300"
+                    }`}
+                    title={visitedBundles.has(b.id) ? "이미 둘러본 묶음" : "처음 누르면 이 묶음 전체가 자동으로 담깁니다"}
+                  >
+                    {b.label}
+                    <span className={`ml-1.5 text-[10px] ${isActive ? "text-amber-100" : "text-gray-400"}`}>
+                      {usedCount}/{b.prompts.length}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-[11px] text-gray-400 -mt-2">
+              💡 묶음을 누르면 그 묶음의 질문이 한 번에 담겨요. 빼고 싶은 질문은 ✕로 제외하세요.
+            </p>
 
             {activeBundle && (() => {
               const allSelected = activeBundle.prompts.length > 0 && activeBundle.prompts.every((p) => itemTextSet.has(p));
