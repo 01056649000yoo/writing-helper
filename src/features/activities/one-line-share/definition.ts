@@ -14,14 +14,14 @@ export const oneLineShareDefinition: ActivityDefinition<
 > = {
   id: "one_line_share",
   label: "한줄모아",
-  description: "핵심단어를 담아 한 문장으로 생각을 나누고, 친구 문장에 좋아요로 반응하는 활동입니다.",
+  description: "핵심단어를 이용해 문장을 만들고 수업을 마무리하는 글쓰기 활동입니다.",
   category: "reflection",
   version: 1,
   usesAi: false,
   supportsRoomResult: true,
   createDefaultConfig: () => ({
     promptTitle: "오늘 수업 한 줄 정리",
-    promptDescription: "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.",
+    promptDescription: "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.",
     keywords: [],
     maxReactionsPerStudent: 3,
   }),
@@ -32,7 +32,7 @@ export const oneLineShareDefinition: ActivityDefinition<
       : "오늘 수업 한 줄 정리";
     const promptDescription = typeof raw.promptDescription === "string" && raw.promptDescription.trim()
       ? raw.promptDescription.trim()
-      : "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.";
+      : "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.";
     const keywords = normalizeKeywords(raw.keywords);
 
     return {

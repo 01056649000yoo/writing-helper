@@ -42,10 +42,11 @@ export function normalizeKeywordText(value: string) {
 }
 
 export function includesConfiguredKeyword(content: string, keywords: string[]) {
-  const normalizedContent = content.trim().toLowerCase();
-  if (!normalizedContent || keywords.length === 0) return true;
+  return getMatchingConfiguredKeywords(content, keywords).length > 0 || keywords.length === 0;
+}
 
-  return keywords.some((keyword) => normalizedContent.includes(keyword.toLowerCase()));
+export function getMatchingConfiguredKeywords(content: string, keywords: string[]) {
+  return keywords.filter((keyword) => keywordMatchesContent(content, keyword));
 }
 
 export function buildOneLineShareBoard(
@@ -103,6 +104,38 @@ function normalizeKeywords(value: unknown) {
   }
 
   return [];
+}
+
+const KOREAN_PARTICLE_SUFFIXES = [
+  "은", "는", "이", "가", "을", "를", "와", "과", "도", "만",
+  "에", "에서", "에게", "께", "한테", "으로", "로", "보다", "처럼",
+  "만큼", "부터", "까지", "랑", "이나", "나", "의",
+];
+
+function keywordMatchesContent(content: string, keyword: string) {
+  const normalizedKeyword = normalizeSearchText(keyword);
+  if (!normalizedKeyword) return false;
+
+  const normalizedContent = normalizeSearchText(content);
+  if (!normalizedContent) return false;
+
+  if (normalizedKeyword.includes(" ")) {
+    return normalizedContent.includes(normalizedKeyword);
+  }
+
+  const tokens = content
+    .split(/[\s,.;:!?()[\]{}"'“”‘’/\\|<>]+/u)
+    .map((token) => normalizeSearchText(token))
+    .filter(Boolean);
+
+  return tokens.some((token) => {
+    if (token === normalizedKeyword) return true;
+    return KOREAN_PARTICLE_SUFFIXES.some((suffix) => token === `${normalizedKeyword}${suffix}`);
+  });
+}
+
+function normalizeSearchText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {

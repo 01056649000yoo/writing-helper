@@ -5,6 +5,7 @@ import { getClasses } from "@/app/actions/class-actions";
 import { signOut } from "@/app/actions/auth-actions";
 import { ManualModal } from "./manual-modal";
 import { BUILD_LABEL } from "@/lib/build-version";
+import { DashboardTabs } from "./dashboard-tabs";
 
 export default async function DashboardPage() {
   const [profile, classes, hasKey] = await Promise.all([
@@ -58,41 +59,7 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">내 학급 목록</h2>
-          <Link href="/dashboard/class/new"
-            className="px-6 py-3 rounded-xl font-semibold text-base bg-indigo-500 text-white hover:bg-indigo-600 transition-colors">
-            + 새 학급 만들기
-          </Link>
-        </div>
-
-        {classes.length === 0 ? (
-          <div className="bg-white rounded-2xl p-16 text-center shadow-sm">
-            <div className="text-6xl mb-5">🏫</div>
-            <p className="text-xl text-gray-500 font-medium">아직 만든 학급이 없습니다.</p>
-            <p className="text-base text-gray-400 mt-2">학급을 만들고 학생 명단을 등록하면 바로 활동을 시작할 수 있어요.</p>
-            <Link href="/dashboard/class/new"
-              className="inline-block mt-6 px-8 py-3.5 bg-indigo-500 text-white rounded-xl text-base font-semibold hover:bg-indigo-600 transition-colors">
-              첫 학급 만들기
-            </Link>
-          </div>
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {classes.map(cls => (
-              <Link key={cls.id} href={`/dashboard/class/${cls.id}`}
-                className="bg-white rounded-2xl p-7 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-indigo-100">
-                <div className="flex items-start justify-between mb-4">
-                  <span className="text-4xl">🏫</span>
-                  <span className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-medium">{cls.grade_level}</span>
-                </div>
-                <h3 className="font-bold text-gray-800 text-xl">{cls.name}</h3>
-                <p className="text-sm text-gray-400 mt-3">
-                  {new Date(cls.created_at).toLocaleDateString("ko-KR")} 개설
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
+        <DashboardTabs classes={classes} />
       </main>
     </div>
   );

@@ -118,6 +118,10 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
     () => oneLineShareBoard.filter((entry) => entry.likedByCurrentSession).length,
     [oneLineShareBoard],
   );
+  const peerOneLineEntries = useMemo(
+    () => oneLineShareBoard.filter((entry) => !entry.isMine),
+    [oneLineShareBoard],
+  );
 
   function copyCurrentText() {
     if (!currentText) return;
@@ -350,7 +354,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          {oneLineShareBoard.length > 0 && (
+          {peerOneLineEntries.length > 0 && (
             <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -361,9 +365,12 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                   좋아요 {usedReactionCount}/{oneLineShareConfig.maxReactionsPerStudent}
                 </span>
               </div>
-              <OneLineShareTopThree entries={oneLineShareBoard} />
+              <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                내 한 줄은 위에서 확인하고, 여기서는 친구들 문장만 편하게 읽으면서 좋아요를 남길 수 있어요.
+              </div>
+              <OneLineShareTopThree entries={peerOneLineEntries} />
               <OneLineShareBoard
-                entries={oneLineShareBoard}
+                entries={peerOneLineEntries}
                 interactive
                 closed={oneLineShareClosed}
                 maxReactionsPerStudent={oneLineShareConfig.maxReactionsPerStudent}

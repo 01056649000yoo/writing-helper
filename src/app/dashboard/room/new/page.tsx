@@ -9,9 +9,9 @@ import {
   getQuestionGeneratorSourceRooms,
   type QuestionGeneratorSourceRoomSummary,
 } from "@/app/actions/room-actions";
-import { getQuestionCardSettings, getTeacherQuestionSets } from "@/app/actions/settings-actions";
+import { getQuestionCardSettings } from "@/app/actions/settings-actions";
 import { activityDefinitions, getActivityDefinition } from "@/features/activities/registry";
-import type { ActivityType, QuestionCardSet, QuestionSet } from "@/features/activities/types";
+import type { ActivityType, QuestionCardSet } from "@/features/activities/types";
 import {
   buildDraftStorageKey,
   clearActivityDraft,
@@ -47,9 +47,6 @@ type QuestionGeneratorDraft = {
   guidance: string;
   require_reason: boolean;
   selectedCardSetIds: string[];
-  // 'bundles' = 기본 카드 묶음 여러 개, 'set' = 저장된 내 질문 세트 1개
-  cardSource: "bundles" | "set";
-  selectedQuestionSetId: string | null;
 };
 
 type QuestionVotingDraft = {
@@ -91,7 +88,7 @@ const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary
   one_line_share: {
     emoji: "💬",
     tone: "from-rose-50 via-white to-pink-50",
-    summary: "핵심단어를 넣은 한 문장을 나누고 친구 문장에 좋아요로 반응하는 활동",
+    summary: "핵심단어를 이용한 문장 만들기로 수업을 마무리하는 활동",
   },
 };
 
@@ -844,7 +841,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
-  const [availableQuestionSets, setAvailableQuestionSets] = useState<QuestionSet[]>([]);
   const [loadingCardSets, setLoadingCardSets] = useState(true);
   const [previewCardSet, setPreviewCardSet] = useState<QuestionCardSet | null>(null);
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
@@ -855,8 +851,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     guidance: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
     require_reason: true,
     selectedCardSetIds: [],
-    cardSource: "bundles",
-    selectedQuestionSetId: null,
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<QuestionGeneratorDraft>(
     buildDraftStorageKey(classId, "question_generator"),
@@ -867,7 +861,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   useEffect(() => {
     let active = true;
 
-    Promise.all([getQuestionCardSettings(), getTeacherQuestionSets()]).then(([cardResult, setResult]) => {
+    getQuestionCardSettings().then((cardResult) => {
       if (!active) return;
       if (cardResult.error) setError(cardResult.error);
       else {
@@ -880,7 +874,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           };
         });
       }
-      if (!setResult.error) setAvailableQuestionSets(setResult.sets);
       setLoadingCardSets(false);
     });
 
@@ -906,16 +899,9 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (draft.cardSource === "set") {
-      if (!draft.selectedQuestionSetId) {
-        setError("사용할 질문 세트를 선택해주세요.");
-        return;
-      }
-    } else {
-      if (draft.selectedCardSetIds.length === 0) {
-        setError("질문 카드 묶음을 1개 이상 선택해주세요.");
-        return;
-      }
+    if (draft.selectedCardSetIds.length === 0) {
+      setError("질문 카드 묶음을 1개 이상 선택해주세요.");
+      return;
     }
 
     setSaving(true);
@@ -924,11 +910,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     const fd = new FormData(e.currentTarget);
     fd.set("class_id", classId);
     fd.set("activity_type", "question_generator");
-    if (draft.cardSource === "set" && draft.selectedQuestionSetId) {
-      fd.set("question_set_id", draft.selectedQuestionSetId);
-    } else {
-      draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
-    }
+    draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
     draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
     const result = await createRoom(fd);
@@ -982,95 +964,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </Link>
           </div>
 
-          {/* 모드 토글: 기본 묶음 vs 내 세트 */}
-          <div className="inline-flex rounded-2xl bg-gray-100 p-1 mb-4">
-            <button
-              type="button"
-              onClick={() => setDraft((prev) => ({ ...prev, cardSource: "bundles" }))}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                draft.cardSource === "bundles"
-                  ? "bg-white text-emerald-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              🎴 기본 카드 묶음
-            </button>
-            <button
-              type="button"
-              onClick={() => setDraft((prev) => ({ ...prev, cardSource: "set" }))}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                draft.cardSource === "set"
-                  ? "bg-white text-amber-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              📚 내 질문 세트
-            </button>
-          </div>
-
-          {/* 세트 모드: 저장된 세트 중 1개 선택 */}
-          {draft.cardSource === "set" && (
-            <div className="space-y-3">
-              {availableQuestionSets.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-4 py-6 text-center">
-                  <p className="text-sm text-amber-700">아직 저장된 질문 세트가 없어요.</p>
-                  <div className="mt-3 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
-                    <Link
-                      href="/dashboard/settings/sets/new?mode=bundle"
-                      className="text-sm font-semibold text-emerald-700 hover:underline"
-                    >
-                      + 묶음으로 세트 만들기 →
-                    </Link>
-                    <Link
-                      href="/dashboard/settings/sets/new?mode=edit"
-                      className="text-sm font-semibold text-amber-700 hover:underline"
-                    >
-                      + 수정해서 세트 만들기 →
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {availableQuestionSets.map((set) => {
-                      const selected = draft.selectedQuestionSetId === set.id;
-                      return (
-                        <button
-                          type="button"
-                          key={set.id}
-                          onClick={() => setDraft((prev) => ({ ...prev, selectedQuestionSetId: set.id }))}
-                          className={`text-left rounded-2xl border p-4 transition-colors ${
-                            selected
-                              ? "border-amber-400 bg-amber-50"
-                              : "border-gray-200 bg-white hover:border-amber-200"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="text-base font-bold text-gray-800">{set.name}</p>
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              selected ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-500"
-                            }`}>{set.items.length}개</span>
-                          </div>
-                          {set.description && (
-                            <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{set.description}</p>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <Link
-                    href="/dashboard/settings/sets/new?mode=bundle"
-                    className="block text-center text-sm font-semibold text-amber-700 hover:underline pt-1"
-                  >
-                    + 새 세트 만들기
-                  </Link>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* 묶음 모드: 기존 그대로 */}
-          {draft.cardSource === "bundles" && (
           <>
           <div className="text-xs text-gray-400 mb-2">{draft.selectedCardSetIds.length}개 선택됨</div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -1132,7 +1025,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </div>
           )}
           </>
-          )}
         </div>
 
         {previewCardSet && (
@@ -1494,7 +1386,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
   const [saving, setSaving] = useState(false);
   const initialDraft = useMemo<OneLineShareDraft>(() => ({
     topic: "오늘 수업 한 줄 정리",
-    topic_description: "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.",
+    topic_description: "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.",
     keywords: "",
     max_reactions_per_student: "3",
     duration_hours: "4",
@@ -1534,13 +1426,13 @@ function OneLineShareSetup({ classId }: { classId: string }) {
   return (
     <>
       <div className="rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 mb-6 text-sm text-rose-800">
-        학생이 핵심단어를 넣어 한 문장으로 생각을 나누고, 친구 문장에는 댓글 대신 좋아요로 간단하게 반응하는 활동입니다.
+        학생이 핵심단어를 이용해 문장을 만들며 수업을 마무리하고, 친구 문장에는 좋아요로 반응하는 활동입니다.
       </div>
 
       <div className="mb-6">
         <DraftSection
           title="한줄모아 활동 설정 저장"
-          description="안내 제목, 설명, 핵심단어를 저장해 두고 나중에 돌아와 이어서 수정할 수 있어요."
+          description="활동 제목, 설명, 핵심단어를 저장해 두고 나중에 돌아와 이어서 수정할 수 있어요."
           onSave={handleSaveDraftNow}
           lastSavedAt={lastSavedAt}
         />
@@ -1556,8 +1448,8 @@ function OneLineShareSetup({ classId }: { classId: string }) {
             topic_description: draft.topic_description,
           }}
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          hint="학생에게 보일 활동 제목과 설명입니다. 핵심단어와 함께 한 문장으로 무엇을 표현할지 안내해 주세요."
-          placeholder="예) 오늘 배운 증발과 물의 순환을 떠올리며, 핵심단어를 넣어 내 생각을 한 문장으로 정리해 봅니다."
+          hint="학생에게 보일 활동 제목과 설명입니다. 핵심단어를 이용해 수업을 마무리하는 문장을 쓰도록 안내해 주세요."
+          placeholder="예) 오늘 배운 증발과 물의 순환을 떠올리며, 핵심단어를 이용해 수업을 마무리하는 한 문장을 써 봅니다."
         />
 
         <div>

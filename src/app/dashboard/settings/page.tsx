@@ -2,17 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   deleteQuestionCardRole,
   deleteQuestionCardSetting,
-  deleteQuestionSet,
   getQuestionCardSettings,
-  getTeacherQuestionSets,
   saveQuestionCardRole,
   saveQuestionCardSetting,
 } from "@/app/actions/settings-actions";
-import type { QuestionCardRole, QuestionCardSet, QuestionSet } from "@/features/activities/types";
+import type { QuestionCardRole, QuestionCardSet } from "@/features/activities/types";
 
 type EditableQuestionCardSet = {
   id: string;
@@ -36,8 +33,6 @@ type EditableQuestionCardRole = {
 };
 
 export default function SettingsPage() {
-  const router = useRouter();
-
   const [roles, setRoles] = useState<EditableQuestionCardRole[]>([]);
   const [cardSets, setCardSets] = useState<EditableQuestionCardSet[]>([]);
   const [cardSettingsLoading, setCardSettingsLoading] = useState(true);
@@ -46,11 +41,6 @@ export default function SettingsPage() {
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const [deletingRoleId, setDeletingRoleId] = useState<string | null>(null);
-
-  const [questionSets, setQuestionSets] = useState<QuestionSet[]>([]);
-  const [questionSetsLoading, setQuestionSetsLoading] = useState(true);
-  const [questionSetsError, setQuestionSetsError] = useState("");
-  const [deletingSetId, setDeletingSetId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -65,14 +55,6 @@ export default function SettingsPage() {
       }
       setCardSettingsLoading(false);
     });
-
-    getTeacherQuestionSets().then((result) => {
-      if (!active) return;
-      if (result.error) setQuestionSetsError(result.error);
-      else setQuestionSets(result.sets);
-      setQuestionSetsLoading(false);
-    });
-
     return () => { active = false; };
   }, []);
 
@@ -230,20 +212,6 @@ export default function SettingsPage() {
     setDeletingCardId(null);
   }
 
-  async function handleDeleteSet(set: QuestionSet) {
-    if (!confirm(`「${set.name}」 세트를 삭제할까요?`)) return;
-    setDeletingSetId(set.id);
-    setQuestionSetsError("");
-    const result = await deleteQuestionSet(set.id);
-    if (result.error) {
-      setQuestionSetsError(result.error);
-      setDeletingSetId(null);
-      return;
-    }
-    setQuestionSets((prev) => prev.filter((item) => item.id !== set.id));
-    setDeletingSetId(null);
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-5xl mx-auto pt-8 pb-16 space-y-6">
@@ -263,79 +231,8 @@ export default function SettingsPage() {
             <Stat label="연구원 역할" value={`${roles.length}개`} tone="emerald" />
             <Stat label="역할별 카드" value={`${roleCardSetCount}개`} tone="sky" />
             <Stat label="전체 질문" value={`${totalPrompts}개`} tone="amber" />
-            <Stat label="내 질문 세트" value={`${questionSets.length}개`} tone="indigo" />
+            <Stat label="질문 카드 묶음" value={`${cardSets.length}개`} tone="indigo" />
           </div>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-xl p-8 space-y-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-gray-800">📚 내 질문 세트</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                카드 묶음을 통째로 조합하거나, 묶음 속 질문을 수정해서 만든 큐레이션 세트입니다.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Link
-                href="/dashboard/settings/sets/new?mode=bundle"
-                className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 whitespace-nowrap text-center"
-              >
-                + 묶음으로 만들기
-              </Link>
-              <Link
-                href="/dashboard/settings/sets/new?mode=edit"
-                className="rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white hover:bg-amber-600 whitespace-nowrap text-center"
-              >
-                + 수정해서 만들기
-              </Link>
-            </div>
-          </div>
-
-          {questionSetsError && (
-            <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl">{questionSetsError}</p>
-          )}
-
-          {questionSetsLoading ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center text-gray-400">
-              질문 세트를 불러오고 있어요...
-            </div>
-          ) : questionSets.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-6 py-10 text-center">
-              <p className="text-sm text-amber-700">아직 만든 세트가 없어요. 위의 버튼으로 첫 세트를 만들어 보세요.</p>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {questionSets.map((set) => (
-                <div key={set.id} className="rounded-2xl border border-amber-100 bg-amber-50/40 p-5 flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-bold text-gray-800">{set.name}</h3>
-                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full whitespace-nowrap font-semibold">
-                      {set.items.length}개
-                    </span>
-                  </div>
-                  {set.description && <p className="text-xs text-gray-500 mb-3 line-clamp-2">{set.description}</p>}
-                  <div className="flex-1" />
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/dashboard/settings/sets/${set.id}`)}
-                      className="flex-1 rounded-xl bg-white border border-amber-200 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100"
-                    >
-                      편집
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSet(set)}
-                      disabled={deletingSetId === set.id}
-                      className="rounded-xl px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      {deletingSetId === set.id ? "삭제..." : "삭제"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl p-8 space-y-5">

@@ -11,7 +11,7 @@ import {
   submitQuestionGenerator,
   submitQuestionVoting,
 } from "@/app/actions/student-actions";
-import { normalizeOneLineShareConfig } from "@/lib/one-line-share";
+import { getMatchingConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import type {
   OneLineShareConfig,
   QuestionCardRole,
@@ -1051,9 +1051,18 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   if (activityType === "one_line_share") {
     const keywords = oneLineShareConfig?.keywords ?? [];
     const normalizedContent = oneLineContent.trim();
-    const containsKeyword = keywords.length === 0
-      ? true
-      : keywords.some((keyword) => normalizedContent.toLowerCase().includes(keyword.toLowerCase()));
+    const matchingKeywords = getMatchingConfiguredKeywords(normalizedContent, keywords);
+    const containsKeyword = keywords.length === 0 || matchingKeywords.length > 0;
+    const missingKeywords = keywords.filter((keyword) => !matchingKeywords.includes(keyword));
+
+    function insertKeyword(keyword: string) {
+      setOneLineContent((prev) => {
+        if (prev.includes(keyword)) return prev;
+        const trimmed = prev.trim();
+        if (!trimmed) return keyword;
+        return `${trimmed} ${keyword}`;
+      });
+    }
 
     async function handleOneLineShareSubmit() {
       if (!normalizedContent) {
@@ -1110,12 +1119,21 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               <p className="text-xs font-bold uppercase tracking-wide text-rose-500">오늘의 핵심단어</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {keywords.map((keyword) => (
-                  <span key={keyword} className="rounded-full bg-rose-100 px-3 py-1.5 text-sm font-semibold text-rose-700">
+                  <button
+                    key={keyword}
+                    type="button"
+                    onClick={() => insertKeyword(keyword)}
+                    className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                      matchingKeywords.includes(keyword)
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                    }`}
+                  >
                     #{keyword}
-                  </span>
+                  </button>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-gray-400">핵심단어를 한 개 이상 포함해서 문장을 써보세요.</p>
+              <p className="mt-3 text-xs text-gray-400">핵심단어를 눌러 문장에 바로 넣을 수 있어요. 제시된 핵심단어 중 하나 이상이 꼭 들어가야 합니다.</p>
             </div>
           )}
 
@@ -1137,8 +1155,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               {keywords.length === 0
                 ? "핵심단어가 없어 자유롭게 한 줄을 써도 괜찮아요."
                 : containsKeyword
-                  ? "좋아요! 핵심단어가 문장에 들어 있어요."
-                  : "핵심단어를 한 개 이상 넣으면 더 좋아요."}
+                  ? `좋아요! 핵심단어 ${matchingKeywords.map((keyword) => `#${keyword}`).join(", ")} 이(가) 들어 있어요.`
+                  : `아직 핵심단어가 없어요. ${missingKeywords.map((keyword) => `#${keyword}`).join(", ")} 중 하나를 넣어주세요.`}
             </div>
 
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -1146,9 +1164,14 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             <button
               type="button"
               onClick={handleOneLineShareSubmit}
+              disabled={!normalizedContent || !containsKeyword}
               className="w-full py-4 bg-rose-500 text-white rounded-2xl font-bold text-lg hover:bg-rose-600 transition-colors"
             >
-              {normalizedContent ? "한 줄 제출하고 친구 문장 보러 가기" : "한 줄을 먼저 적어주세요"}
+              {!normalizedContent
+                ? "한 줄을 먼저 적어주세요"
+                : !containsKeyword
+                  ? "핵심단어를 먼저 넣어주세요"
+                  : "한 줄 제출하고 친구 문장 보러 가기"}
             </button>
           </div>
         </div>

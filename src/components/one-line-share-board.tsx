@@ -79,68 +79,70 @@ export function OneLineShareBoard({
         </div>
       )}
 
-      {entries.map((entry, index) => {
-        const blocked = interactive
-          && !closed
-          && !entry.isMine
-          && !entry.likedByCurrentSession
-          && currentReactionCount >= maxReactionsPerStudent;
+      <div className="grid gap-3 md:grid-cols-2">
+        {entries.map((entry, index) => {
+          const blocked = interactive
+            && !closed
+            && !entry.isMine
+            && !entry.likedByCurrentSession
+            && currentReactionCount >= maxReactionsPerStudent;
 
-        return (
-          <div key={entry.entryId} className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-rose-500">
-                  {showStudentName
-                    ? `${index + 1}위 · ${entry.studentNumber}번 ${entry.studentName}`
-                    : entry.isMine
+          return (
+            <div key={entry.entryId} className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase tracking-wide text-rose-500">
+                    {showStudentName
+                      ? `${index + 1}위 · ${entry.studentNumber}번 ${entry.studentName}`
+                      : entry.isMine
+                        ? "내 문장"
+                        : `친구 문장 ${index + 1}`}
+                  </p>
+                  <p className="mt-2 text-sm font-medium leading-relaxed text-gray-900 break-words">{entry.content}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                    ❤️ {entry.likeCount}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  {entry.containsKeywords && (
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
+                      핵심단어 포함
+                    </span>
+                  )}
+                </div>
+
+                {interactive && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleLike?.(entry.entryId)}
+                    disabled={closed || entry.isMine || blocked || pendingEntryId === entry.entryId}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                      entry.likedByCurrentSession
+                        ? "bg-rose-500 text-white hover:bg-rose-600"
+                        : "bg-gray-100 text-gray-700 hover:bg-rose-50 hover:text-rose-700"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    {entry.isMine
                       ? "내 문장"
-                      : `친구 문장 ${index + 1}`}
-                </p>
-                <p className="mt-2 text-sm font-medium leading-relaxed text-gray-900">{entry.content}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
-                  ❤️ {entry.likeCount}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                {entry.containsKeywords && (
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
-                    핵심단어 포함
-                  </span>
+                      : pendingEntryId === entry.entryId
+                        ? "처리 중..."
+                        : entry.likedByCurrentSession
+                          ? "좋아요 취소"
+                          : blocked
+                            ? "좋아요 꽉 참"
+                            : "좋아요"}
+                  </button>
                 )}
               </div>
-
-              {interactive && (
-                <button
-                  type="button"
-                  onClick={() => onToggleLike?.(entry.entryId)}
-                  disabled={closed || entry.isMine || blocked || pendingEntryId === entry.entryId}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                    entry.likedByCurrentSession
-                      ? "bg-rose-500 text-white hover:bg-rose-600"
-                      : "bg-gray-100 text-gray-700 hover:bg-rose-50 hover:text-rose-700"
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                  {entry.isMine
-                    ? "내 문장"
-                    : pendingEntryId === entry.entryId
-                      ? "처리 중..."
-                      : entry.likedByCurrentSession
-                        ? "좋아요 취소"
-                        : blocked
-                          ? "좋아요 꽉 참"
-                          : "좋아요"}
-                </button>
-              )}
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

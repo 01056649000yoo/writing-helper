@@ -127,89 +127,30 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   } else if (activityType === "question_generator") {
     const guidance = String(formData.get("guidance") ?? "").trim()
       || "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.";
-    const questionSetId = String(formData.get("question_set_id") ?? "").trim();
+    const { cardSets: teacherCardSets, roles: teacherRoles } = await getTeacherQuestionCardSettingsTree(admin, user.id);
+    const allowedIds = new Set(teacherCardSets.map((cardSet) => cardSet.id));
+    const enabledCardSetIds = formData
+      .getAll("enabled_card_set_ids")
+      .map((value) => String(value))
+      .filter((value): value is string => allowedIds.has(value));
 
-    if (questionSetId) {
-      // 세트 모드: 저장된 질문 세트를 source_label 기준의 여러 가상 카드 묶음으로 변환한다.
-      const { data: setRow } = await admin
-        .schema("writing_helper")
-        .from("question_sets")
-        .select("id, name, description, items")
-        .eq("id", questionSetId)
-        .eq("teacher_id", user.id)
-        .maybeSingle();
-      if (!setRow) return { error: "선택한 질문 세트를 찾을 수 없습니다." };
-      const items = Array.isArray(setRow.items) ? setRow.items : [];
-      const groupedItems = new Map<string, string[]>();
-
-      items.forEach((row: unknown) => {
-        if (typeof row === "string") {
-          const text = row.trim();
-          if (!text) return;
-          const fallbackLabel = `${setRow.name} 질문`;
-          groupedItems.set(fallbackLabel, [...(groupedItems.get(fallbackLabel) ?? []), text]);
-          return;
-        }
-
-        if (row && typeof row === "object") {
-          const text = typeof (row as { text?: unknown }).text === "string"
-            ? (row as { text: string }).text.trim()
-            : "";
-          if (!text) return;
-
-          const rawSource = typeof (row as { source_label?: unknown }).source_label === "string"
-            ? (row as { source_label: string }).source_label.trim()
-            : "";
-          const label = rawSource || `${setRow.name} 질문`;
-          groupedItems.set(label, [...(groupedItems.get(label) ?? []), text]);
-        }
-      });
-
-      const virtualCardSets = Array.from(groupedItems.entries()).map(([label, prompts], index) => ({
-        id: `set:${setRow.id}:${index + 1}`,
-        label,
-        description:
-          groupedItems.size > 1
-            ? `${setRow.name} 세트에서 고른 ${label} 질문`
-            : setRow.description ?? "",
-        prompts,
-      })).filter((cardSet) => cardSet.prompts.length > 0);
-
-      if (virtualCardSets.length === 0) return { error: "선택한 질문 세트에 질문이 비어 있습니다." };
-
-      activityConfig = {
-        enabledCardSetIds: virtualCardSets.map((cardSet) => cardSet.id),
-        cardSets: virtualCardSets,
-        maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
-        guidance,
-        requireReason: formData.get("require_reason") !== null,
-      };
-    } else {
-      const { cardSets: teacherCardSets, roles: teacherRoles } = await getTeacherQuestionCardSettingsTree(admin, user.id);
-      const allowedIds = new Set(teacherCardSets.map((cardSet) => cardSet.id));
-      const enabledCardSetIds = formData
-        .getAll("enabled_card_set_ids")
-        .map((value) => String(value))
-        .filter((value): value is string => allowedIds.has(value));
-
-      if (enabledCardSetIds.length === 0) {
-        return { error: "질문 카드 묶음을 1개 이상 선택해주세요." };
-      }
-
-      activityConfig = {
-        enabledCardSetIds,
-        cardSets: teacherCardSets.filter((cardSet) => enabledCardSetIds.includes(cardSet.id)),
-        roles: teacherRoles
-          .map((role) => ({
-            ...role,
-            cardSetIds: role.cardSetIds.filter((cardSetId) => enabledCardSetIds.includes(cardSetId)),
-          }))
-          .filter((role) => role.cardSetIds.length > 0),
-        maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
-        guidance,
-        requireReason: formData.get("require_reason") !== null,
-      };
+    if (enabledCardSetIds.length === 0) {
+      return { error: "질문 카드 묶음을 1개 이상 선택해주세요." };
     }
+
+    activityConfig = {
+      enabledCardSetIds,
+      cardSets: teacherCardSets.filter((cardSet) => enabledCardSetIds.includes(cardSet.id)),
+      roles: teacherRoles
+        .map((role) => ({
+          ...role,
+          cardSetIds: role.cardSetIds.filter((cardSetId) => enabledCardSetIds.includes(cardSetId)),
+        }))
+        .filter((role) => role.cardSetIds.length > 0),
+      maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
+      guidance,
+      requireReason: formData.get("require_reason") !== null,
+    };
   } else if (activityType === "question_voting") {
     const sourceRoomId = String(formData.get("source_room_id") ?? "").trim();
     const evaluationCriteria = String(formData.get("evaluation_criteria") ?? "")
@@ -238,8 +179,13 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       requireReason: formData.get("require_reason") !== "off",
     };
   } else {
-    const promptTitle = String(formData.get("prompt_title") ?? "").trim() || "오늘 수업 한 줄 정리";
-    const promptDescription = String(formData.get("prompt_description") ?? "").trim()
+    const promptTitle =
+      String(formData.get("prompt_title") ?? "").trim()
+      || String(formData.get("topic") ?? "").trim()
+      || "오늘 수업 한 줄 정리";
+    const promptDescription =
+      String(formData.get("prompt_description") ?? "").trim()
+      || String(formData.get("topic_description") ?? "").trim()
       || "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.";
     const keywords = normalizeKeywordText(String(formData.get("keywords") ?? ""));
 
