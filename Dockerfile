@@ -6,17 +6,20 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM base AS builder
-ARG BUILD_VERSION=dev
+ARG BUILD_VERSION
+RUN test -n "$BUILD_VERSION"
 ENV NEXT_PUBLIC_BUILD_VERSION=${BUILD_VERSION}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
 FROM node:20-alpine AS runner
+ARG BUILD_VERSION
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV NEXT_PUBLIC_BUILD_VERSION=${BUILD_VERSION}
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./

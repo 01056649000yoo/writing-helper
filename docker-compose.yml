@@ -5,14 +5,13 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BUILD_VERSION: ${BUILD_VERSION:-dev}
+        BUILD_VERSION: ${BUILD_VERSION:?BUILD_VERSION is required}
     env_file:
       - .env.local
     environment:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      NEXT_PUBLIC_BUILD_VERSION: ${BUILD_VERSION:-dev}
       SUPABASE_INTERNAL_URL: http://host.docker.internal:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"

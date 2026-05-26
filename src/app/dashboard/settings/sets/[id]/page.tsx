@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   getQuestionCardSettings,
@@ -10,20 +10,25 @@ import {
 } from "@/app/actions/settings-actions";
 import type { QuestionCardSet, QuestionSetItem } from "@/features/activities/types";
 
+type BuilderMode = "bundle" | "edit";
+
 export default function QuestionSetEditorPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id;
   const isNew = id === "new";
+  const requestedMode = searchParams.get("mode");
+  const initialMode: BuilderMode = requestedMode === "edit" ? "edit" : "bundle";
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<QuestionSetItem[]>([]);
+  const [builderMode, setBuilderMode] = useState<BuilderMode>(initialMode);
 
   const [bundles, setBundles] = useState<QuestionCardSet[]>([]);
   const [activeBundleId, setActiveBundleId] = useState<string | null>(null);
-  // 이미 한 번 본 묶음. 처음 클릭한 묶음만 자동으로 전체 담는다.
-  const [visitedBundles, setVisitedBundles] = useState<Set<string>>(new Set());
+  const [bundleDrafts, setBundleDrafts] = useState<Record<string, string[]>>({});
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,6 +48,11 @@ export default function QuestionSetEditorPage() {
       } else {
         loadedBundles = bundlesResult.cardSets;
         setBundles(loadedBundles);
+        setBundleDrafts(
+          Object.fromEntries(
+            loadedBundles.map((bundle) => [bundle.id, [...bundle.prompts]])
+          )
+        );
         if (loadedBundles.length > 0) {
           setActiveBundleId((prev) => prev ?? loadedBundles[0].id);
         }
@@ -62,21 +72,6 @@ export default function QuestionSetEditorPage() {
         }
       }
 
-      // 기존 세트에 이미 담긴 묶음들은 "이미 본 묶음"으로 표시 → 자동 추가 방지
-      const loadedTexts = new Set(loadedItems.map((i) => i.text));
-      const visited = new Set<string>();
-      loadedBundles.forEach((b) => {
-        if (b.prompts.some((p) => loadedTexts.has(p))) visited.add(b.id);
-      });
-
-      // 새 세트 + 첫 묶음이 있으면 자동으로 그 묶음 전체를 기본 담기
-      if (isNew && loadedBundles[0]) {
-        const first = loadedBundles[0];
-        setItems(first.prompts.map((text) => ({ text, source_label: first.label })));
-        visited.add(first.id);
-      }
-      setVisitedBundles(visited);
-
       setLoading(false);
     })();
     return () => { active = false; };
@@ -84,27 +79,6 @@ export default function QuestionSetEditorPage() {
 
   function handleSelectBundle(bundleId: string) {
     setActiveBundleId(bundleId);
-    if (visitedBundles.has(bundleId)) return;
-
-    const bundle = bundles.find((b) => b.id === bundleId);
-    if (!bundle) return;
-
-    setVisitedBundles((prev) => {
-      const next = new Set(prev);
-      next.add(bundleId);
-      return next;
-    });
-
-    // 이 묶음이 아직 비어 있을 때만 자동으로 전체 담기
-    setItems((prev) => {
-      const existing = new Set(prev.map((i) => i.text));
-      const bundleHasItems = bundle.prompts.some((p) => existing.has(p));
-      if (bundleHasItems) return prev;
-      const additions = bundle.prompts
-        .filter((p) => !existing.has(p))
-        .map((text) => ({ text, source_label: bundle.label }));
-      return [...prev, ...additions];
-    });
   }
 
   const itemTextSet = useMemo(() => new Set(items.map((i) => i.text)), [items]);
@@ -114,13 +88,9 @@ export default function QuestionSetEditorPage() {
     [bundles, activeBundleId]
   );
 
-  function togglePrompt(text: string, source_label?: string) {
-    if (itemTextSet.has(text)) {
-      setItems((prev) => prev.filter((i) => i.text !== text));
-    } else {
-      setItems((prev) => [...prev, source_label ? { text, source_label } : { text }]);
-    }
-  }
+  useEffect(() => {
+    setBuilderMode(initialMode);
+  }, [initialMode]);
 
   function toggleAllInActiveBundle() {
     if (!activeBundle) return;
@@ -141,6 +111,52 @@ export default function QuestionSetEditorPage() {
         return [...prev, ...additions];
       });
     }
+  }
+
+  function toggleBundle(bundle: QuestionCardSet) {
+    const allSelected = bundle.prompts.length > 0 && bundle.prompts.every((prompt) => itemTextSet.has(prompt));
+    if (allSelected) {
+      const removeSet = new Set(bundle.prompts);
+      setItems((prev) => prev.filter((item) => !removeSet.has(item.text)));
+      return;
+    }
+
+    setItems((prev) => {
+      const existingTexts = new Set(prev.map((item) => item.text));
+      const additions = bundle.prompts
+        .filter((prompt) => !existingTexts.has(prompt))
+        .map((text) => ({ text, source_label: bundle.label }));
+      return [...prev, ...additions];
+    });
+  }
+
+  function updateBundleDraft(bundleId: string, promptIndex: number, value: string) {
+    setBundleDrafts((prev) => {
+      const next = { ...prev };
+      const current = next[bundleId] ? [...next[bundleId]] : [];
+      current[promptIndex] = value;
+      next[bundleId] = current;
+      return next;
+    });
+  }
+
+  function addEditedPrompt(bundle: QuestionCardSet, promptIndex: number) {
+    const text = (bundleDrafts[bundle.id]?.[promptIndex] ?? bundle.prompts[promptIndex] ?? "").trim();
+    if (!text) {
+      setError("빈 질문은 담을 수 없어요.");
+      return;
+    }
+    if (itemTextSet.has(text)) {
+      setError("이미 담긴 질문입니다.");
+      return;
+    }
+    setItems((prev) => [...prev, { text, source_label: bundle.label }]);
+    setError(null);
+  }
+
+  function resetBundleDraft(bundleId: string, promptIndex: number) {
+    const original = bundles.find((bundle) => bundle.id === bundleId)?.prompts[promptIndex] ?? "";
+    updateBundleDraft(bundleId, promptIndex, original);
   }
 
   function removeAt(idx: number) {
@@ -226,6 +242,40 @@ export default function QuestionSetEditorPage() {
             </p>
           </div>
 
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
+            <p className="text-sm font-semibold text-amber-900 mb-3">세트를 만드는 방법</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setBuilderMode("bundle")}
+                className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
+                  builderMode === "bundle"
+                    ? "border-emerald-400 bg-emerald-50"
+                    : "border-amber-200 bg-white hover:border-amber-300"
+                }`}
+              >
+                <p className="text-sm font-bold text-gray-800">1. 내 질문 세트 만들기</p>
+                <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                  어울리는 카드 묶음만 골라 한 번에 담고, 묶음을 조합해서 세트를 만듭니다.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBuilderMode("edit")}
+                className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
+                  builderMode === "edit"
+                    ? "border-sky-400 bg-sky-50"
+                    : "border-amber-200 bg-white hover:border-amber-300"
+                }`}
+              >
+                <p className="text-sm font-bold text-gray-800">2. 질문을 수정해서 세트 만들기</p>
+                <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                  묶음 속 질문을 다듬어 담고, 필요한 묶음을 더해 맞춤형 세트를 만듭니다.
+                </p>
+              </button>
+            </div>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="세트 이름">
               <input
@@ -248,91 +298,161 @@ export default function QuestionSetEditorPage() {
 
         {/* 빌더 본문 */}
         <div className="grid gap-5 lg:grid-cols-2">
-          {/* 좌측: 묶음 → 질문 선택 */}
+          {/* 좌측: 묶음 선택 / 질문 수정 */}
           <div className="bg-white rounded-3xl shadow-lg border border-white/70 p-6 space-y-4">
             <div>
-              <h2 className="text-base font-bold text-gray-700">🎴 묶음에서 골라 담기</h2>
-              <p className="text-xs text-gray-400 mt-1">묶음을 골라 질문에 체크하면 우측에 담깁니다.</p>
+              <h2 className="text-base font-bold text-gray-700">
+                {builderMode === "bundle" ? "🎴 묶음 골라 담기" : "✍️ 질문 수정해서 담기"}
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">
+                {builderMode === "bundle"
+                  ? "어울리는 묶음만 선택해서 세트에 바로 담아 보세요."
+                  : "묶음 속 질문을 다듬은 뒤 원하는 질문만 세트에 담아 보세요."}
+              </p>
             </div>
 
-            <div className="flex gap-2 flex-wrap">
-              {bundles.map((b) => {
-                const usedCount = b.prompts.filter((p) => itemTextSet.has(p)).length;
-                const isActive = activeBundle?.id === b.id;
-                return (
-                  <button
-                    type="button"
-                    key={b.id}
-                    onClick={() => handleSelectBundle(b.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-                      isActive
-                        ? "bg-amber-500 text-white border-amber-500"
-                        : usedCount > 0
-                          ? "bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-300"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-amber-300"
-                    }`}
-                    title={visitedBundles.has(b.id) ? "이미 둘러본 묶음" : "처음 누르면 이 묶음 전체가 자동으로 담깁니다"}
-                  >
-                    {b.label}
-                    <span className={`ml-1.5 text-[10px] ${isActive ? "text-amber-100" : "text-gray-400"}`}>
-                      {usedCount}/{b.prompts.length}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-gray-400 -mt-2">
-              💡 묶음을 누르면 그 묶음의 질문이 한 번에 담겨요. 빼고 싶은 질문은 ✕로 제외하세요.
-            </p>
+            {builderMode === "bundle" ? (
+              <div className="space-y-3">
+                <p className="text-[11px] text-gray-400">
+                  💡 묶음을 통째로 담고, 필요 없는 묶음은 다시 눌러 한 번에 뺄 수 있어요.
+                </p>
+                <div className="space-y-3">
+                  {bundles.map((bundle) => {
+                    const selectedCount = bundle.prompts.filter((prompt) => itemTextSet.has(prompt)).length;
+                    const allSelected = bundle.prompts.length > 0 && selectedCount === bundle.prompts.length;
+                    return (
+                      <button
+                        type="button"
+                        key={bundle.id}
+                        onClick={() => toggleBundle(bundle)}
+                        className={`w-full rounded-2xl border p-4 text-left transition-colors ${
+                          allSelected
+                            ? "border-emerald-300 bg-emerald-50"
+                            : selectedCount > 0
+                              ? "border-amber-200 bg-amber-50/60"
+                              : "border-gray-200 bg-white hover:border-amber-300"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-gray-800">{bundle.label}</p>
+                            {bundle.description && (
+                              <p className="mt-1 text-xs leading-relaxed text-gray-500">{bundle.description}</p>
+                            )}
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            allSelected
+                              ? "bg-emerald-500 text-white"
+                              : selectedCount > 0
+                                ? "bg-amber-200 text-amber-800"
+                                : "bg-gray-100 text-gray-500"
+                          }`}>
+                            {selectedCount}/{bundle.prompts.length}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2 flex-wrap">
+                  {bundles.map((b) => {
+                    const usedCount = b.prompts.filter((p) => itemTextSet.has(p)).length;
+                    const isActive = activeBundle?.id === b.id;
+                    return (
+                      <button
+                        type="button"
+                        key={b.id}
+                        onClick={() => handleSelectBundle(b.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                          isActive
+                            ? "bg-sky-500 text-white border-sky-500"
+                            : usedCount > 0
+                              ? "bg-sky-50 text-sky-700 border-sky-200 hover:border-sky-300"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-sky-300"
+                        }`}
+                      >
+                        {b.label}
+                        <span className={`ml-1.5 text-[10px] ${isActive ? "text-sky-100" : "text-gray-400"}`}>
+                          {usedCount}/{b.prompts.length}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-            {activeBundle && (() => {
-              const allSelected = activeBundle.prompts.length > 0 && activeBundle.prompts.every((p) => itemTextSet.has(p));
-              const selectedCount = activeBundle.prompts.filter((p) => itemTextSet.has(p)).length;
-              return (
-                <>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <p className="text-xs text-gray-500">
-                      이 묶음에서 <strong className="text-amber-700">{selectedCount}</strong> / {activeBundle.prompts.length}개 담음
-                    </p>
-                    <button
-                      type="button"
-                      onClick={toggleAllInActiveBundle}
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-                        allSelected
-                          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          : "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                      }`}
-                    >
-                      {allSelected ? "✕ 모두 해제" : "✓ 모두 선택"}
-                    </button>
-                  </div>
-                  <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-                    {activeBundle.prompts.map((prompt, i) => {
-                      const selected = itemTextSet.has(prompt);
-                      return (
-                    <button
-                      type="button"
-                      key={i}
-                      onClick={() => togglePrompt(prompt, activeBundle.label)}
-                      className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left text-sm transition-colors ${
-                        selected
-                          ? "bg-amber-50 border-amber-300 text-amber-900"
-                          : "bg-white border-gray-200 text-gray-700 hover:border-amber-200"
-                      }`}
-                    >
-                      <span className={`inline-flex w-5 h-5 shrink-0 rounded-md border-2 items-center justify-center text-xs font-bold ${
-                        selected ? "bg-amber-500 border-amber-500 text-white" : "bg-white border-gray-300 text-transparent"
-                      }`}>
-                        ✓
-                      </span>
-                      <span className="leading-relaxed">{prompt}</span>
-                    </button>
+                {activeBundle && (() => {
+                  const selectedCount = activeBundle.prompts.filter((p) => itemTextSet.has(p)).length;
+                  return (
+                    <>
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <p className="text-xs text-gray-500">
+                          이 묶음에서 <strong className="text-sky-700">{selectedCount}</strong> / {activeBundle.prompts.length}개 담음
+                        </p>
+                        <button
+                          type="button"
+                          onClick={toggleAllInActiveBundle}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors"
+                        >
+                          묶음 원문 모두 담기
+                        </button>
+                      </div>
+                      <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                        {activeBundle.prompts.map((prompt, i) => {
+                          const draftText = bundleDrafts[activeBundle.id]?.[i] ?? prompt;
+                          const selected = itemTextSet.has(draftText);
+                          const changed = draftText.trim() !== prompt.trim();
+                          return (
+                            <div
+                              key={i}
+                              className={`rounded-2xl border p-3 ${
+                                selected
+                                  ? "border-sky-300 bg-sky-50"
+                                  : "border-gray-200 bg-white"
+                              }`}
+                            >
+                              <p className="text-[11px] font-semibold text-gray-400 mb-2">원문</p>
+                              <p className="text-sm leading-relaxed text-gray-600">{prompt}</p>
+                              <textarea
+                                value={draftText}
+                                onChange={(e) => updateBundleDraft(activeBundle.id, i, e.target.value)}
+                                className="mt-3 min-h-24 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                              />
+                              <div className="mt-3 flex items-center justify-between gap-2">
+                                <div className="text-[11px] text-gray-400">
+                                  {changed ? "질문을 다듬은 뒤 세트에 담을 수 있어요." : "원문 그대로 담거나 수정해서 담을 수 있어요."}
+                                </div>
+                                <div className="flex gap-2">
+                                  {changed && (
+                                    <button
+                                      type="button"
+                                      onClick={() => resetBundleDraft(activeBundle.id, i)}
+                                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                                    >
+                                      원문으로
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => addEditedPrompt(activeBundle, i)}
+                                    disabled={selected}
+                                    className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {selected ? "이미 담김" : "세트에 담기"}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   );
-                })}
-                  </div>
-                </>
-              );
-            })()}
+                })()}
+              </>
+            )}
           </div>
 
           {/* 우측: 선택된 항목 + 직접 추가 */}

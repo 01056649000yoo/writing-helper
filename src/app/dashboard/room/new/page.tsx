@@ -1014,12 +1014,20 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
               {availableQuestionSets.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-4 py-6 text-center">
                   <p className="text-sm text-amber-700">아직 저장된 질문 세트가 없어요.</p>
-                  <Link
-                    href="/dashboard/settings/sets/new"
-                    className="mt-2 inline-block text-sm font-semibold text-amber-700 hover:underline"
-                  >
-                    + 새 질문 세트 만들기 →
-                  </Link>
+                  <div className="mt-3 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                    <Link
+                      href="/dashboard/settings/sets/new?mode=bundle"
+                      className="text-sm font-semibold text-emerald-700 hover:underline"
+                    >
+                      + 묶음으로 세트 만들기 →
+                    </Link>
+                    <Link
+                      href="/dashboard/settings/sets/new?mode=edit"
+                      className="text-sm font-semibold text-amber-700 hover:underline"
+                    >
+                      + 수정해서 세트 만들기 →
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -1051,7 +1059,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                     })}
                   </div>
                   <Link
-                    href="/dashboard/settings/sets/new"
+                    href="/dashboard/settings/sets/new?mode=bundle"
                     className="block text-center text-sm font-semibold text-amber-700 hover:underline pt-1"
                   >
                     + 새 세트 만들기

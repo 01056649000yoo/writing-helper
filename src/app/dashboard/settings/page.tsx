@@ -155,8 +155,8 @@ export default function SettingsPage() {
           <div className="text-5xl mb-3">🃏</div>
           <h1 className="text-2xl font-bold text-gray-800">질문 카드 설정</h1>
           <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-            기본 카드 묶음을 편집하거나, 여러 묶음에서 골라 나만의 <strong>질문 세트</strong>를 만들 수 있어요.
-            질문 만들기 활동에서 묶음 대신 세트를 쓸 수도 있어요.
+            기본 카드 묶음을 편집하거나, 여러 묶음을 조합해 나만의 <strong>질문 세트</strong>를 만들 수 있어요.
+            묶음을 통째로 골라 담거나, 질문을 다듬어서 세트로 만드는 두 가지 방법을 지원해요.
           </p>
 
           <div className="grid gap-3 mt-6 grid-cols-3">
@@ -172,15 +172,23 @@ export default function SettingsPage() {
             <div>
               <h2 className="text-xl font-bold text-gray-800">📚 내 질문 세트</h2>
               <p className="text-sm text-gray-500 mt-1">
-                기본 카드 묶음의 질문들에서 골라 만든 큐레이션 세트입니다.
+                카드 묶음을 통째로 조합하거나, 묶음 속 질문을 수정해서 만든 큐레이션 세트입니다.
               </p>
             </div>
-            <Link
-              href="/dashboard/settings/sets/new"
-              className="rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white hover:bg-amber-600 whitespace-nowrap"
-            >
-              + 새 세트 만들기
-            </Link>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Link
+                href="/dashboard/settings/sets/new?mode=bundle"
+                className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 whitespace-nowrap text-center"
+              >
+                + 묶음으로 만들기
+              </Link>
+              <Link
+                href="/dashboard/settings/sets/new?mode=edit"
+                className="rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white hover:bg-amber-600 whitespace-nowrap text-center"
+              >
+                + 수정해서 만들기
+              </Link>
+            </div>
           </div>
 
           {questionSetsError && (
@@ -194,7 +202,7 @@ export default function SettingsPage() {
           ) : questionSets.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-6 py-10 text-center">
               <p className="text-sm text-amber-700">
-                아직 만든 세트가 없어요. 위의 「+ 새 세트 만들기」를 눌러 첫 세트를 만들어 보세요.
+                아직 만든 세트가 없어요. 위의 버튼으로 첫 세트를 만들어 보세요.
               </p>
             </div>
           ) : (
