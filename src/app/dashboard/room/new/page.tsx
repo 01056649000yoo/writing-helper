@@ -9,9 +9,9 @@ import {
   getQuestionGeneratorSourceRooms,
   type QuestionGeneratorSourceRoomSummary,
 } from "@/app/actions/room-actions";
-import { getQuestionCardSettings } from "@/app/actions/settings-actions";
+import { getQuestionCardSettings, getTeacherQuestionSets } from "@/app/actions/settings-actions";
 import { activityDefinitions, getActivityDefinition } from "@/features/activities/registry";
-import type { ActivityType, QuestionCardSet } from "@/features/activities/types";
+import type { ActivityType, QuestionCardSet, QuestionSet } from "@/features/activities/types";
 import {
   buildDraftStorageKey,
   clearActivityDraft,
@@ -47,6 +47,9 @@ type QuestionGeneratorDraft = {
   guidance: string;
   require_reason: boolean;
   selectedCardSetIds: string[];
+  // 'bundles' = 기본 카드 묶음 여러 개, 'set' = 저장된 내 질문 세트 1개
+  cardSource: "bundles" | "set";
+  selectedQuestionSetId: string | null;
 };
 
 type QuestionVotingDraft = {
@@ -841,6 +844,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
+  const [availableQuestionSets, setAvailableQuestionSets] = useState<QuestionSet[]>([]);
   const [loadingCardSets, setLoadingCardSets] = useState(true);
   const [previewCardSet, setPreviewCardSet] = useState<QuestionCardSet | null>(null);
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
@@ -851,6 +855,8 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     guidance: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
     require_reason: true,
     selectedCardSetIds: [],
+    cardSource: "bundles",
+    selectedQuestionSetId: null,
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<QuestionGeneratorDraft>(
     buildDraftStorageKey(classId, "question_generator"),
@@ -861,20 +867,20 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   useEffect(() => {
     let active = true;
 
-    getQuestionCardSettings().then((result) => {
+    Promise.all([getQuestionCardSettings(), getTeacherQuestionSets()]).then(([cardResult, setResult]) => {
       if (!active) return;
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setAvailableCardSets(result.cardSets);
+      if (cardResult.error) setError(cardResult.error);
+      else {
+        setAvailableCardSets(cardResult.cardSets);
         setDraft((prev) => {
-          const fallbackIds = result.cardSets.map((cardSet) => cardSet.id);
+          const fallbackIds = cardResult.cardSets.map((cs) => cs.id);
           return {
             ...prev,
             selectedCardSetIds: prev.selectedCardSetIds.length > 0 ? prev.selectedCardSetIds : fallbackIds,
           };
         });
       }
+      if (!setResult.error) setAvailableQuestionSets(setResult.sets);
       setLoadingCardSets(false);
     });
 
@@ -899,17 +905,30 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (draft.selectedCardSetIds.length === 0) {
-      setError("질문 카드 묶음을 1개 이상 선택해주세요.");
-      return;
+
+    if (draft.cardSource === "set") {
+      if (!draft.selectedQuestionSetId) {
+        setError("사용할 질문 세트를 선택해주세요.");
+        return;
+      }
+    } else {
+      if (draft.selectedCardSetIds.length === 0) {
+        setError("질문 카드 묶음을 1개 이상 선택해주세요.");
+        return;
+      }
     }
+
     setSaving(true);
     setError("");
     const storageKey = buildDraftStorageKey(classId, "question_generator");
     const fd = new FormData(e.currentTarget);
     fd.set("class_id", classId);
     fd.set("activity_type", "question_generator");
-    draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
+    if (draft.cardSource === "set" && draft.selectedQuestionSetId) {
+      fd.set("question_set_id", draft.selectedQuestionSetId);
+    } else {
+      draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
+    }
     draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
     const result = await createRoom(fd);
@@ -954,17 +973,98 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
 
         <div>
           <div className="flex items-center justify-between mb-3">
-            <label className="block text-base font-medium text-gray-700">질문 카드 묶음 선택</label>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-400">{draft.selectedCardSetIds.length}개 선택됨</span>
-              <Link
-                href="/dashboard/settings"
-                className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
-              >
-                질문 카드 설정 →
-              </Link>
-            </div>
+            <label className="block text-base font-medium text-gray-700">질문 카드 선택</label>
+            <Link
+              href="/dashboard/settings"
+              className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+            >
+              질문 카드 설정 →
+            </Link>
           </div>
+
+          {/* 모드 토글: 기본 묶음 vs 내 세트 */}
+          <div className="inline-flex rounded-2xl bg-gray-100 p-1 mb-4">
+            <button
+              type="button"
+              onClick={() => setDraft((prev) => ({ ...prev, cardSource: "bundles" }))}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                draft.cardSource === "bundles"
+                  ? "bg-white text-emerald-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              🎴 기본 카드 묶음
+            </button>
+            <button
+              type="button"
+              onClick={() => setDraft((prev) => ({ ...prev, cardSource: "set" }))}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                draft.cardSource === "set"
+                  ? "bg-white text-amber-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              📚 내 질문 세트
+            </button>
+          </div>
+
+          {/* 세트 모드: 저장된 세트 중 1개 선택 */}
+          {draft.cardSource === "set" && (
+            <div className="space-y-3">
+              {availableQuestionSets.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 px-4 py-6 text-center">
+                  <p className="text-sm text-amber-700">아직 저장된 질문 세트가 없어요.</p>
+                  <Link
+                    href="/dashboard/settings/sets/new"
+                    className="mt-2 inline-block text-sm font-semibold text-amber-700 hover:underline"
+                  >
+                    + 새 질문 세트 만들기 →
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {availableQuestionSets.map((set) => {
+                      const selected = draft.selectedQuestionSetId === set.id;
+                      return (
+                        <button
+                          type="button"
+                          key={set.id}
+                          onClick={() => setDraft((prev) => ({ ...prev, selectedQuestionSetId: set.id }))}
+                          className={`text-left rounded-2xl border p-4 transition-colors ${
+                            selected
+                              ? "border-amber-400 bg-amber-50"
+                              : "border-gray-200 bg-white hover:border-amber-200"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <p className="text-base font-bold text-gray-800">{set.name}</p>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              selected ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-500"
+                            }`}>{set.items.length}개</span>
+                          </div>
+                          {set.description && (
+                            <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{set.description}</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <Link
+                    href="/dashboard/settings/sets/new"
+                    className="block text-center text-sm font-semibold text-amber-700 hover:underline pt-1"
+                  >
+                    + 새 세트 만들기
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 묶음 모드: 기존 그대로 */}
+          {draft.cardSource === "bundles" && (
+          <>
+          <div className="text-xs text-gray-400 mb-2">{draft.selectedCardSetIds.length}개 선택됨</div>
           <div className="grid gap-3 md:grid-cols-2">
             {availableCardSets.map((cardSet) => {
               const selected = draft.selectedCardSetIds.includes(cardSet.id);
@@ -1022,6 +1122,8 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                 설정에서 질문 카드 묶음 만들기 →
               </Link>
             </div>
+          )}
+          </>
           )}
         </div>
 

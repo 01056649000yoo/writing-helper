@@ -10,7 +10,7 @@ import {
   isMissingQuestionCardSetsTable,
   normalizeQuestionCardSetInput,
 } from "@/lib/question-card-sets";
-import type { QuestionCardSet } from "@/features/activities/types";
+import type { QuestionCardSet, QuestionSet, QuestionSetItem } from "@/features/activities/types";
 
 export async function saveGptApiKey(formData: FormData): Promise<{ error?: string; success?: boolean }> {
   const user = await getCurrentUser();
@@ -168,6 +168,167 @@ export async function saveQuestionCardSetting(input: {
       prompts: Array.isArray(data.prompts) ? data.prompts.filter((prompt): prompt is string => typeof prompt === "string") : [],
     },
   };
+}
+
+// ──────────────────────────────────────────
+// 질문 세트 (교사 큐레이션 컬렉션) CRUD
+// ──────────────────────────────────────────
+
+function normalizeQuestionSetItems(input: unknown): QuestionSetItem[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((row): QuestionSetItem | null => {
+      if (typeof row === "string") {
+        const text = row.trim();
+        return text ? { text } : null;
+      }
+      if (row && typeof row === "object") {
+        const r = row as Record<string, unknown>;
+        const text = typeof r.text === "string" ? r.text.trim() : "";
+        if (!text) return null;
+        const source = typeof r.source_label === "string" && r.source_label.trim()
+          ? r.source_label.trim() : undefined;
+        return source ? { text, source_label: source } : { text };
+      }
+      return null;
+    })
+    .filter((row): row is QuestionSetItem => row !== null);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToQuestionSet(row: any): QuestionSet {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? "",
+    items: normalizeQuestionSetItems(row.items),
+  };
+}
+
+function isMissingQuestionSetsTable(message: string) {
+  return message.includes("question_sets");
+}
+
+export async function getTeacherQuestionSets(): Promise<{ sets: QuestionSet[]; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { sets: [], error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .schema("writing_helper")
+    .from("question_sets")
+    .select("id, name, description, items, sort_order, created_at")
+    .eq("teacher_id", user.id)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    if (isMissingQuestionSetsTable(error.message)) {
+      return { sets: [], error: "질문 세트 테이블이 아직 준비되지 않았습니다. 마이그레이션을 먼저 적용해주세요." };
+    }
+    return { sets: [], error: error.message };
+  }
+  return { sets: (data ?? []).map(rowToQuestionSet) };
+}
+
+export async function getTeacherQuestionSet(id: string): Promise<{ set?: QuestionSet; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+  if (!id) return { error: "잘못된 요청입니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .schema("writing_helper")
+    .from("question_sets")
+    .select("id, name, description, items, sort_order, created_at, teacher_id")
+    .eq("id", id)
+    .eq("teacher_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingQuestionSetsTable(error.message)) {
+      return { error: "질문 세트 테이블이 아직 준비되지 않았습니다." };
+    }
+    return { error: error.message };
+  }
+  if (!data) return { error: "질문 세트를 찾을 수 없습니다." };
+  return { set: rowToQuestionSet(data) };
+}
+
+export async function saveQuestionSet(input: {
+  id?: string;
+  name: string;
+  description: string;
+  items: QuestionSetItem[];
+}): Promise<{ set?: QuestionSet; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const name = String(input.name ?? "").trim();
+  const description = String(input.description ?? "").trim();
+  const items = normalizeQuestionSetItems(input.items);
+
+  if (!name) return { error: "세트 이름을 입력해주세요." };
+  if (items.length === 0) return { error: "질문을 1개 이상 골라주세요." };
+
+  const admin = createSupabaseAdminClient();
+  const payload = {
+    teacher_id: user.id,
+    name,
+    description,
+    items,
+  };
+
+  if (input.id) {
+    const { data, error } = await admin
+      .schema("writing_helper")
+      .from("question_sets")
+      .update(payload)
+      .eq("id", input.id)
+      .eq("teacher_id", user.id)
+      .select("id, name, description, items, sort_order, created_at")
+      .maybeSingle();
+    if (error) {
+      if (isMissingQuestionSetsTable(error.message)) return { error: "질문 세트 테이블이 준비되지 않았습니다." };
+      return { error: error.message };
+    }
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/room/new");
+    return { set: data ? rowToQuestionSet(data) : undefined };
+  }
+
+  const { data, error } = await admin
+    .schema("writing_helper")
+    .from("question_sets")
+    .insert(payload)
+    .select("id, name, description, items, sort_order, created_at")
+    .single();
+  if (error) {
+    if (isMissingQuestionSetsTable(error.message)) return { error: "질문 세트 테이블이 준비되지 않았습니다." };
+    return { error: error.message };
+  }
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/room/new");
+  return { set: rowToQuestionSet(data) };
+}
+
+export async function deleteQuestionSet(id: string): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+  if (!id) return { error: "삭제할 세트를 찾지 못했습니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("question_sets")
+    .delete()
+    .eq("id", id)
+    .eq("teacher_id", user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/room/new");
+  return {};
 }
 
 export async function deleteQuestionCardSetting(id: string): Promise<{ error?: string }> {

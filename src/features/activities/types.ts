@@ -61,6 +61,19 @@ export type QuestionCardSet = {
   prompts: string[];
 };
 
+/** 교사가 큐레이션한 질문 세트 — 여러 묶음에서 골라 만든 평면 질문 풀 */
+export type QuestionSetItem = {
+  text: string;
+  source_label?: string;  // 어느 묶음에서 가져왔는지 (선택)
+};
+
+export type QuestionSet = {
+  id: string;
+  name: string;
+  description: string;
+  items: QuestionSetItem[];
+};
+
 export type QuestionGeneratorConfig = {
   enabledCardSetIds: string[];
   cardSets: QuestionCardSet[];

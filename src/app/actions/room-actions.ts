@@ -125,26 +125,66 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     baseRoomPayload.question_sets = questionSets;
     baseRoomPayload.questions_generated_at = questionsGeneratedAt;
   } else if (activityType === "question_generator") {
-    const teacherCardSets = await getTeacherQuestionCardSets(admin, user.id);
-    const allowedIds = new Set(teacherCardSets.map((cardSet) => cardSet.id));
-    const enabledCardSetIds = formData
-      .getAll("enabled_card_set_ids")
-      .map((value) => String(value))
-      .filter((value): value is string => allowedIds.has(value));
     const guidance = String(formData.get("guidance") ?? "").trim()
       || "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.";
+    const questionSetId = String(formData.get("question_set_id") ?? "").trim();
 
-    if (enabledCardSetIds.length === 0) {
-      return { error: "질문 카드 묶음을 1개 이상 선택해주세요." };
+    if (questionSetId) {
+      // 세트 모드: 저장된 질문 세트 1개를 가상의 단일 카드 묶음으로 변환해 활동에 넣는다.
+      const { data: setRow } = await admin
+        .schema("writing_helper")
+        .from("question_sets")
+        .select("id, name, description, items")
+        .eq("id", questionSetId)
+        .eq("teacher_id", user.id)
+        .maybeSingle();
+      if (!setRow) return { error: "선택한 질문 세트를 찾을 수 없습니다." };
+      const items = Array.isArray(setRow.items) ? setRow.items : [];
+      const prompts = items
+        .map((row: unknown) => {
+          if (typeof row === "string") return row.trim();
+          if (row && typeof row === "object") {
+            const text = (row as { text?: unknown }).text;
+            return typeof text === "string" ? text.trim() : "";
+          }
+          return "";
+        })
+        .filter((text: string) => text.length > 0);
+      if (prompts.length === 0) return { error: "선택한 질문 세트에 질문이 비어 있습니다." };
+
+      const virtualCardSetId = `set:${setRow.id}`;
+      activityConfig = {
+        enabledCardSetIds: [virtualCardSetId],
+        cardSets: [{
+          id: virtualCardSetId,
+          label: setRow.name,
+          description: setRow.description ?? "",
+          prompts,
+        }],
+        maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
+        guidance,
+        requireReason: formData.get("require_reason") !== null,
+      };
+    } else {
+      const teacherCardSets = await getTeacherQuestionCardSets(admin, user.id);
+      const allowedIds = new Set(teacherCardSets.map((cardSet) => cardSet.id));
+      const enabledCardSetIds = formData
+        .getAll("enabled_card_set_ids")
+        .map((value) => String(value))
+        .filter((value): value is string => allowedIds.has(value));
+
+      if (enabledCardSetIds.length === 0) {
+        return { error: "질문 카드 묶음을 1개 이상 선택해주세요." };
+      }
+
+      activityConfig = {
+        enabledCardSetIds,
+        cardSets: teacherCardSets.filter((cardSet) => enabledCardSetIds.includes(cardSet.id)),
+        maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
+        guidance,
+        requireReason: formData.get("require_reason") !== null,
+      };
     }
-
-    activityConfig = {
-      enabledCardSetIds,
-      cardSets: teacherCardSets.filter((cardSet) => enabledCardSetIds.includes(cardSet.id)),
-      maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
-      guidance,
-      requireReason: formData.get("require_reason") !== null,
-    };
   } else if (activityType === "question_voting") {
     const sourceRoomId = String(formData.get("source_room_id") ?? "").trim();
     const evaluationCriteria = String(formData.get("evaluation_criteria") ?? "")
