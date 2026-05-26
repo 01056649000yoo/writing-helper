@@ -3,7 +3,6 @@ import { getTeacherProfile } from "@/app/actions/auth-actions";
 import { checkHasApiKey } from "@/app/actions/settings-actions";
 import { getClasses } from "@/app/actions/class-actions";
 import { signOut } from "@/app/actions/auth-actions";
-import { ManualModal } from "./manual-modal";
 import { BUILD_LABEL } from "@/lib/build-version";
 import { DashboardTabs } from "./dashboard-tabs";
 
@@ -27,7 +26,6 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <ManualModal />
             <Link
               href="/dashboard/settings"
               className="text-base px-5 py-2.5 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
