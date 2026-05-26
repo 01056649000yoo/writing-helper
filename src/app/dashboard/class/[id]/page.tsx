@@ -13,9 +13,9 @@ import { RosterManager } from "./roster-manager";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
 
 type UnifiedRoom =
-  | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; is_active: boolean; created_at: string }
-  | { kind: "science"; id: string; title: string; topic: string; inquiry_track: "basic" | "integrated" | null; is_active: boolean; created_at: string }
-  | { kind: "morals"; id: string; title: string; topic: string; track: "reflection" | "judgement"; is_active: boolean; created_at: string };
+  | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; is_active: boolean; created_at: string; expires_at: string | null }
+  | { kind: "science"; id: string; title: string; topic: string; inquiry_track: "basic" | "integrated" | null; is_active: boolean; created_at: string; expires_at: string | null }
+  | { kind: "morals"; id: string; title: string; topic: string; track: "reflection" | "judgement"; is_active: boolean; created_at: string; expires_at: string | null };
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,6 +38,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       subject_type: r.subject_type ?? null,
       is_active: r.is_active,
       created_at: r.created_at,
+      expires_at: r.expires_at ?? null,
     })),
     ...scienceRooms.map((r): UnifiedRoom => ({
       kind: "science",
@@ -47,6 +48,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       inquiry_track: r.inquiryTrack,
       is_active: r.is_active,
       created_at: r.created_at,
+      expires_at: r.expires_at ?? null,
     })),
     ...moralsRooms.map((r): UnifiedRoom => ({
       kind: "morals",
@@ -56,11 +58,13 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       track: r.track,
       is_active: r.is_active,
       created_at: r.created_at,
+      expires_at: r.expires_at ?? null,
     })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const activeRooms = unified.filter((r) => r.is_active);
   const closedRooms = unified.filter((r) => !r.is_active);
+  const renderNow = Date.now();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -105,9 +109,9 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                 </Link>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2">
                 {activeRooms.map((room) => (
-                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="active" />
+                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="active" now={renderNow} />
                 ))}
               </div>
             )}
@@ -118,7 +122,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               <h2 className="text-lg font-bold text-gray-800 mb-4">⚫ 종료된 활동 세션 ({closedRooms.length})</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {closedRooms.map((room) => (
-                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="closed" />
+                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="closed" now={renderNow} />
                 ))}
               </div>
             </div>
@@ -129,7 +133,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
   );
 }
 
-function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | "closed" }) {
+function ActivityCard({ room, status, now }: { room: UnifiedRoom; status: "active" | "closed"; now: number }) {
   const href =
     room.kind === "writing" ? `/dashboard/room/${room.id}` :
     room.kind === "science" ? `/dashboard/science/${room.id}` :
@@ -193,9 +197,44 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
         {room.kind === "writing" && room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
           <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
         )}
+        {isActive && room.expires_at && (
+          <ExpiryBadge expiresAt={room.expires_at} now={now} />
+        )}
       </div>
       <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
     </Link>
+  );
+}
+
+function ExpiryBadge({ expiresAt, now }: { expiresAt: string; now: number }) {
+  const exp = new Date(expiresAt).getTime();
+  const diffMs = exp - now;
+
+  if (diffMs <= 0) {
+    return (
+      <span className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-full font-medium">
+        ⛔ 시간 만료
+      </span>
+    );
+  }
+
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMin / 60);
+  const remainMin = diffMin % 60;
+
+  let label = "";
+  if (diffHour > 0) {
+    label = remainMin > 0 ? `${diffHour}시간 ${remainMin}분 남음` : `${diffHour}시간 남음`;
+  } else {
+    label = `${diffMin}분 남음`;
+  }
+
+  const isWarning = diffMin <= 30;
+
+  return (
+    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${isWarning ? "bg-amber-100 text-amber-700" : "bg-teal-50 text-teal-700"}`}>
+      ⏰ {label}
+    </span>
   );
 }
 

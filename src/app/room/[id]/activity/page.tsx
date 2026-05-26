@@ -66,6 +66,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [reason, setReason] = useState("");
   const [questionSelections, setQuestionSelections] = useState<QuestionSelection[]>([]);
   const [questionBuildMode, setQuestionBuildMode] = useState<QuestionBuildMode | null>(null);
+  const [promptSearch, setPromptSearch] = useState("");
   const [selectedVotingQuestionIds, setSelectedVotingQuestionIds] = useState<string[]>([]);
   const [votingReason, setVotingReason] = useState("");
   const [oneLineContent, setOneLineContent] = useState("");
@@ -82,6 +83,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     () => enabledCardSets.find((cardSet) => cardSet.id === selectedCardSetId) ?? null,
     [enabledCardSets, selectedCardSetId]
   );
+  const filteredPrompts = useMemo(() => {
+    if (!selectedCardSet) return [];
+    const query = promptSearch.trim().toLowerCase();
+    if (!query) return selectedCardSet.prompts;
+    return selectedCardSet.prompts.filter((prompt) => prompt.toLowerCase().includes(query));
+  }, [promptSearch, selectedCardSet]);
 
   const maxSelections = questionGeneratorConfig?.maxSelections ?? 1;
   const requireReason = questionGeneratorConfig?.requireReason ?? true;
@@ -306,6 +313,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     setSelectedPrompt(null);
     setRemixedQuestion("");
     setReason("");
+    setPromptSearch("");
   }
 
   function removeQuestionSelection(selectionId: string) {
@@ -488,7 +496,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                   <p className="text-sm text-sky-600 font-semibold">질문 카드 묶음 고르기</p>
                   <h1 className="text-2xl font-bold text-gray-800 mt-1">{topic}</h1>
                   <p className="text-sm text-gray-500 mt-2">
-                    마음에 드는 카드 묶음을 고른 뒤, 그 안에서 질문 하나를 선택해요.
+                    먼저 주제별 카드 묶음을 고른 뒤, 그 안에서 바꿔 보고 싶은 질문을 찾아 선택해요.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700">
@@ -527,6 +535,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                   onClick={() => {
                     setSelectedCardSetId(cardSet.id);
                     setSelectedPrompt(null);
+                    setPromptSearch("");
                     setStep("question_prompt");
                   }}
                   className="rounded-3xl bg-white p-6 shadow-xl text-left hover:-translate-y-0.5 hover:shadow-2xl transition-all"
@@ -560,12 +569,22 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               <p className="text-sm font-semibold text-sky-600 mt-4">{selectedCardSet.label} 카드</p>
               <h1 className="text-2xl font-bold text-gray-800 mt-1">어떤 질문을 바꿔볼까요?</h1>
               <p className="text-sm text-gray-500 mt-2">
-                마음에 드는 질문을 하나 고른 뒤, 오늘 주제에 어울리게 새 질문으로 바꿔봐요.
+                바꾸고 싶은 질문을 찾아 고른 뒤, 오늘 주제에 어울리게 새 질문으로 바꿔봐요.
               </p>
             </div>
 
+            <div className="mb-4 rounded-3xl bg-white p-4 shadow-lg">
+              <label className="block text-xs font-semibold text-sky-700 mb-2">질문 찾기</label>
+              <input
+                value={promptSearch}
+                onChange={(event) => setPromptSearch(event.target.value)}
+                placeholder="바꾸고 싶은 질문의 단어나 표현을 찾아보세요."
+                className="w-full rounded-2xl border-2 border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-sky-400"
+              />
+            </div>
+
             <div className="grid gap-3">
-              {selectedCardSet.prompts.map((prompt, index) => (
+              {filteredPrompts.map((prompt, index) => (
                 <button
                   key={prompt}
                   onClick={() => {
@@ -578,7 +597,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                   <p className="text-gray-800 font-medium leading-relaxed">{prompt}</p>
                 </button>
               ))}
-
+              {filteredPrompts.length === 0 && (
+                <div className="rounded-3xl bg-white p-8 text-center shadow-lg">
+                  <p className="text-sm font-semibold text-gray-700">찾는 질문이 아직 안 보여요.</p>
+                  <p className="mt-2 text-sm text-gray-500">검색어를 조금 다르게 바꾸거나 지우고 다시 찾아보세요.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

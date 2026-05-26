@@ -130,7 +130,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     const questionSetId = String(formData.get("question_set_id") ?? "").trim();
 
     if (questionSetId) {
-      // 세트 모드: 저장된 질문 세트 1개를 가상의 단일 카드 묶음으로 변환해 활동에 넣는다.
+      // 세트 모드: 저장된 질문 세트를 source_label 기준의 여러 가상 카드 묶음으로 변환한다.
       const { data: setRow } = await admin
         .schema("writing_helper")
         .from("question_sets")
@@ -140,27 +140,46 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
         .maybeSingle();
       if (!setRow) return { error: "선택한 질문 세트를 찾을 수 없습니다." };
       const items = Array.isArray(setRow.items) ? setRow.items : [];
-      const prompts = items
-        .map((row: unknown) => {
-          if (typeof row === "string") return row.trim();
-          if (row && typeof row === "object") {
-            const text = (row as { text?: unknown }).text;
-            return typeof text === "string" ? text.trim() : "";
-          }
-          return "";
-        })
-        .filter((text: string) => text.length > 0);
-      if (prompts.length === 0) return { error: "선택한 질문 세트에 질문이 비어 있습니다." };
+      const groupedItems = new Map<string, string[]>();
 
-      const virtualCardSetId = `set:${setRow.id}`;
+      items.forEach((row: unknown) => {
+        if (typeof row === "string") {
+          const text = row.trim();
+          if (!text) return;
+          const fallbackLabel = `${setRow.name} 질문`;
+          groupedItems.set(fallbackLabel, [...(groupedItems.get(fallbackLabel) ?? []), text]);
+          return;
+        }
+
+        if (row && typeof row === "object") {
+          const text = typeof (row as { text?: unknown }).text === "string"
+            ? (row as { text: string }).text.trim()
+            : "";
+          if (!text) return;
+
+          const rawSource = typeof (row as { source_label?: unknown }).source_label === "string"
+            ? (row as { source_label: string }).source_label.trim()
+            : "";
+          const label = rawSource || `${setRow.name} 질문`;
+          groupedItems.set(label, [...(groupedItems.get(label) ?? []), text]);
+        }
+      });
+
+      const virtualCardSets = Array.from(groupedItems.entries()).map(([label, prompts], index) => ({
+        id: `set:${setRow.id}:${index + 1}`,
+        label,
+        description:
+          groupedItems.size > 1
+            ? `${setRow.name} 세트에서 고른 ${label} 질문`
+            : setRow.description ?? "",
+        prompts,
+      })).filter((cardSet) => cardSet.prompts.length > 0);
+
+      if (virtualCardSets.length === 0) return { error: "선택한 질문 세트에 질문이 비어 있습니다." };
+
       activityConfig = {
-        enabledCardSetIds: [virtualCardSetId],
-        cardSets: [{
-          id: virtualCardSetId,
-          label: setRow.name,
-          description: setRow.description ?? "",
-          prompts,
-        }],
+        enabledCardSetIds: virtualCardSets.map((cardSet) => cardSet.id),
+        cardSets: virtualCardSets,
         maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
         guidance,
         requireReason: formData.get("require_reason") !== null,
