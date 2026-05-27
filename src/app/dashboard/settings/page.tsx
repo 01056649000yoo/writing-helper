@@ -262,16 +262,9 @@ export default function SettingsPage() {
             href="/dashboard"
             onClick={(event) => {
               if (typeof window === "undefined") return;
-              try {
-                if (document.referrer) {
-                  const referrerOrigin = new URL(document.referrer).origin;
-                  if (referrerOrigin === window.location.origin) {
-                    event.preventDefault();
-                    router.back();
-                  }
-                }
-              } catch {
-                // fall through to the default Link navigation
+              if (window.history.length > 1) {
+                event.preventDefault();
+                router.back();
               }
             }}
             className="text-indigo-500 text-base hover:underline"
