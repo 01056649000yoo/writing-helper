@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   deleteQuestionCardRole,
   deleteQuestionCardSetting,
@@ -36,6 +37,7 @@ type EditableQuestionCardRole = {
 };
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [roles, setRoles] = useState<EditableQuestionCardRole[]>([]);
   const [cardSets, setCardSets] = useState<EditableQuestionCardSet[]>([]);
   const [cardSettingsLoading, setCardSettingsLoading] = useState(true);
@@ -256,7 +258,26 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-5xl mx-auto pt-8 pb-16 space-y-6">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/dashboard" className="text-indigo-500 text-base hover:underline">← 대시보드로</Link>
+          <Link
+            href="/dashboard"
+            onClick={(event) => {
+              if (typeof window === "undefined") return;
+              try {
+                if (document.referrer) {
+                  const referrerOrigin = new URL(document.referrer).origin;
+                  if (referrerOrigin === window.location.origin) {
+                    event.preventDefault();
+                    router.back();
+                  }
+                }
+              } catch {
+                // fall through to the default Link navigation
+              }
+            }}
+            className="text-indigo-500 text-base hover:underline"
+          >
+            ← 돌아가기
+          </Link>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl p-8">
