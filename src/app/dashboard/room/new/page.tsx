@@ -11,7 +11,7 @@ import {
 } from "@/app/actions/room-actions";
 import { getQuestionCardSettings } from "@/app/actions/settings-actions";
 import { activityDefinitions, getActivityDefinition } from "@/features/activities/registry";
-import type { ActivityType, QuestionCardSet } from "@/features/activities/types";
+import type { ActivityType, QuestionCardRole, QuestionCardSet } from "@/features/activities/types";
 import {
   buildDraftStorageKey,
   clearActivityDraft,
@@ -838,8 +838,10 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<QuestionCardRole[]>([]);
   const [loadingCardSets, setLoadingCardSets] = useState(true);
   const [previewCardSet, setPreviewCardSet] = useState<QuestionCardSet | null>(null);
+  const [expandedRoleIds, setExpandedRoleIds] = useState<Set<string>>(new Set());
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
     topic: "",
     topic_description: "",
@@ -863,6 +865,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
       if (cardResult.error) setError(cardResult.error);
       else {
         setAvailableCardSets(cardResult.cardSets);
+        setAvailableRoles(cardResult.roles);
         setDraft((prev) => {
           const fallbackIds = cardResult.cardSets.map((cs) => cs.id);
           return {
@@ -887,6 +890,54 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
         : [...prev.selectedCardSetIds, cardSetId],
     }));
   }
+
+  function toggleRoleExpand(roleId: string) {
+    setExpandedRoleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(roleId)) next.delete(roleId);
+      else next.add(roleId);
+      return next;
+    });
+  }
+
+  function toggleRoleAllCards(groupCardSetIds: string[], shouldDeselect: boolean) {
+    setDraft((prev) => {
+      if (shouldDeselect) {
+        const removeSet = new Set(groupCardSetIds);
+        return {
+          ...prev,
+          selectedCardSetIds: prev.selectedCardSetIds.filter((id) => !removeSet.has(id)),
+        };
+      }
+      const merged = new Set(prev.selectedCardSetIds);
+      groupCardSetIds.forEach((id) => merged.add(id));
+      return { ...prev, selectedCardSetIds: Array.from(merged) };
+    });
+  }
+
+  const roleGroups = useMemo(() => {
+    const groups: Array<{ role: QuestionCardRole; cardSets: QuestionCardSet[] }> = [];
+    for (const role of availableRoles) {
+      const cards = availableCardSets.filter((cs) => cs.roleId === role.id);
+      if (cards.length > 0) groups.push({ role, cardSets: cards });
+    }
+    const knownIds = new Set(availableRoles.map((r) => r.id));
+    const orphans = availableCardSets.filter((cs) => !cs.roleId || !knownIds.has(cs.roleId));
+    if (orphans.length > 0) {
+      groups.push({
+        role: {
+          id: "__orphan__",
+          label: "기타",
+          subtitle: "역할 미지정",
+          description: "",
+          icon: "🃏",
+          cardSetIds: [],
+        },
+        cardSets: orphans,
+      });
+    }
+    return groups;
+  }, [availableRoles, availableCardSets]);
 
   function handleSaveDraftNow() {
     persistActivityDraft(buildDraftStorageKey(classId, "question_generator"), draft);
@@ -962,57 +1013,158 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           </div>
 
           <>
-          <div className="text-xs text-gray-400 mb-2">{draft.selectedCardSetIds.length}개 선택됨</div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {availableCardSets.map((cardSet) => {
-              const selected = draft.selectedCardSetIds.includes(cardSet.id);
-              return (
-                <div
-                  key={cardSet.id}
-                  className={`rounded-2xl border p-4 text-left transition-colors ${
-                    selected
-                      ? "border-emerald-400 bg-emerald-50"
-                      : "border-gray-200 bg-white hover:border-emerald-200"
-                  }`}
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-gray-400">
+              총 카드 {availableCardSets.length}개 중 <span className="font-semibold text-emerald-700">{draft.selectedCardSetIds.length}개 선택됨</span>
+            </div>
+            {roleGroups.length > 1 && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExpandedRoleIds(new Set(roleGroups.map((g) => g.role.id)))}
+                  className="text-xs font-semibold text-emerald-600 hover:underline"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-base font-bold text-gray-800">[{cardSet.label}] 카드</p>
-                      <p className="text-sm text-gray-500 mt-1">{cardSet.description}</p>
+                  모두 펼치기
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => setExpandedRoleIds(new Set())}
+                  className="text-xs font-semibold text-gray-500 hover:underline"
+                >
+                  모두 접기
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {roleGroups.map(({ role, cardSets: groupCards }) => {
+              const groupIds = groupCards.map((cs) => cs.id);
+              const selectedInGroup = groupIds.filter((id) => draft.selectedCardSetIds.includes(id)).length;
+              const allSelected = selectedInGroup === groupIds.length && groupIds.length > 0;
+              const noneSelected = selectedInGroup === 0;
+              const expanded = expandedRoleIds.has(role.id);
+
+              return (
+                <div key={role.id} className="rounded-2xl border border-emerald-100 bg-emerald-50/30 overflow-hidden">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleRoleExpand(role.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        toggleRoleExpand(role.id);
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-emerald-50/60 cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-2xl">{role.icon || "🃏"}</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-gray-800 truncate">{role.label}</p>
+                            {role.subtitle && (
+                              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                {role.subtitle}
+                              </span>
+                            )}
+                          </div>
+                          {role.description && (
+                            <p className="text-xs text-gray-500 mt-0.5 truncate">{role.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            selectedInGroup > 0 ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {selectedInGroup}/{groupIds.length} 선택
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleRoleAllCards(groupIds, allSelected);
+                          }}
+                          className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            allSelected
+                              ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                              : "bg-emerald-500 text-white hover:bg-emerald-600"
+                          }`}
+                        >
+                          {allSelected ? "모두 해제" : noneSelected ? "모두 선택" : "나머지 선택"}
+                        </button>
+                        <span className={`text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`}>▾</span>
+                      </div>
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      selected ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
-                    }`}>
-                      {selected ? "선택됨" : "선택"}
-                    </span>
                   </div>
-                  <p className="mt-3 text-xs text-gray-400 leading-5">
-                    예시: {cardSet.prompts[0]}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewCardSet(cardSet)}
-                      className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
-                    >
-                      질문 미리보기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleCardSet(cardSet.id)}
-                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                        selected
-                          ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {selected ? "선택 해제" : "이 묶음 선택"}
-                    </button>
-                  </div>
+
+                  {expanded && (
+                    <div className="border-t border-emerald-100 bg-white px-4 py-4">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {groupCards.map((cardSet) => {
+                          const selected = draft.selectedCardSetIds.includes(cardSet.id);
+                          return (
+                            <div
+                              key={cardSet.id}
+                              className={`rounded-2xl border p-4 text-left transition-colors ${
+                                selected
+                                  ? "border-emerald-400 bg-emerald-50"
+                                  : "border-gray-200 bg-white hover:border-emerald-200"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-base font-bold text-gray-800">[{cardSet.label}] 카드</p>
+                                  <p className="text-sm text-gray-500 mt-1">{cardSet.description}</p>
+                                </div>
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                    selected ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                                  }`}
+                                >
+                                  {selected ? "선택됨" : "선택"}
+                                </span>
+                              </div>
+                              <p className="mt-3 text-xs text-gray-400 leading-5">
+                                예시: {cardSet.prompts[0]}
+                              </p>
+                              <div className="mt-4 flex items-center justify-between gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewCardSet(cardSet)}
+                                  className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+                                >
+                                  질문 미리보기
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCardSet(cardSet.id)}
+                                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                                    selected
+                                      ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                  }`}
+                                >
+                                  {selected ? "선택 해제" : "이 묶음 선택"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
+
           {!loadingCardSets && availableCardSets.length === 0 && (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
               <p className="text-sm text-gray-500">저장된 질문 카드 묶음이 없어요.</p>
