@@ -125,6 +125,10 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     baseRoomPayload.question_sets = questionSets;
     baseRoomPayload.questions_generated_at = questionsGeneratedAt;
   } else if (activityType === "question_generator") {
+    if (!topicDescription) {
+      return { error: "학생에게 보여줄 활동 가이드를 주제 부연 설명에 입력해주세요." };
+    }
+
     const guidance = String(formData.get("guidance") ?? "").trim()
       || "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.";
     const { cardSets: teacherCardSets, roles: teacherRoles } = await getTeacherQuestionCardSettingsTree(admin, user.id);
@@ -149,7 +153,6 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
         .filter((role) => role.cardSetIds.length > 0),
       maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
       guidance,
-      requireReason: formData.get("require_reason") !== null,
     };
   } else if (activityType === "question_voting") {
     const sourceRoomId = String(formData.get("source_room_id") ?? "").trim();
@@ -489,7 +492,6 @@ export type QuestionGeneratorRoomResultSummary = {
     cardSetLabel: string;
     originalPrompt: string | null;
     remixedQuestion: string;
-    reason?: string;
   }>;
 };
 
@@ -543,7 +545,6 @@ export async function getQuestionGeneratorRoomResults(roomId: string): Promise<Q
           cardSetLabel: selection.cardSetLabel,
           originalPrompt: selection.originalPrompt,
           remixedQuestion: selection.remixedQuestion,
-          reason: selection.reason,
         })),
       }];
     });

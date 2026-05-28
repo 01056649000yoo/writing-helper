@@ -221,7 +221,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-gray-400 font-medium">교사 권장 설정</span>
-                    <span className="text-gray-700 font-semibold">선택 질문 카드 묶음 활성화, 최대 카드 수, 이유 작성 여부</span>
+                    <span className="text-gray-700 font-semibold">선택 질문 카드 묶음 활성화, 최대 카드 수</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 font-medium">특화 포인트</span>

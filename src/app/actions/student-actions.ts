@@ -513,7 +513,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
   const { data } = await admin
     .schema("writing_helper")
     .from("rooms")
-    .select("topic, title, question_sets, activity_type, activity_config")
+    .select("topic, topic_description, title, question_sets, activity_type, activity_config")
     .eq("id", roomId)
     .maybeSingle();
   if (!data) return null;
@@ -593,9 +593,6 @@ export async function submitQuestionGenerator(
       ? selection.originalPrompt.trim()
       : null,
     remixedQuestion: String(selection.remixedQuestion ?? "").trim(),
-    reason: typeof selection.reason === "string" && selection.reason.trim()
-      ? selection.reason.trim()
-      : null,
   })).filter((selection) => selection.remixedQuestion.length > 0);
 
   if (sanitizedSelections.length === 0) {

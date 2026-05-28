@@ -34,7 +34,6 @@ type QuestionResult = {
     cardSetLabel: string;
     originalPrompt: string | null;
     remixedQuestion: string;
-    reason?: string;
   }>;
 };
 type QuestionVotingRanking = Array<{
@@ -283,12 +282,6 @@ function QuestionResultsModal({
                           </p>
                         </div>
 
-                        {selection.reason && (
-                          <div className="mt-3 rounded-2xl bg-emerald-50 p-3">
-                            <p className="text-xs font-semibold text-emerald-700">이렇게 만든 이유</p>
-                            <p className="mt-1 text-sm leading-relaxed text-emerald-950">{selection.reason}</p>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>

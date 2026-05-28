@@ -200,12 +200,6 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                 <p className="text-base font-medium text-sky-950 leading-relaxed">{selection.remixedQuestion}</p>
               </div>
 
-              {selection.reason && (
-                <div className="rounded-2xl bg-emerald-50 p-4">
-                  <p className="text-xs font-semibold text-emerald-700 mb-2">이렇게 바꾼 이유</p>
-                  <p className="text-sm text-emerald-950 leading-relaxed">{selection.reason}</p>
-                </div>
-              )}
             </div>
           ))}
 

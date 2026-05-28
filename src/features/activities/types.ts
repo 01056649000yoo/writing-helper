@@ -92,7 +92,6 @@ export type QuestionGeneratorConfig = {
   roles?: QuestionCardRole[];
   maxSelections: number;
   guidance: string;
-  requireReason: boolean;
 };
 
 export type StudentQuestion = {
@@ -108,7 +107,6 @@ export type QuestionGeneratorSubmission = {
     cardSetLabel: string;
     originalPrompt: string | null;
     remixedQuestion: string;
-    reason?: string;
   }>;
 };
 

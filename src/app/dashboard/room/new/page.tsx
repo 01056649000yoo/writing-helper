@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -16,8 +16,8 @@ import {
   buildDraftStorageKey,
   clearActivityDraft,
   persistActivityDraft,
-  readActivityDraft,
 } from "@/lib/activity-drafts";
+import { useActivityDraft } from "@/lib/use-activity-draft";
 import type { QuestionSets, Question } from "@/types";
 
 const SUBJECT_TYPES = [
@@ -45,11 +45,16 @@ type QuestionGeneratorDraft = {
   duration_hours: string;
   max_selections: string;
   guidance: string;
-  require_reason: boolean;
   selectedCardSetIds: string[];
 };
 
 type CardOriginFilter = "all" | "default" | "custom";
+
+function matchesCardOrigin(cardSet: QuestionCardSet, originFilter: CardOriginFilter) {
+  if (originFilter === "all") return true;
+  if (originFilter === "default") return Boolean(cardSet.isDefault);
+  return !cardSet.isDefault;
+}
 
 type QuestionVotingDraft = {
   duration_hours: string;
@@ -68,8 +73,6 @@ type OneLineShareDraft = {
   max_reactions_per_student: string;
   duration_hours: string;
 };
-
-const DRAFT_SAVE_INTERVAL_MS = 5000;
 
 const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary: string }> = {
   outline_builder: {
@@ -459,44 +462,6 @@ function PageShell({
   );
 }
 
-function DraftSection({
-  title,
-  description,
-  onSave,
-  lastSavedAt,
-}: {
-  title: string;
-  description: string;
-  onSave: () => void;
-  lastSavedAt: number | null;
-}) {
-  return (
-    <div className="rounded-3xl border border-gray-200 bg-gray-50/70 px-5 py-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-indigo-600">설정 저장</p>
-          <h3 className="mt-1 text-lg font-bold text-gray-800">{title}</h3>
-          <p className="mt-1 text-sm text-gray-500">{description}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <button
-            type="button"
-            onClick={onSave}
-            className="rounded-xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
-          >
-            현재 설정 저장
-          </button>
-          <p className="text-xs font-medium text-indigo-600">
-            {lastSavedAt
-              ? `마지막 저장: ${new Date(lastSavedAt).toLocaleTimeString("ko-KR")}`
-              : "아직 저장 전"}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function OutlineBuilderSetup({ classId }: { classId: string }) {
   const [step, setStep] = useState<Step>("form");
   const [error, setError] = useState("");
@@ -514,7 +479,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     buildDraftStorageKey(classId, "outline_builder"),
     initialDraft
   );
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [formFields, setFormFields] = useState<{
     topic: string;
     topic_description: string;
@@ -583,7 +547,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     if (result?.error) {
       persistActivityDraft(storageKey, draft);
       draftControls.resumeAutosave();
-      setLastSavedAt(Date.now());
       setError(result.error);
       setStep("preview");
       return;
@@ -593,11 +556,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   const updateLevel = useCallback((level: Level, qs: Question[]) => {
     setQuestionSets((prev) => (prev ? { ...prev, [level]: { questions: qs } } : prev));
   }, []);
-
-  function handleSaveDraftNow() {
-    persistActivityDraft(buildDraftStorageKey(classId, "outline_builder"), draft);
-    setLastSavedAt(Date.now());
-  }
 
   const levelMeta: Record<Level, { label: string; emoji: string; color: string }> = {
     low: { label: "어려운 학생", emoji: "🐢", color: "text-green-600 border-green-400 bg-green-50" },
@@ -700,15 +658,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
         <StepBadge>활동 시작</StepBadge>
       </div>
 
-      <div className="mb-6">
-        <DraftSection
-          title="글 개요 짜기 설정 저장"
-          description="이 활동 기획 중인 내용을 이 브라우저에 저장해 두고, 다시 돌아와 이어서 수정할 수 있어요."
-          onSave={handleSaveDraftNow}
-          lastSavedAt={lastSavedAt}
-        />
-      </div>
-
       <form onSubmit={handleGenerate} className="space-y-6">
         <input type="hidden" name="class_id" value={classId} />
         <input type="hidden" name="activity_type" value="outline_builder" />
@@ -721,6 +670,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
           hint="설명을 자세히 적을수록 AI가 더 알맞은 글 개요 질문을 만들어줍니다."
           placeholder="예) 지난 주 금요일 학교 뒷산으로 봄 소풍을 다녀왔어요. 친구들과 도시락을 나눠먹고 계곡에서 물놀이를 했습니다."
+          savedAt={draftControls.savedAt}
         />
 
         <div>
@@ -852,14 +802,12 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     duration_hours: "4",
     max_selections: "1",
     guidance: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
-    require_reason: true,
     selectedCardSetIds: [],
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<QuestionGeneratorDraft>(
     buildDraftStorageKey(classId, "question_generator"),
     initialDraft
   );
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const deferredCardSearch = useDeferredValue(cardSearch);
 
   useEffect(() => {
@@ -872,10 +820,15 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
         setAvailableCardSets(cardResult.cardSets);
         setAvailableRoles(cardResult.roles);
         setDraft((prev) => {
-          const fallbackIds = cardResult.cardSets.map((cs) => cs.id);
+          const allCardSetIds = new Set(cardResult.cardSets.map((cs) => cs.id));
+          const wasAutoSelectedDefault =
+            prev.selectedCardSetIds.length === cardResult.cardSets.length &&
+            prev.selectedCardSetIds.every((id) => allCardSetIds.has(id)) &&
+            !prev.topic.trim() &&
+            !prev.topic_description.trim();
           return {
             ...prev,
-            selectedCardSetIds: prev.selectedCardSetIds.length > 0 ? prev.selectedCardSetIds : fallbackIds,
+            selectedCardSetIds: wasAutoSelectedDefault ? [] : prev.selectedCardSetIds,
           };
         });
       }
@@ -935,26 +888,34 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     return groups;
   }, [availableRoles, availableCardSets]);
 
+  const originFilteredRoleGroups = useMemo(() => (
+    roleGroups
+      .map(({ role, cardSets }) => ({
+        role,
+        cardSets: cardSets.filter((cardSet) => matchesCardOrigin(cardSet, originFilter)),
+      }))
+      .filter(({ cardSets }) => cardSets.length > 0)
+  ), [originFilter, roleGroups]);
+
   const roleOptions = useMemo(() => (
-    roleGroups.map(({ role, cardSets }) => ({
+    originFilteredRoleGroups.map(({ role, cardSets }) => ({
       id: role.id,
       label: role.label,
       icon: role.icon || "🃏",
       count: cardSets.length,
       selectedCount: cardSets.filter((cardSet) => draft.selectedCardSetIds.includes(cardSet.id)).length,
     }))
-  ), [draft.selectedCardSetIds, roleGroups]);
+  ), [draft.selectedCardSetIds, originFilteredRoleGroups]);
 
   const filteredCardSets = useMemo(() => {
+    if (originFilter !== "all" && activeRoleFilterId === "all") {
+      return [];
+    }
+
     const normalizedSearch = deferredCardSearch.trim().toLowerCase();
 
     return availableCardSets.filter((cardSet) => {
-      const matchesOrigin = originFilter === "all"
-        ? true
-        : originFilter === "default"
-          ? Boolean(cardSet.isDefault)
-          : !cardSet.isDefault;
-      if (!matchesOrigin) return false;
+      if (!matchesCardOrigin(cardSet, originFilter)) return false;
 
       const matchesRole = activeRoleFilterId === "all" ? true : cardSet.roleId === activeRoleFilterId;
       if (!matchesRole) return false;
@@ -985,11 +946,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     () => new Map(availableRoles.map((role) => [role.id, role] as const)),
     [availableRoles],
   );
-
-  function handleSaveDraftNow() {
-    persistActivityDraft(buildDraftStorageKey(classId, "question_generator"), draft);
-    setLastSavedAt(Date.now());
-  }
+  const waitingForRoleSelection = originFilter !== "all" && activeRoleFilterId === "all";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1012,7 +969,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     if (result?.error) {
       persistActivityDraft(storageKey, draft);
       draftControls.resumeAutosave();
-      setLastSavedAt(Date.now());
       setError(result.error);
       setSaving(false);
       return;
@@ -1023,15 +979,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     <>
       <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 mb-6 text-sm text-emerald-800">
         학생이 먼저 직접 질문을 만들지, 질문 카드를 참고해 바꿔볼지 스스로 고른 뒤 자기 수준에 맞게 참여하는 활동입니다.
-      </div>
-
-      <div className="mb-6">
-        <DraftSection
-          title="질문 만들기 활동 설정 저장"
-          description="활동 주제, 카드 선택, 안내 문구를 저장해 두고 이 화면으로 돌아오면 이어서 수정할 수 있어요."
-          onSave={handleSaveDraftNow}
-          lastSavedAt={lastSavedAt}
-        />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1046,6 +993,8 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
           hint="어떤 글이나 그림, 이야기와 연결해 질문을 만들지 적어두면 학생들이 주제와 더 잘 연결할 수 있습니다."
           placeholder="예) 오늘 읽은 이야기 속 주인공과 장면을 떠올리며, 직접 질문을 만들거나 질문 카드를 주제에 맞게 바꿔 봅니다."
+          savedAt={draftControls.savedAt}
+          descriptionRequired
         />
 
         <div>
@@ -1073,7 +1022,10 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setOriginFilter(option.value)}
+                    onClick={() => {
+                      setOriginFilter(option.value);
+                      setActiveRoleFilterId("all");
+                    }}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                       originFilter === option.value
                         ? "bg-emerald-600 text-white"
@@ -1136,12 +1088,60 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                 ))}
               </div>
             )}
+
+            {originFilteredRoleGroups.length > 0 && (
+              <div className="mt-4 border-t border-emerald-100 pt-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-emerald-800">역할별 빠른 선택</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {originFilteredRoleGroups.map(({ role, cardSets: groupCards }) => {
+                    const groupIds = groupCards.map((cardSet) => cardSet.id);
+                    const selectedCount = groupIds.filter((id) => draft.selectedCardSetIds.includes(id)).length;
+                    const allSelected = selectedCount === groupIds.length && groupIds.length > 0;
+
+                    return (
+                      <div
+                        key={role.id}
+                        className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-3 ${
+                          selectedCount > 0 ? "border-emerald-200 bg-white" : "border-white bg-white/70"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setActiveRoleFilterId(role.id)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className="block truncate text-sm font-bold text-gray-800">
+                            {role.icon || "🃏"} {role.label}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-gray-500">
+                            {selectedCount}/{groupIds.length}개 선택
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleRoleAllCards(groupIds, allSelected)}
+                          className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+                            allSelected
+                              ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700"
+                          }`}
+                        >
+                          {allSelected ? "전체 해제" : "전체 선택"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {activeRoleFilterId !== "all" && (
             <div className="mt-3 flex justify-end">
               {(() => {
-                const currentRole = roleGroups.find(({ role }) => role.id === activeRoleFilterId);
+                const currentRole = originFilteredRoleGroups.find(({ role }) => role.id === activeRoleFilterId);
                 if (!currentRole) return null;
                 const groupIds = currentRole.cardSets.map((cardSet) => cardSet.id);
                 const selectedCount = groupIds.filter((id) => draft.selectedCardSetIds.includes(id)).length;
@@ -1160,74 +1160,78 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </div>
           )}
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {filteredCardSets.map((cardSet) => {
-              const selected = draft.selectedCardSetIds.includes(cardSet.id);
-              const role = cardSet.roleId ? roleById.get(cardSet.roleId) ?? null : null;
+          {!waitingForRoleSelection && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {filteredCardSets.map((cardSet) => {
+                const selected = draft.selectedCardSetIds.includes(cardSet.id);
+                const role = cardSet.roleId ? roleById.get(cardSet.roleId) ?? null : null;
 
-              return (
-                <div
-                  key={cardSet.id}
-                  className={`rounded-2xl border p-4 text-left transition-colors ${
-                    selected
-                      ? "border-emerald-400 bg-emerald-50"
-                      : "border-gray-200 bg-white hover:border-emerald-200"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-bold text-gray-800">[{cardSet.label}] 카드</p>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          cardSet.isDefault
-                            ? "bg-slate-100 text-slate-600"
-                            : "bg-amber-100 text-amber-700"
-                        }`}>
-                          {cardSet.isDefault ? "기본 제공" : "내 카드"}
-                        </span>
-                        {role && (
-                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                            {role.icon || "🃏"} {role.label}
+                return (
+	                  <div
+	                    key={cardSet.id}
+	                    className={`relative overflow-hidden rounded-2xl border-2 p-4 text-left transition-all ${
+	                      selected
+	                        ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-100"
+	                        : "border-gray-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30"
+	                    }`}
+	                  >
+	                    {selected && <div className="absolute inset-y-0 left-0 w-1.5 bg-emerald-500" />}
+	                    <div className="flex items-start justify-between gap-3">
+	                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-bold text-gray-800">[{cardSet.label}] 카드</p>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            cardSet.isDefault
+                              ? "bg-slate-100 text-slate-600"
+                              : "bg-amber-100 text-amber-700"
+                          }`}>
+                            {cardSet.isDefault ? "기본 제공" : "내 카드"}
                           </span>
-                        )}
+                          {role && (
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                              {role.icon || "🃏"} {role.label}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500">{cardSet.description}</p>
                       </div>
-                      <p className="mt-1 text-sm text-gray-500">{cardSet.description}</p>
+	                      <span
+	                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
+	                          selected ? "bg-emerald-600 text-white shadow-sm" : "bg-gray-100 text-gray-500"
+	                        }`}
+	                      >
+	                        {selected ? "✓ 선택됨" : "미선택"}
+	                      </span>
                     </div>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        selected ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {selected ? "선택됨" : "선택 가능"}
-                    </span>
+                    <p className="mt-3 text-xs text-gray-400 leading-5">
+                      예시: {cardSet.prompts[0]}
+                    </p>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewCardSet(cardSet)}
+                        className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+                      >
+                        질문 미리보기
+                      </button>
+	                      <button
+	                        type="button"
+	                        onClick={() => toggleCardSet(cardSet.id)}
+	                        aria-pressed={selected}
+	                        className={`min-w-28 rounded-xl border px-4 py-2 text-sm font-bold transition-colors ${
+	                          selected
+	                            ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+	                            : "border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+	                        }`}
+	                      >
+	                        {selected ? "✓ 선택 완료" : "선택하기"}
+	                      </button>
+                    </div>
                   </div>
-                  <p className="mt-3 text-xs text-gray-400 leading-5">
-                    예시: {cardSet.prompts[0]}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewCardSet(cardSet)}
-                      className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
-                    >
-                      질문 미리보기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleCardSet(cardSet.id)}
-                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                        selected
-                          ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {selected ? "선택 해제" : "이 묶음 선택"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {!loadingCardSets && availableCardSets.length === 0 && (
             <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
@@ -1238,7 +1242,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </div>
           )}
 
-          {!loadingCardSets && availableCardSets.length > 0 && filteredCardSets.length === 0 && (
+          {!loadingCardSets && availableCardSets.length > 0 && !waitingForRoleSelection && filteredCardSets.length === 0 && (
             <div className="mt-4 rounded-2xl border border-dashed border-emerald-200 bg-white px-4 py-8 text-center">
               <p className="text-sm font-semibold text-gray-700">조건에 맞는 카드가 없어요.</p>
               <p className="mt-1 text-xs text-gray-500">검색어나 필터를 조금 넓혀보세요.</p>
@@ -1331,20 +1335,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           />
         </div>
 
-        <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50/70">
-          <input
-            type="checkbox"
-            name="require_reason"
-            checked={draft.require_reason}
-            onChange={(event) => setDraft((prev) => ({ ...prev, require_reason: event.target.checked }))}
-            className="text-emerald-500"
-          />
-          <div>
-            <p className="text-sm font-semibold text-gray-800">왜 이렇게 바꿨는지 함께 적기</p>
-            <p className="text-xs text-gray-400 mt-1">질문을 고친 이유를 짧게 적게 합니다.</p>
-          </div>
-        </label>
-
         {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
 
         <button
@@ -1377,7 +1367,6 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     buildDraftStorageKey(classId, "question_voting"),
     initialDraft
   );
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -1401,11 +1390,6 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
 
   const selectedSourceRoom = sourceRooms.find((room) => room.roomId === draft.source_room_id) ?? null;
 
-  function handleSaveDraftNow() {
-    persistActivityDraft(buildDraftStorageKey(classId, "question_voting"), draft);
-    setLastSavedAt(Date.now());
-  }
-
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!draft.source_room_id) {
@@ -1424,7 +1408,6 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     if (result?.error) {
       persistActivityDraft(storageKey, draft);
       draftControls.resumeAutosave();
-      setLastSavedAt(Date.now());
       setError(result.error);
       setSaving(false);
       return;
@@ -1435,15 +1418,6 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     <>
       <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 mb-6 text-sm text-amber-800">
         학생들이 질문 후보를 읽고, 가장 좋은 질문을 선택하며 이유까지 나누는 토의형 활동입니다.
-      </div>
-
-      <div className="mb-6">
-        <DraftSection
-          title="좋은 질문 고르기 설정 저장"
-          description="질문 후보와 선택 조건을 저장해 두고, 이 활동 화면으로 돌아오면 그대로 이어서 수정할 수 있어요."
-          onSave={handleSaveDraftNow}
-          lastSavedAt={lastSavedAt}
-        />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1614,12 +1588,6 @@ function OneLineShareSetup({ classId }: { classId: string }) {
     buildDraftStorageKey(classId, "one_line_share"),
     initialDraft,
   );
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-
-  function handleSaveDraftNow() {
-    persistActivityDraft(buildDraftStorageKey(classId, "one_line_share"), draft);
-    setLastSavedAt(Date.now());
-  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1635,7 +1603,6 @@ function OneLineShareSetup({ classId }: { classId: string }) {
     if (result?.error) {
       persistActivityDraft(storageKey, draft);
       draftControls.resumeAutosave();
-      setLastSavedAt(Date.now());
       setError(result.error);
       setSaving(false);
       return;
@@ -1646,15 +1613,6 @@ function OneLineShareSetup({ classId }: { classId: string }) {
     <>
       <div className="rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 mb-6 text-sm text-rose-800">
         학생이 핵심단어를 이용해 문장을 만들며 수업을 마무리하고, 친구 문장에는 좋아요로 반응하는 활동입니다.
-      </div>
-
-      <div className="mb-6">
-        <DraftSection
-          title="한줄모아 활동 설정 저장"
-          description="활동 제목, 설명, 핵심단어를 저장해 두고 나중에 돌아와 이어서 수정할 수 있어요."
-          onSave={handleSaveDraftNow}
-          lastSavedAt={lastSavedAt}
-        />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1669,6 +1627,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
           hint="학생에게 보일 활동 제목과 설명입니다. 핵심단어를 이용해 수업을 마무리하는 문장을 쓰도록 안내해 주세요."
           placeholder="예) 오늘 배운 증발과 물의 순환을 떠올리며, 핵심단어를 이용해 수업을 마무리하는 한 문장을 써 봅니다."
+          savedAt={draftControls.savedAt}
         />
 
         <div>
@@ -1735,6 +1694,8 @@ function TopicFields({
   onChange,
   hint,
   placeholder,
+  savedAt,
+  descriptionRequired = false,
 }: {
   values: {
     topic: string;
@@ -1743,6 +1704,8 @@ function TopicFields({
   onChange: (patch: { topic?: string; topic_description?: string }) => void;
   hint: string;
   placeholder: string;
+  savedAt: number | null;
+  descriptionRequired?: boolean;
 }) {
   return (
     <div className="space-y-3">
@@ -1758,22 +1721,28 @@ function TopicFields({
         />
       </div>
       <div>
-        <label className="block text-base font-medium text-gray-700 mb-1">
-          주제 부연 설명
-          <span className="ml-2 text-sm font-normal text-gray-400">(선택)</span>
-        </label>
-        <textarea
-          name="topic_description"
-          rows={3}
+	        <label className="block text-base font-medium text-gray-700 mb-1">
+	          주제 부연 설명
+	          {!descriptionRequired && <span className="ml-2 text-sm font-normal text-gray-400">(선택)</span>}
+	        </label>
+	        <textarea
+	          name="topic_description"
+	          required={descriptionRequired}
+	          rows={3}
           value={values.topic_description}
           onChange={(event) => onChange({ topic_description: event.target.value })}
           placeholder={placeholder}
           className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
         />
-        <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <span className="text-amber-500 text-base shrink-0 mt-0.5">💡</span>
-          <p className="text-sm text-amber-700 leading-relaxed">{hint}</p>
-        </div>
+	        <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+	          <span className="text-amber-500 text-base shrink-0 mt-0.5">💡</span>
+	          <p className="text-sm text-amber-700 leading-relaxed">{hint}</p>
+	        </div>
+        <p className="mt-2 text-xs font-medium text-emerald-600">
+          {savedAt
+            ? `자동 저장됨 · ${new Date(savedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+            : "입력하면 자동 저장됩니다."}
+        </p>
       </div>
     </div>
   );
@@ -1863,50 +1832,6 @@ export default function NewRoomPage() {
       <NewRoomForm />
     </Suspense>
   );
-}
-
-function useActivityDraft<T>(storageKey: string, initialState: T) {
-  const [draft, setDraft] = useState<T>(initialState);
-  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
-  const autosaveEnabledRef = useRef(true);
-
-  useEffect(() => {
-    const { draft: nextDraft } = readActivityDraft(storageKey, initialState);
-    autosaveEnabledRef.current = true;
-    startTransition(() => {
-      setDraft(nextDraft);
-      setAutosaveEnabled(true);
-    });
-  }, [initialState, storageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!autosaveEnabled) return;
-
-    const saveDraft = () => {
-      if (!autosaveEnabledRef.current) return;
-      persistActivityDraft(storageKey, draft);
-    };
-
-    const intervalId = window.setInterval(saveDraft, DRAFT_SAVE_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(intervalId);
-      saveDraft();
-    };
-  }, [autosaveEnabled, draft, storageKey]);
-
-  const suspendAutosave = useCallback(() => {
-    autosaveEnabledRef.current = false;
-    setAutosaveEnabled(false);
-  }, []);
-
-  const resumeAutosave = useCallback(() => {
-    autosaveEnabledRef.current = true;
-    setAutosaveEnabled(true);
-  }, []);
-
-  return [draft, setDraft, { suspendAutosave, resumeAutosave }] as const;
 }
 
 function parseActivityType(value: string | null): ActivityType | null {
