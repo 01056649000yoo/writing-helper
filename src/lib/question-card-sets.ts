@@ -212,6 +212,7 @@ function normalizeQuestionCardSetRow(row: QuestionCardSetRow): QuestionCardSet {
       ? row.prompts.filter((prompt): prompt is string => typeof prompt === "string" && prompt.trim().length > 0)
       : [],
     roleId: row.role_id ?? null,
+    isDefault: isDefaultQuestionCardSetLabel(row.label),
   };
 }
 
@@ -223,6 +224,7 @@ function normalizeQuestionCardRoleRow(row: QuestionCardRoleRow, cardSets: Questi
     description: row.description,
     icon: row.icon,
     cardSetIds: cardSets.filter((cardSet) => cardSet.roleId === row.id).map((cardSet) => cardSet.id),
+    isDefault: isDefaultQuestionCardRoleLabel(row.label),
   };
 }
 
@@ -236,7 +238,18 @@ function buildFallbackRoles(cardSets: QuestionCardSet[]): QuestionCardRole[] {
     cardSetIds: cardSets
       .filter((cardSet) => preset.cardSetLabels.some((label) => normalizeQuestionCardLabel(label) === normalizeQuestionCardLabel(cardSet.label)))
       .map((cardSet) => cardSet.id),
+    isDefault: true,
   })).filter((role) => role.cardSetIds.length > 0);
+}
+
+function isDefaultQuestionCardSetLabel(label: string) {
+  const normalizedLabel = normalizeQuestionCardLabel(label);
+  return QUESTION_CARD_SETS.some((cardSet) => normalizeQuestionCardLabel(cardSet.label) === normalizedLabel);
+}
+
+function isDefaultQuestionCardRoleLabel(label: string) {
+  const normalizedLabel = normalizeQuestionCardLabel(label);
+  return QUESTION_CARD_ROLE_PRESETS.some((role) => normalizeQuestionCardLabel(role.label) === normalizedLabel);
 }
 
 function findRoleIdForCardLabel(roleIdByLabel: Map<string, string>, cardLabel: string) {

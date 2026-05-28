@@ -60,6 +60,7 @@ export type QuestionCardSet = {
   description: string;
   prompts: string[];
   roleId?: string | null;
+  isDefault?: boolean;
 };
 
 export type QuestionCardRole = {
@@ -69,6 +70,7 @@ export type QuestionCardRole = {
   description: string;
   icon: string;
   cardSetIds: string[];
+  isDefault?: boolean;
 };
 
 /** 교사가 큐레이션한 질문 세트 — 여러 묶음에서 골라 만든 평면 질문 풀 */

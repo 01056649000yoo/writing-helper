@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -48,6 +48,8 @@ type QuestionGeneratorDraft = {
   require_reason: boolean;
   selectedCardSetIds: string[];
 };
+
+type CardOriginFilter = "all" | "default" | "custom";
 
 type QuestionVotingDraft = {
   duration_hours: string;
@@ -841,7 +843,9 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [availableRoles, setAvailableRoles] = useState<QuestionCardRole[]>([]);
   const [loadingCardSets, setLoadingCardSets] = useState(true);
   const [previewCardSet, setPreviewCardSet] = useState<QuestionCardSet | null>(null);
-  const [expandedRoleIds, setExpandedRoleIds] = useState<Set<string>>(new Set());
+  const [cardSearch, setCardSearch] = useState("");
+  const [originFilter, setOriginFilter] = useState<CardOriginFilter>("all");
+  const [activeRoleFilterId, setActiveRoleFilterId] = useState<string>("all");
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
     topic: "",
     topic_description: "",
@@ -856,6 +860,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     initialDraft
   );
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const deferredCardSearch = useDeferredValue(cardSearch);
 
   useEffect(() => {
     let active = true;
@@ -880,7 +885,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [setDraft]);
 
   function toggleCardSet(cardSetId: string) {
     setDraft((prev) => ({
@@ -889,15 +894,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
         ? prev.selectedCardSetIds.filter((id) => id !== cardSetId)
         : [...prev.selectedCardSetIds, cardSetId],
     }));
-  }
-
-  function toggleRoleExpand(roleId: string) {
-    setExpandedRoleIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(roleId)) next.delete(roleId);
-      else next.add(roleId);
-      return next;
-    });
   }
 
   function toggleRoleAllCards(groupCardSetIds: string[], shouldDeselect: boolean) {
@@ -938,6 +934,57 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     }
     return groups;
   }, [availableRoles, availableCardSets]);
+
+  const roleOptions = useMemo(() => (
+    roleGroups.map(({ role, cardSets }) => ({
+      id: role.id,
+      label: role.label,
+      icon: role.icon || "🃏",
+      count: cardSets.length,
+      selectedCount: cardSets.filter((cardSet) => draft.selectedCardSetIds.includes(cardSet.id)).length,
+    }))
+  ), [draft.selectedCardSetIds, roleGroups]);
+
+  const filteredCardSets = useMemo(() => {
+    const normalizedSearch = deferredCardSearch.trim().toLowerCase();
+
+    return availableCardSets.filter((cardSet) => {
+      const matchesOrigin = originFilter === "all"
+        ? true
+        : originFilter === "default"
+          ? Boolean(cardSet.isDefault)
+          : !cardSet.isDefault;
+      if (!matchesOrigin) return false;
+
+      const matchesRole = activeRoleFilterId === "all" ? true : cardSet.roleId === activeRoleFilterId;
+      if (!matchesRole) return false;
+
+      if (!normalizedSearch) return true;
+
+      const roleLabel = availableRoles.find((role) => role.id === cardSet.roleId)?.label ?? "";
+      const haystack = [
+        cardSet.label,
+        cardSet.description,
+        roleLabel,
+        ...cardSet.prompts.slice(0, 3),
+      ].join(" ").toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [activeRoleFilterId, availableCardSets, availableRoles, deferredCardSearch, originFilter]);
+
+  const defaultCardCount = useMemo(
+    () => availableCardSets.filter((cardSet) => cardSet.isDefault).length,
+    [availableCardSets],
+  );
+  const customCardCount = useMemo(
+    () => availableCardSets.filter((cardSet) => !cardSet.isDefault).length,
+    [availableCardSets],
+  );
+
+  const roleById = useMemo(
+    () => new Map(availableRoles.map((role) => [role.id, role] as const)),
+    [availableRoles],
+  );
 
   function handleSaveDraftNow() {
     persistActivityDraft(buildDraftStorageKey(classId, "question_generator"), draft);
@@ -1012,168 +1059,191 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </Link>
           </div>
 
-          <>
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs text-gray-400">
-              총 카드 {availableCardSets.length}개 중 <span className="font-semibold text-emerald-700">{draft.selectedCardSetIds.length}개 선택됨</span>
+          <div className="rounded-3xl border border-emerald-100 bg-emerald-50/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-emerald-900">
+                총 카드 {availableCardSets.length}개 중 <span className="font-bold">{draft.selectedCardSetIds.length}개 선택</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: "all", label: `전체 ${availableCardSets.length}` },
+                  { value: "default", label: `기본 제공 ${defaultCardCount}` },
+                  { value: "custom", label: `내 카드 ${customCardCount}` },
+                ] as const).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setOriginFilter(option.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      originFilter === option.value
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white text-gray-600 hover:bg-emerald-100"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            {roleGroups.length > 1 && (
-              <div className="flex gap-2">
+
+            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <input
+                type="search"
+                value={cardSearch}
+                onChange={(event) => setCardSearch(event.target.value)}
+                placeholder="카드 이름, 설명, 역할, 예시 질문으로 검색"
+                className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setCardSearch("");
+                  setOriginFilter("all");
+                  setActiveRoleFilterId("all");
+                }}
+                className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+              >
+                필터 초기화
+              </button>
+            </div>
+
+            {roleOptions.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setExpandedRoleIds(new Set(roleGroups.map((g) => g.role.id)))}
-                  className="text-xs font-semibold text-emerald-600 hover:underline"
+                  onClick={() => setActiveRoleFilterId("all")}
+                  className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
+                    activeRoleFilterId === "all"
+                      ? "bg-gray-900 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-100"
+                  }`}
                 >
-                  모두 펼치기
+                  전체 역할
                 </button>
-                <span className="text-gray-300">|</span>
-                <button
-                  type="button"
-                  onClick={() => setExpandedRoleIds(new Set())}
-                  className="text-xs font-semibold text-gray-500 hover:underline"
-                >
-                  모두 접기
-                </button>
+                {roleOptions.map((role) => (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => setActiveRoleFilterId(role.id)}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
+                      activeRoleFilterId === role.id
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white text-gray-700 hover:bg-emerald-100"
+                    }`}
+                  >
+                    {role.icon} {role.label} {role.selectedCount > 0 ? `· ${role.selectedCount}/${role.count}` : `· ${role.count}`}
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="space-y-3">
-            {roleGroups.map(({ role, cardSets: groupCards }) => {
-              const groupIds = groupCards.map((cs) => cs.id);
-              const selectedInGroup = groupIds.filter((id) => draft.selectedCardSetIds.includes(id)).length;
-              const allSelected = selectedInGroup === groupIds.length && groupIds.length > 0;
-              const noneSelected = selectedInGroup === 0;
-              const expanded = expandedRoleIds.has(role.id);
+          {activeRoleFilterId !== "all" && (
+            <div className="mt-3 flex justify-end">
+              {(() => {
+                const currentRole = roleGroups.find(({ role }) => role.id === activeRoleFilterId);
+                if (!currentRole) return null;
+                const groupIds = currentRole.cardSets.map((cardSet) => cardSet.id);
+                const selectedCount = groupIds.filter((id) => draft.selectedCardSetIds.includes(id)).length;
+                const allSelected = selectedCount === groupIds.length && groupIds.length > 0;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => toggleRoleAllCards(groupIds, allSelected)}
+                    className="rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                  >
+                    {allSelected ? "이 역할 카드 모두 해제" : "이 역할 카드 모두 선택"}
+                  </button>
+                );
+              })()}
+            </div>
+          )}
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {filteredCardSets.map((cardSet) => {
+              const selected = draft.selectedCardSetIds.includes(cardSet.id);
+              const role = cardSet.roleId ? roleById.get(cardSet.roleId) ?? null : null;
 
               return (
-                <div key={role.id} className="rounded-2xl border border-emerald-100 bg-emerald-50/30 overflow-hidden">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => toggleRoleExpand(role.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        toggleRoleExpand(role.id);
-                      }
-                    }}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50/60 cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-2xl">{role.icon || "🃏"}</span>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-bold text-gray-800 truncate">{role.label}</p>
-                            {role.subtitle && (
-                              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                                {role.subtitle}
-                              </span>
-                            )}
-                          </div>
-                          {role.description && (
-                            <p className="text-xs text-gray-500 mt-0.5 truncate">{role.description}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            selectedInGroup > 0 ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-500"
-                          }`}
-                        >
-                          {selectedInGroup}/{groupIds.length} 선택
+                <div
+                  key={cardSet.id}
+                  className={`rounded-2xl border p-4 text-left transition-colors ${
+                    selected
+                      ? "border-emerald-400 bg-emerald-50"
+                      : "border-gray-200 bg-white hover:border-emerald-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-bold text-gray-800">[{cardSet.label}] 카드</p>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          cardSet.isDefault
+                            ? "bg-slate-100 text-slate-600"
+                            : "bg-amber-100 text-amber-700"
+                        }`}>
+                          {cardSet.isDefault ? "기본 제공" : "내 카드"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            toggleRoleAllCards(groupIds, allSelected);
-                          }}
-                          className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
-                            allSelected
-                              ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                              : "bg-emerald-500 text-white hover:bg-emerald-600"
-                          }`}
-                        >
-                          {allSelected ? "모두 해제" : noneSelected ? "모두 선택" : "나머지 선택"}
-                        </button>
-                        <span className={`text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`}>▾</span>
+                        {role && (
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                            {role.icon || "🃏"} {role.label}
+                          </span>
+                        )}
                       </div>
+                      <p className="mt-1 text-sm text-gray-500">{cardSet.description}</p>
                     </div>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        selected ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {selected ? "선택됨" : "선택 가능"}
+                    </span>
                   </div>
-
-                  {expanded && (
-                    <div className="border-t border-emerald-100 bg-white px-4 py-4">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {groupCards.map((cardSet) => {
-                          const selected = draft.selectedCardSetIds.includes(cardSet.id);
-                          return (
-                            <div
-                              key={cardSet.id}
-                              className={`rounded-2xl border p-4 text-left transition-colors ${
-                                selected
-                                  ? "border-emerald-400 bg-emerald-50"
-                                  : "border-gray-200 bg-white hover:border-emerald-200"
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-base font-bold text-gray-800">[{cardSet.label}] 카드</p>
-                                  <p className="text-sm text-gray-500 mt-1">{cardSet.description}</p>
-                                </div>
-                                <span
-                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                    selected ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
-                                  }`}
-                                >
-                                  {selected ? "선택됨" : "선택"}
-                                </span>
-                              </div>
-                              <p className="mt-3 text-xs text-gray-400 leading-5">
-                                예시: {cardSet.prompts[0]}
-                              </p>
-                              <div className="mt-4 flex items-center justify-between gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewCardSet(cardSet)}
-                                  className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
-                                >
-                                  질문 미리보기
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleCardSet(cardSet.id)}
-                                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                                    selected
-                                      ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                  }`}
-                                >
-                                  {selected ? "선택 해제" : "이 묶음 선택"}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  <p className="mt-3 text-xs text-gray-400 leading-5">
+                    예시: {cardSet.prompts[0]}
+                  </p>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewCardSet(cardSet)}
+                      className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+                    >
+                      질문 미리보기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleCardSet(cardSet.id)}
+                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                        selected
+                          ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {selected ? "선택 해제" : "이 묶음 선택"}
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
 
           {!loadingCardSets && availableCardSets.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
+            <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
               <p className="text-sm text-gray-500">저장된 질문 카드 묶음이 없어요.</p>
               <Link href="/dashboard/settings" className="mt-2 inline-block text-sm font-semibold text-emerald-600 hover:underline">
                 설정에서 질문 카드 묶음 만들기 →
               </Link>
             </div>
           )}
-          </>
+
+          {!loadingCardSets && availableCardSets.length > 0 && filteredCardSets.length === 0 && (
+            <div className="mt-4 rounded-2xl border border-dashed border-emerald-200 bg-white px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-gray-700">조건에 맞는 카드가 없어요.</p>
+              <p className="mt-1 text-xs text-gray-500">검색어나 필터를 조금 넓혀보세요.</p>
+            </div>
+          )}
         </div>
 
         {previewCardSet && (

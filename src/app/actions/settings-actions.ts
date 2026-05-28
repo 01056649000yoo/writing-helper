@@ -7,13 +7,48 @@ import { saveApiKey, hasApiKey, getApiKey } from "@/lib/vault";
 import { createOpenAIClient, generateAiRolesAndQuestions, type GeneratedRoleData } from "@/lib/gpt";
 import {
   getTeacherQuestionCardSettingsTree,
-  getTeacherQuestionCardSets,
   isMissingQuestionCardRolesTable,
   isMissingQuestionCardSetsTable,
   normalizeQuestionCardSetInput,
 } from "@/lib/question-card-sets";
 import type { QuestionCardRole, QuestionCardSet, QuestionSet, QuestionSetItem } from "@/features/activities/types";
 import { normalizeQuestionCardLabel } from "@/features/activities/question-generator/question-card-roles";
+
+function isDefaultCardSetLabel(label: string) {
+  const normalized = normalizeQuestionCardLabel(label);
+  return getDefaultCardLabels().has(normalized);
+}
+
+function isDefaultRoleLabel(label: string) {
+  const normalized = normalizeQuestionCardLabel(label);
+  return getDefaultRoleLabels().has(normalized);
+}
+
+function getDefaultCardLabels() {
+  return new Set([
+    "상상",
+    "마음",
+    "감각",
+    "이유",
+    "연결",
+    "가치",
+    "관점",
+    "해결",
+    "반전",
+    "관찰",
+    "비유",
+    "시간",
+  ].map(normalizeQuestionCardLabel));
+}
+
+function getDefaultRoleLabels() {
+  return new Set([
+    "탐정",
+    "마법사",
+    "판사",
+    "상담사",
+  ].map(normalizeQuestionCardLabel));
+}
 
 export async function saveGptApiKey(formData: FormData): Promise<{ error?: string; success?: boolean }> {
   const user = await getCurrentUser();
@@ -145,6 +180,7 @@ export async function saveQuestionCardSetting(input: {
             description: data.description,
             prompts: Array.isArray(data.prompts) ? data.prompts.filter((prompt): prompt is string => typeof prompt === "string") : [],
             roleId: data.role_id ?? null,
+            isDefault: isDefaultCardSetLabel(data.label),
           }
         : normalized,
     };
@@ -173,6 +209,7 @@ export async function saveQuestionCardSetting(input: {
       description: data.description,
       prompts: Array.isArray(data.prompts) ? data.prompts.filter((prompt): prompt is string => typeof prompt === "string") : [],
       roleId: data.role_id ?? null,
+      isDefault: isDefaultCardSetLabel(data.label),
     },
   };
 }
@@ -222,7 +259,7 @@ export async function saveQuestionCardRole(input: {
     revalidatePath("/dashboard/room/new");
     return {
       role: data
-        ? { id: data.id, label: data.label, subtitle: data.subtitle, description: data.description, icon: data.icon, cardSetIds: [] }
+        ? { id: data.id, label: data.label, subtitle: data.subtitle, description: data.description, icon: data.icon, cardSetIds: [], isDefault: isDefaultRoleLabel(data.label) }
         : undefined,
     };
   }
@@ -244,7 +281,7 @@ export async function saveQuestionCardRole(input: {
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/room/new");
   return {
-    role: { id: data.id, label: data.label, subtitle: data.subtitle, description: data.description, icon: data.icon, cardSetIds: [] },
+    role: { id: data.id, label: data.label, subtitle: data.subtitle, description: data.description, icon: data.icon, cardSetIds: [], isDefault: isDefaultRoleLabel(data.label) },
   };
 }
 
@@ -612,4 +649,3 @@ export async function resetDefaultQuestionCardSettings(): Promise<{ success?: bo
     return { error: msg };
   }
 }
-
