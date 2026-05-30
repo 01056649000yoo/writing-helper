@@ -77,7 +77,7 @@ export default function LoginPageClient() {
           <div className="max-w-md mx-auto w-full">
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-3xl font-bold text-gray-900">반갑습니다!</h2>
+                <h2 className="text-3xl font-bold text-gray-900">안녕하세요!</h2>
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold tracking-wider px-2 py-0.5">
                   BETA
                 </span>
