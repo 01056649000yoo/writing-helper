@@ -3,8 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "./auth-actions";
-import { saveApiKey, hasApiKey, getApiKey } from "@/lib/vault";
+import { saveApiKey } from "@/lib/vault";
 import { createOpenAIClient, generateAiRolesAndQuestions, type GeneratedRoleData } from "@/lib/gpt";
+import {
+  claimServiceAdmin,
+  getGlobalApiKeySecretOwner,
+  getServiceAdminState,
+  getSharedOpenAiKey,
+  getTeacherOpenAiAccess,
+  logApiUsage,
+  logServiceAudit,
+  requireServiceAdmin,
+} from "@/lib/service-admin";
 import {
   getTeacherQuestionCardSettingsTree,
   isMissingQuestionCardRolesTable,
@@ -44,23 +54,45 @@ function getDefaultCardLabels() {
 function getDefaultRoleLabels() {
   return new Set([
     "탐정",
+    "탐정 모드",
     "마법사",
+    "마법사 모드",
     "판사",
+    "판사 모드",
     "상담사",
+    "상담사 모드",
   ].map(normalizeQuestionCardLabel));
 }
 
 export async function saveGptApiKey(formData: FormData): Promise<{ error?: string; success?: boolean }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
+  if (!user.email) return { error: "이메일 정보를 확인할 수 없습니다." };
 
   const apiKey = String(formData.get("api_key") ?? "").trim();
   if (!apiKey.startsWith("sk-")) return { error: "올바른 OpenAI API 키 형식이 아닙니다." };
 
   try {
-    const secretId = await saveApiKey(user.id, apiKey);
+    await requireServiceAdmin(user);
+    const secretId = await saveApiKey(getGlobalApiKeySecretOwner(), apiKey);
+    await claimServiceAdmin(user.email);
 
     const admin = createSupabaseAdminClient();
+    const { error: settingsError } = await admin
+      .schema("writing_helper")
+      .from("service_settings")
+      .upsert({
+        id: "singleton",
+        admin_email: user.email.trim().toLowerCase(),
+        global_vault_secret_id: secretId,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
+
+    if (settingsError) {
+      console.error("[saveGptApiKey] service settings update error:", settingsError);
+      return { error: `공용 설정 업데이트 실패: ${settingsError.message}` };
+    }
+
     const { error: updateError } = await admin
       .schema("writing_helper")
       .from("teacher_profiles")
@@ -73,7 +105,15 @@ export async function saveGptApiKey(formData: FormData): Promise<{ error?: strin
     }
 
     revalidatePath("/dashboard/api-key");
+    revalidatePath("/dashboard/admin");
     revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard");
+    await logServiceAudit({
+      actorUserId: user.id,
+      actorEmail: user.email,
+      action: "global_api_key_saved",
+      metadata: { hasSharedKey: true },
+    });
     return { success: true };
   } catch (e) {
     console.error("[saveGptApiKey] error:", e);
@@ -84,34 +124,59 @@ export async function saveGptApiKey(formData: FormData): Promise<{ error?: strin
 export async function checkHasApiKey(): Promise<boolean> {
   const user = await getCurrentUser();
   if (!user) return false;
-  return hasApiKey(user.id);
+  const result = await getSharedOpenAiKey();
+  return Boolean(result.apiKey);
 }
 
 export async function testApiKey(): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "로그인이 필요합니다." };
-
-  const admin = createSupabaseAdminClient();
-  const { data: profile } = await admin
-    .schema("writing_helper")
-    .from("teacher_profiles")
-    .select("vault_secret_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!profile?.vault_secret_id) return { ok: false, error: "저장된 API 키가 없습니다." };
-
-  const apiKey = await getApiKey(profile.vault_secret_id);
-  if (!apiKey) return { ok: false, error: "API 키를 불러올 수 없습니다." };
+  try {
+    await requireServiceAdmin(user);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "서비스 관리자만 공용 API 키를 테스트할 수 있습니다.",
+    };
+  }
+  const shared = await getSharedOpenAiKey();
+  if (shared.error || !shared.apiKey) return { ok: false, error: shared.error ?? "공용 API 키가 없습니다." };
 
   try {
-    const client = createOpenAIClient(apiKey);
+    const client = createOpenAIClient(shared.apiKey);
     await client.models.list();
+    await logServiceAudit({
+      actorUserId: user.id,
+      actorEmail: user.email ?? null,
+      action: "global_api_key_tested",
+      metadata: { ok: true },
+    });
     return { ok: true };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "알 수 없는 오류";
+    await logServiceAudit({
+      actorUserId: user.id,
+      actorEmail: user.email ?? null,
+      action: "global_api_key_tested",
+      metadata: { ok: false, error: msg },
+    });
     return { ok: false, error: msg };
   }
+}
+
+export async function getApiKeyAccessInfo(): Promise<{
+  hasKey: boolean;
+  isAdmin: boolean;
+  adminEmail: string | null;
+}> {
+  const user = await getCurrentUser();
+  const state = await getServiceAdminState(user);
+  const shared = await getSharedOpenAiKey();
+  return {
+    hasKey: Boolean(shared.apiKey),
+    isAdmin: Boolean(user && state.isAdmin),
+    adminEmail: state.adminEmail,
+  };
 }
 
 export async function getQuestionCardSettings(): Promise<{ roles: QuestionCardRole[]; cardSets: QuestionCardSet[]; error?: string }> {
@@ -520,26 +585,20 @@ export async function generateAiRolesAndCardsAction(
 ): Promise<{ roles?: GeneratedRoleData[]; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
-
-  const admin = createSupabaseAdminClient();
-  const { data: profile } = await admin
-    .schema("writing_helper")
-    .from("teacher_profiles")
-    .select("vault_secret_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!profile?.vault_secret_id) {
-    return { error: "저장된 API 키가 없습니다. OpenAI API 키를 먼저 등록해주세요." };
-  }
-
-  const apiKey = await getApiKey(profile.vault_secret_id);
-  if (!apiKey) {
-    return { error: "API 키를 불러올 수 없습니다." };
+  const keyAccess = await getTeacherOpenAiAccess(user.id);
+  if (keyAccess.error || !keyAccess.access) {
+    return { error: keyAccess.error ?? "OpenAI API 키를 불러올 수 없습니다." };
   }
 
   try {
-    const roles = await generateAiRolesAndQuestions(apiKey, topic, gradeLevel, roleCount);
+    await logApiUsage({
+      teacherId: user.id,
+      feature: "admin_generate_ai_roles",
+      model: "gpt-4o",
+      usedSharedApi: keyAccess.access.usedSharedApi,
+      metadata: { topic, gradeLevel, roleCount },
+    });
+    const roles = await generateAiRolesAndQuestions(keyAccess.access.apiKey, topic, gradeLevel, roleCount);
     return { roles };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.";

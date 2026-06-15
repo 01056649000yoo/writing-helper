@@ -25,7 +25,6 @@ export const questionVotingDefinition: ActivityDefinition<
     sourceQuestions: [],
     evaluationCriteria: [],
     maxSelections: 1,
-    requireReason: true,
   }),
   validateConfig: (input) => {
     const raw = isRecord(input) ? input : {};
@@ -52,13 +51,11 @@ export const questionVotingDefinition: ActivityDefinition<
         sourceQuestions,
         evaluationCriteria,
         maxSelections: clampNumber(raw.maxSelections, 1, Math.max(sourceQuestions.length, 1), 1),
-        requireReason: raw.requireReason !== false,
       },
     };
   },
   emptySubmission: () => ({
     selectedQuestionIds: [],
-    reason: undefined,
   }),
   emptyResult: () => ({
     selectedQuestionIds: [],

@@ -15,6 +15,7 @@ const WRITING_LABEL: Record<ActivityType, string> = {
   question_generator: "질문 만들기",
   question_voting: "좋은 질문 고르기",
   one_line_share: "한줄모아",
+  hanja_writing: "한자 활용 문장 만들기",
 };
 
 const WRITING_EMOJI: Record<ActivityType, string> = {
@@ -22,6 +23,7 @@ const WRITING_EMOJI: Record<ActivityType, string> = {
   question_generator: "❓",
   question_voting: "🗳️",
   one_line_share: "💬",
+  hanja_writing: "📜",
 };
 
 const SUBJECT_LABEL: Record<"science" | "morals", string> = {

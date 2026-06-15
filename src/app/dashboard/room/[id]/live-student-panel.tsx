@@ -5,10 +5,15 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import {
+  applyQuestionGeneratorSpellingCorrections,
+  correctQuestionGeneratorSpelling,
+  getHanjaWritingRoomResults,
   getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
   getRoomSessions,
+  updateQuestionGeneratorSelection,
+  type SpellingCorrectionCandidate,
 } from "@/app/actions/room-actions";
 import {
   QuestionVotingCompactList,
@@ -23,7 +28,7 @@ type Session = {
   level: string | null;
   status: string;
 };
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing";
 type QuestionResult = {
   sessionId: string;
   studentNumber: number;
@@ -34,13 +39,13 @@ type QuestionResult = {
     cardSetLabel: string;
     originalPrompt: string | null;
     remixedQuestion: string;
+    originalRemixedQuestion?: string;
   }>;
 };
 type QuestionVotingRanking = Array<{
   questionId: string;
   text: string;
   votes: number;
-  reasons: string[];
 }>;
 type OneLineShareResults = Array<{
   entryId: string;
@@ -54,6 +59,14 @@ type OneLineShareResults = Array<{
   containsKeywords: boolean;
   createdAt: string;
   updatedAt: string;
+}>;
+type HanjaWritingResults = Array<{
+  sessionId: string;
+  studentNumber: number;
+  studentName: string;
+  content: string;
+  likeCount: number;
+  createdAt: string;
 }>;
 
 function levelLabel(level: string) {
@@ -144,13 +157,28 @@ function StudentQrModal({
 
 function QuestionResultsModal({
   results,
+  roomId,
+  onResultsChange,
   onClose,
 }: {
   results: QuestionResult[];
+  roomId: string;
+  onResultsChange: (next: QuestionResult[]) => void;
   onClose: () => void;
 }) {
   const totalQuestions = results.reduce((sum, result) => sum + result.selections.length, 0);
   const [viewMode, setViewMode] = useState<"students" | "questions">("students");
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const [correctionMode, setCorrectionMode] = useState<"idle" | "loading" | "review">("idle");
+  const [correctionCandidates, setCorrectionCandidates] = useState<SpellingCorrectionCandidate[]>([]);
+  const [correctionSelected, setCorrectionSelected] = useState<Set<string>>(new Set());
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [applyingCorrections, setApplyingCorrections] = useState(false);
+
   const flattenedQuestions = results.flatMap((result) =>
     result.selections.map((selection, index) => ({
       sessionId: result.sessionId,
@@ -160,6 +188,125 @@ function QuestionResultsModal({
       selection,
     }))
   );
+
+  function buildKey(sessionId: string, selectionId: string) {
+    return `${sessionId}::${selectionId}`;
+  }
+
+  function applyLocalUpdates(updates: Array<{ sessionId: string; selectionId: string; newText: string }>) {
+    const bySession = new Map<string, Map<string, string>>();
+    for (const update of updates) {
+      if (!bySession.has(update.sessionId)) bySession.set(update.sessionId, new Map());
+      bySession.get(update.sessionId)!.set(update.selectionId, update.newText);
+    }
+    onResultsChange(
+      results.map((result) => {
+        const sessionUpdates = bySession.get(result.sessionId);
+        if (!sessionUpdates) return result;
+        return {
+          ...result,
+          selections: result.selections.map((selection) => {
+            const nextText = sessionUpdates.get(selection.id);
+            if (!nextText || nextText === selection.remixedQuestion) return selection;
+            return {
+              ...selection,
+              remixedQuestion: nextText,
+              originalRemixedQuestion: selection.originalRemixedQuestion ?? selection.remixedQuestion,
+            };
+          }),
+        };
+      })
+    );
+  }
+
+  function startEdit(sessionId: string, selectionId: string, currentText: string) {
+    setEditingKey(buildKey(sessionId, selectionId));
+    setEditingText(currentText);
+    setEditError(null);
+  }
+
+  function cancelEdit() {
+    setEditingKey(null);
+    setEditingText("");
+    setEditError(null);
+  }
+
+  async function saveEdit(sessionId: string, selectionId: string) {
+    const trimmed = editingText.trim();
+    if (!trimmed) {
+      setEditError("질문 내용을 비워둘 수 없습니다.");
+      return;
+    }
+    const key = buildKey(sessionId, selectionId);
+    setSavingKey(key);
+    setEditError(null);
+    const result = await updateQuestionGeneratorSelection(roomId, sessionId, selectionId, trimmed);
+    setSavingKey(null);
+    if (result.error) {
+      setEditError(result.error);
+      return;
+    }
+    applyLocalUpdates([{ sessionId, selectionId, newText: trimmed }]);
+    cancelEdit();
+  }
+
+  async function runCorrection() {
+    if (!window.confirm("OpenAI에 모든 질문을 보내 맞춤법을 교정합니다. 진행할까요?")) return;
+    setCorrectionMode("loading");
+    setCorrectionError(null);
+    const result = await correctQuestionGeneratorSpelling(roomId);
+    if (result.error) {
+      setCorrectionError(result.error);
+      setCorrectionMode("idle");
+      return;
+    }
+    const candidates = result.candidates ?? [];
+    if (candidates.length === 0) {
+      setCorrectionMode("idle");
+      window.alert("교정할 항목이 없어요. 이미 맞춤법이 깨끗합니다!");
+      return;
+    }
+    setCorrectionCandidates(candidates);
+    setCorrectionSelected(new Set(candidates.map((c) => buildKey(c.sessionId, c.selectionId))));
+    setCorrectionMode("review");
+  }
+
+  function toggleCorrection(key: string) {
+    setCorrectionSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function cancelCorrections() {
+    setCorrectionMode("idle");
+    setCorrectionCandidates([]);
+    setCorrectionSelected(new Set());
+    setCorrectionError(null);
+  }
+
+  async function applyCorrections() {
+    const updates = correctionCandidates
+      .filter((c) => correctionSelected.has(buildKey(c.sessionId, c.selectionId)))
+      .map((c) => ({ sessionId: c.sessionId, selectionId: c.selectionId, newText: c.corrected }));
+    if (updates.length === 0) {
+      cancelCorrections();
+      return;
+    }
+    setApplyingCorrections(true);
+    setCorrectionError(null);
+    const result = await applyQuestionGeneratorSpellingCorrections(roomId, updates);
+    setApplyingCorrections(false);
+    if (result.error) {
+      setCorrectionError(result.error);
+      return;
+    }
+    applyLocalUpdates(updates);
+    cancelCorrections();
+    window.alert(`${result.applied ?? updates.length}개 질문의 맞춤법을 교정했습니다.`);
+  }
 
   return (
     <div
@@ -188,30 +335,81 @@ function QuestionResultsModal({
         </div>
 
         <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
-          <div className="mb-5 inline-flex rounded-2xl bg-sky-50 p-1">
-            <button
-              type="button"
-              onClick={() => setViewMode("students")}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
-                viewMode === "students"
-                  ? "bg-white text-sky-700 shadow-sm"
-                  : "text-sky-600 hover:text-sky-700"
-              }`}
-            >
-              학생별 보기
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("questions")}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
-                viewMode === "questions"
-                  ? "bg-white text-sky-700 shadow-sm"
-                  : "text-sky-600 hover:text-sky-700"
-              }`}
-            >
-              질문만 모아보기
-            </button>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-2xl bg-sky-50 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("students")}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  viewMode === "students"
+                    ? "bg-white text-sky-700 shadow-sm"
+                    : "text-sky-600 hover:text-sky-700"
+                }`}
+              >
+                학생별 보기
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("questions")}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  viewMode === "questions"
+                    ? "bg-white text-sky-700 shadow-sm"
+                    : "text-sky-600 hover:text-sky-700"
+                }`}
+              >
+                질문만 모아보기
+              </button>
+            </div>
+            {viewMode === "questions" && results.length > 0 && correctionMode === "idle" && (
+              <button
+                type="button"
+                onClick={runCorrection}
+                className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-600"
+              >
+                ✨ 맞춤법 자동 교정
+              </button>
+            )}
+            {viewMode === "questions" && correctionMode === "loading" && (
+              <span className="inline-flex items-center gap-2 rounded-2xl bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+                AI가 맞춤법을 점검하고 있어요...
+              </span>
+            )}
           </div>
+
+          {correctionError && (
+            <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {correctionError}
+            </div>
+          )}
+
+          {viewMode === "questions" && correctionMode === "review" && (
+            <div className="mb-4 sticky top-0 z-10 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-violet-800">
+                  교정안 {correctionCandidates.length}개 · 선택됨 {correctionSelected.size}개
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={cancelCorrections}
+                    disabled={applyingCorrections}
+                    className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyCorrections}
+                    disabled={applyingCorrections || correctionSelected.size === 0}
+                    className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {applyingCorrections ? "적용 중..." : `선택한 ${correctionSelected.size}개 적용`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {results.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/70 p-10 text-center">
@@ -220,23 +418,73 @@ function QuestionResultsModal({
             </div>
           ) : viewMode === "questions" ? (
             <div className="grid gap-3">
-              {flattenedQuestions.map(({ sessionId, studentNumber, studentName, order, selection }) => (
-                <div key={`${sessionId}-${selection.id}`} className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-sky-500">
-                        {studentNumber}번 {studentName} · 질문 {order}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
-                      </p>
+              {flattenedQuestions.map(({ sessionId, studentNumber, studentName, order, selection }) => {
+                const key = buildKey(sessionId, selection.id);
+                const candidate = correctionMode === "review"
+                  ? correctionCandidates.find((c) => buildKey(c.sessionId, c.selectionId) === key)
+                  : null;
+                const isSelected = candidate ? correctionSelected.has(key) : false;
+                return (
+                  <div key={key} className={`rounded-2xl border bg-white p-4 shadow-sm ${candidate ? "border-violet-200" : "border-sky-100"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-sky-500">
+                          {studentNumber}번 {studentName} · 질문 {order}
+                        </p>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
+                        </p>
+                      </div>
+                      {candidate && (
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCorrection(key)}
+                            className="h-4 w-4 accent-violet-500"
+                          />
+                          <span className="text-xs font-semibold text-violet-700">교정 적용</span>
+                        </label>
+                      )}
                     </div>
+                    {candidate ? (
+                      <div className="mt-3 space-y-2">
+                        <div className="rounded-xl bg-gray-50 px-3 py-2">
+                          <p className="text-xs font-semibold text-gray-400">교정 전</p>
+                          <p className="mt-1 text-sm leading-relaxed text-gray-500 line-through decoration-gray-300">
+                            {candidate.original}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-violet-50 px-3 py-2">
+                          <p className="text-xs font-semibold text-violet-700">교정 후 (적용 시 최종 질문)</p>
+                          <p className="mt-1 text-base font-medium leading-relaxed text-violet-950">
+                            {candidate.corrected}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
+                          <div className="rounded-xl bg-gray-50 px-3 py-2">
+                            <p className="text-xs font-semibold text-gray-400">학생이 적은 원본</p>
+                            <p className="mt-1 text-sm leading-relaxed text-gray-500 line-through decoration-gray-300">
+                              {selection.originalRemixedQuestion}
+                            </p>
+                          </div>
+                        )}
+                        <div className={`rounded-xl px-3 py-2 ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "bg-emerald-50" : ""}`}>
+                          {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
+                            <p className="text-xs font-semibold text-emerald-700">최종 질문 (교정 적용됨)</p>
+                          )}
+                          <p className={`text-base font-medium leading-relaxed ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "mt-1 text-emerald-950" : "text-sky-950"}`}>
+                            {selection.remixedQuestion}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-3 text-base font-medium leading-relaxed text-sky-950">
-                    {selection.remixedQuestion}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-4">
@@ -255,35 +503,93 @@ function QuestionResultsModal({
                   </div>
 
                   <div className="mt-4 space-y-3">
-                    {result.selections.map((selection, index) => (
-                      <div key={selection.id} className="rounded-2xl bg-white p-4 shadow-sm">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-bold uppercase tracking-wide text-sky-500">
-                              질문 {index + 1}
-                            </p>
-                            <p className="mt-1 text-sm text-gray-500">
-                              {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
-                            </p>
+                    {result.selections.map((selection, index) => {
+                      const key = buildKey(result.sessionId, selection.id);
+                      const isEditing = editingKey === key;
+                      const isSaving = savingKey === key;
+                      return (
+                        <div key={selection.id} className="rounded-2xl bg-white p-4 shadow-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-wide text-sky-500">
+                                질문 {index + 1}
+                              </p>
+                              <p className="mt-1 text-sm text-gray-500">
+                                {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
+                              </p>
+                            </div>
+                            {!isEditing && (
+                              <button
+                                type="button"
+                                onClick={() => startEdit(result.sessionId, selection.id, selection.remixedQuestion)}
+                                className="rounded-xl bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                              >
+                                ✏️ 수정
+                              </button>
+                            )}
                           </div>
+
+                          {selection.originalPrompt && (
+                            <div className="mt-3 rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-semibold text-gray-500">고른 질문 카드</p>
+                              <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
+                            </div>
+                          )}
+
+                          {isEditing ? (
+                            <div className="mt-3 rounded-2xl bg-sky-50 p-3">
+                              <p className="text-xs font-semibold text-sky-700">학생이 만든 질문 수정</p>
+                              <textarea
+                                value={editingText}
+                                onChange={(event) => setEditingText(event.target.value)}
+                                rows={3}
+                                className="mt-2 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm leading-relaxed text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-300 resize-y"
+                              />
+                              {editError && (
+                                <p className="mt-2 text-xs font-semibold text-red-600">{editError}</p>
+                              )}
+                              <div className="mt-2 flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={cancelEdit}
+                                  disabled={isSaving}
+                                  className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => saveEdit(result.sessionId, selection.id)}
+                                  disabled={isSaving}
+                                  className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                                >
+                                  {isSaving ? "저장 중..." : "저장"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 space-y-2">
+                              {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
+                                <div className="rounded-2xl bg-gray-50 p-3">
+                                  <p className="text-xs font-semibold text-gray-500">학생이 적은 원본</p>
+                                  <p className="mt-1 text-sm leading-relaxed text-gray-500 line-through decoration-gray-300">
+                                    {selection.originalRemixedQuestion}
+                                  </p>
+                                </div>
+                              )}
+                              <div className={`rounded-2xl p-3 ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "bg-emerald-50" : "bg-sky-50"}`}>
+                                <p className={`text-xs font-semibold ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "text-emerald-700" : "text-sky-700"}`}>
+                                  {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "최종 질문 (수정/교정 적용됨)" : "학생이 만든 질문"}
+                                </p>
+                                <p className={`mt-1 text-base font-medium leading-relaxed ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "text-emerald-950" : "text-sky-950"}`}>
+                                  {selection.remixedQuestion}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
-
-                        {selection.originalPrompt && (
-                          <div className="mt-3 rounded-2xl bg-gray-50 p-3">
-                            <p className="text-xs font-semibold text-gray-500">고른 질문 카드</p>
-                            <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
-                          </div>
-                        )}
-
-                        <div className="mt-3 rounded-2xl bg-sky-50 p-3">
-                          <p className="text-xs font-semibold text-sky-700">학생이 만든 질문</p>
-                          <p className="mt-1 text-base font-medium leading-relaxed text-sky-950">
-                            {selection.remixedQuestion}
-                          </p>
-                        </div>
-
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -337,7 +643,7 @@ function QuestionVotingResultsModal({
           ) : (
             <div className="space-y-4">
               <QuestionVotingTopThree ranking={ranking} />
-              <QuestionVotingCompactList ranking={ranking} showReasons />
+              <QuestionVotingCompactList ranking={ranking} />
             </div>
           )}
         </div>
@@ -390,6 +696,69 @@ function OneLineShareResultsModal({
   );
 }
 
+function HanjaWritingResultsModal({
+  entries,
+  onClose,
+}: {
+  entries: HanjaWritingResults;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-amber-100 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-500">한자 문장 결과</p>
+            <h3 className="text-2xl font-bold text-gray-800 mt-1">학급 전체 문장 모아보기</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              학생들이 만든 문장과 반응 수를 번호, 이름과 함께 한 번에 볼 수 있어요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
+          {entries.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-amber-200 bg-amber-50/70 p-10 text-center">
+              <p className="text-base font-semibold text-amber-800">아직 제출된 문장이 없어요.</p>
+              <p className="mt-2 text-sm text-amber-700">학생들이 문장을 제출하면 여기에 모입니다.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {entries.map((entry) => (
+                <div key={entry.sessionId} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
+                      좋아요 {entry.likeCount}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                  <p className="mt-3 text-[11px] text-gray-400">
+                    {new Date(entry.createdAt).toLocaleString("ko-KR")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LiveStudentPanel({
   roomId,
   students,
@@ -398,6 +767,7 @@ export default function LiveStudentPanel({
   questionResults: initialQuestionResults,
   questionVotingResults: initialQuestionVotingResults,
   oneLineShareResults: initialOneLineShareResults,
+  hanjaWritingResults: initialHanjaWritingResults,
 }: {
   roomId: string;
   students: Student[];
@@ -406,15 +776,18 @@ export default function LiveStudentPanel({
   questionResults: QuestionResult[];
   questionVotingResults: QuestionVotingRanking;
   oneLineShareResults: OneLineShareResults;
+  hanjaWritingResults: HanjaWritingResults;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
   const [isQuestionResultsOpen, setIsQuestionResultsOpen] = useState(false);
   const [isQuestionVotingResultsOpen, setIsQuestionVotingResultsOpen] = useState(false);
   const [isOneLineShareResultsOpen, setIsOneLineShareResultsOpen] = useState(false);
+  const [isHanjaWritingResultsOpen, setIsHanjaWritingResultsOpen] = useState(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>(initialQuestionResults);
   const [questionVotingResults, setQuestionVotingResults] = useState<QuestionVotingRanking>(initialQuestionVotingResults);
   const [oneLineShareResults, setOneLineShareResults] = useState<OneLineShareResults>(initialOneLineShareResults);
+  const [hanjaWritingResults, setHanjaWritingResults] = useState<HanjaWritingResults>(initialHanjaWritingResults);
 
   useEffect(() => {
     let cancelled = false;
@@ -436,6 +809,10 @@ export default function LiveStudentPanel({
         const oneLineData = await getOneLineShareRoomResults(roomId);
         if (cancelled) return;
         setOneLineShareResults(oneLineData ?? []);
+      } else if (activityType === "hanja_writing") {
+        const hanjaData = await getHanjaWritingRoomResults(roomId);
+        if (cancelled) return;
+        setHanjaWritingResults(hanjaData ?? []);
       }
     };
 
@@ -466,6 +843,8 @@ export default function LiveStudentPanel({
       {isQuestionResultsOpen && (
         <QuestionResultsModal
           results={questionResults}
+          roomId={roomId}
+          onResultsChange={setQuestionResults}
           onClose={() => setIsQuestionResultsOpen(false)}
         />
       )}
@@ -479,6 +858,12 @@ export default function LiveStudentPanel({
         <OneLineShareResultsModal
           entries={oneLineShareResults}
           onClose={() => setIsOneLineShareResultsOpen(false)}
+        />
+      )}
+      {isHanjaWritingResultsOpen && (
+        <HanjaWritingResultsModal
+          entries={hanjaWritingResults}
+          onClose={() => setIsHanjaWritingResultsOpen(false)}
         />
       )}
 
@@ -495,6 +880,9 @@ export default function LiveStudentPanel({
             )}
             {activityType === "one_line_share" && (
               <p className="mt-1 text-sm text-gray-500">학생들이 쓴 한 줄과 좋아요 수를 실시간으로 모아볼 수 있어요.</p>
+            )}
+            {activityType === "hanja_writing" && (
+              <p className="mt-1 text-sm text-gray-500">학생들이 만든 한자 문장을 실시간으로 모아보고 학급 전체 결과를 함께 볼 수 있어요.</p>
             )}
           </div>
           <div className="flex items-center gap-3">
@@ -526,6 +914,16 @@ export default function LiveStudentPanel({
                 disabled={oneLineShareResults.length === 0}
               >
                 한줄모아 결과 보기
+              </button>
+            )}
+            {activityType === "hanja_writing" && (
+              <button
+                type="button"
+                onClick={() => setIsHanjaWritingResultsOpen(true)}
+                className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-200"
+                disabled={hanjaWritingResults.length === 0}
+              >
+                한자 문장 결과 보기
               </button>
             )}
             <div className="flex gap-3 text-sm">
@@ -580,6 +978,8 @@ export default function LiveStudentPanel({
                     ? "✅ 좋은 질문 평가 완료"
                     : activityType === "one_line_share"
                       ? "✅ 한 줄 제출 완료"
+                      : activityType === "hanja_writing"
+                        ? "✅ 한자 문장 제출 완료"
                     : "✅ 개요 완성"}
               </p>
               <p className="text-xs text-gray-400">
@@ -589,6 +989,8 @@ export default function LiveStudentPanel({
                     ? "보기 → 학생 선택 결과"
                     : activityType === "one_line_share"
                       ? "보기 → 학생 문장 상세"
+                      : activityType === "hanja_writing"
+                        ? "보기 → 학생 문장 상세"
                     : "QR 버튼 → 학생 개인 결과 QR"}
               </p>
             </div>

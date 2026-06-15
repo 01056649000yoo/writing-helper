@@ -1,11 +1,13 @@
 "use server";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
-import { getApiKey } from "@/lib/vault";
 import { generateDraftFromAnswers, generateOutline } from "@/lib/gpt";
 import { parseOutlineResult, serializeOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
-import { buildOneLineShareBoard, includesConfiguredKeyword, normalizeOneLineShareConfig } from "@/lib/one-line-share";
+import { deterministicShuffle } from "@/lib/anonymous-order";
+import { buildOneLineShareBoard, includesAllConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
+import { buildHanjaWritingBoard, normalizeHanjaWritingConfig, sentenceContainsWord } from "@/lib/hanja-writing";
+import { getTeacherOpenAiAccess, logApiUsage } from "@/lib/service-admin";
 import {
   buildQuestionVotingRanking,
   normalizeQuestionVotingConfig,
@@ -189,6 +191,36 @@ export async function getStudentResult(sessionId: string, roomId: string) {
       oneLineShareEntry,
       oneLineShareBoard,
       oneLineShareClosed: roomRes.data?.is_active === false,
+      hanjaWritingConfig: null,
+      hanjaWritingEntry: null,
+      hanjaWritingBoard: [],
+    };
+  }
+
+  if (activityType === "hanja_writing") {
+    const hanjaWritingConfig = normalizeHanjaWritingConfig(roomRes.data?.activity_config);
+    const hanjaWritingBoard = await getHanjaWritingBoardForRoom(roomId, sessionId);
+    const submission = sessionRes.data?.submission as { content?: unknown } | null | undefined;
+    const myContent = typeof submission?.content === "string" ? submission.content : "";
+    return {
+      activityType,
+      outline: "",
+      draft: "",
+      studentName: sessionRes.data?.student_name ?? "",
+      topic: roomRes.data?.topic ?? "",
+      questionGeneratorSubmission: null,
+      anonymousPeerQuestions: [],
+      questionVotingSubmission: null,
+      questionVotingConfig: null,
+      questionVotingRanking: [],
+      questionVotingClosed: false,
+      oneLineShareConfig: null,
+      oneLineShareEntry: null,
+      oneLineShareBoard: [],
+      oneLineShareClosed: false,
+      hanjaWritingConfig,
+      hanjaWritingEntry: myContent ? { content: myContent } : null,
+      hanjaWritingBoard,
     };
   }
 
@@ -207,7 +239,31 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     oneLineShareEntry: null,
     oneLineShareBoard: [],
     oneLineShareClosed: false,
+    hanjaWritingConfig: null,
+    hanjaWritingEntry: null,
+    hanjaWritingBoard: [],
   };
+}
+
+async function getHanjaWritingBoardForRoom(roomId: string, currentSessionId: string | null) {
+  const admin = createSupabaseAdminClient();
+  const [sessionsRes, reactionsRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, student_number, student_name, submission, updated_at")
+      .eq("room_id", roomId)
+      .eq("status", "done")
+      .order("student_number"),
+    admin
+      .schema("writing_helper")
+      .from("hanja_writing_reactions")
+      .select("target_session_id, session_id")
+      .eq("room_id", roomId)
+      .eq("reaction_type", "like"),
+  ]);
+
+  return buildHanjaWritingBoard(sessionsRes.data ?? [], reactionsRes.data ?? [], currentSessionId);
 }
 
 // 수준 저장
@@ -371,18 +427,19 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
         .eq("id", item.room_id)
         .maybeSingle();
 
-      const { data: profile } = await admin
-        .schema("writing_helper")
-        .from("teacher_profiles")
-        .select("vault_secret_id")
-        .eq("user_id", room?.teacher_id)
-        .maybeSingle();
+      const keyAccess = await getTeacherOpenAiAccess(room!.teacher_id);
+      if (keyAccess.error || !keyAccess.access) throw new Error(keyAccess.error ?? "OpenAI API 키 없음");
+      const apiKey = keyAccess.access.apiKey;
 
-      if (!profile?.vault_secret_id) throw new Error("API 키 없음");
-
-      const apiKey = await getApiKey(profile.vault_secret_id);
-      if (!apiKey) throw new Error("API 키 복호화 실패");
-
+      await logApiUsage({
+        teacherId: room!.teacher_id,
+        feature: "generate_outline",
+        model: "gpt-4o",
+        usedSharedApi: keyAccess.access.usedSharedApi,
+        roomId: item.room_id,
+        sessionId: item.session_id,
+        metadata: { level: session?.level ?? "mid" },
+      });
       const outline = await generateOutline(
         apiKey,
         room!.topic,
@@ -396,7 +453,15 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
 
       const activityConfig = room?.activity_config as { generateDraft?: boolean } | null;
       const draft = activityConfig?.generateDraft
-        ? await generateDraftFromAnswers(
+        ? (await logApiUsage({
+            teacherId: room!.teacher_id,
+            feature: "generate_draft",
+            model: "gpt-4o",
+            usedSharedApi: keyAccess.access.usedSharedApi,
+            roomId: item.room_id,
+            sessionId: item.session_id,
+            metadata: { level: session?.level ?? "mid" },
+          }), await generateDraftFromAnswers(
             apiKey,
             room!.topic,
             room!.topic_description ?? "",
@@ -405,7 +470,7 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
             room!.outline_depth,
             session?.level ?? "mid",
             item.answers
-          )
+          ))
         : null;
 
       // 결과 저장
@@ -534,6 +599,10 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
     .eq("room_id", roomId)
     .maybeSingle();
 
+  const hanjaSubmissionContent = typeof (submissionData?.submission as { content?: unknown } | null | undefined)?.content === "string"
+    ? ((submissionData?.submission as { content: string }).content)
+    : null;
+
   return {
     ...data,
     existing_submission: normalizeQuestionGeneratorSubmission(submissionData?.submission),
@@ -544,6 +613,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
           content: oneLineEntry.content,
         } satisfies OneLineShareSubmission)
       : null,
+    existing_hanja_writing_submission: hanjaSubmissionContent ? { content: hanjaSubmissionContent } : null,
     session_status: submissionData?.status ?? "in_progress",
   };
 }
@@ -572,15 +642,29 @@ export async function submitQuestionGenerator(
   }
 
   const admin = createSupabaseAdminClient();
-  const { data: session } = await admin
-    .schema("writing_helper")
-    .from("student_sessions")
-    .select("id")
-    .eq("id", sessionId)
-    .eq("room_id", roomId)
-    .maybeSingle();
+  const [sessionRes, roomRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_config")
+      .eq("id", roomId)
+      .maybeSingle(),
+  ]);
 
-  if (!session) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+
+  const configMaxSelections = Number((roomRes.data.activity_config as { maxSelections?: unknown } | null)?.maxSelections);
+  const maxSelections = Number.isFinite(configMaxSelections)
+    ? Math.min(Math.max(Math.trunc(configMaxSelections), 1), 4)
+    : 4;
 
   const sanitizedSelections = submission.selections.map((selection, index) => ({
     id: typeof selection.id === "string" && selection.id.trim()
@@ -597,6 +681,10 @@ export async function submitQuestionGenerator(
 
   if (sanitizedSelections.length === 0) {
     return { error: "바꾼 질문을 입력해주세요." };
+  }
+
+  if (sanitizedSelections.length > maxSelections) {
+    return { error: `질문은 ${maxSelections}개까지 만들 수 있어요.` };
   }
 
   const { error } = await admin
@@ -660,18 +748,12 @@ export async function submitQuestionVoting(
     return { error: `좋은 질문은 ${config.maxSelections}개까지 고를 수 있어요.` };
   }
 
-  const reason = submission.reason?.trim();
-  if (config.requireReason && !reason) {
-    return { error: "왜 좋은 질문인지 한 줄 적어주세요." };
-  }
-
   const { error } = await admin
     .schema("writing_helper")
     .from("student_sessions")
     .update({
       submission: {
         selectedQuestionIds,
-        reason: reason || null,
       },
       result: {
         selectedQuestionIds,
@@ -728,8 +810,8 @@ export async function submitOneLineShare(
   const config = normalizeOneLineShareConfig(roomRes.data.activity_config);
   if (!config) return { error: "활동 설정을 불러오지 못했습니다." };
 
-  if (config.keywords.length > 0 && !includesConfiguredKeyword(normalizedContent, config.keywords)) {
-    return { error: "핵심단어를 한 개 이상 넣어 문장을 다시 써주세요." };
+  if (config.coreKeywords.length > 0 && !includesAllConfiguredKeywords(normalizedContent, config.coreKeywords)) {
+    return { error: "핵심단어를 모두 넣어 문장을 다시 써주세요." };
   }
 
   const payload = {
@@ -738,7 +820,7 @@ export async function submitOneLineShare(
     student_number: sessionRes.data.student_number,
     student_name: sessionRes.data.student_name,
     content: normalizedContent,
-    contains_keywords: includesConfiguredKeyword(normalizedContent, config.keywords),
+    contains_keywords: includesAllConfiguredKeywords(normalizedContent, config.coreKeywords),
     updated_at: new Date().toISOString(),
   };
 
@@ -785,6 +867,138 @@ export async function submitOneLineShare(
 
   if (error) return { error: "학생 활동 상태 저장에 실패했습니다." };
   return { entryId: entryRes.data.id };
+}
+
+export async function submitHanjaWriting(
+  sessionId: string,
+  roomId: string,
+  content: string,
+): Promise<{ error?: string }> {
+  if (!sessionId || !roomId) return { error: "잘못된 요청입니다." };
+
+  const normalizedContent = content.trim();
+  if (!normalizedContent) {
+    return { error: "한 문장을 적어주세요." };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const [sessionRes, roomRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_config, activity_type")
+      .eq("id", roomId)
+      .maybeSingle(),
+  ]);
+
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+  if (roomRes.data.activity_type !== "hanja_writing") return { error: "활동 종류가 맞지 않습니다." };
+
+  const config = roomRes.data.activity_config as { card?: { word?: string } } | null;
+  const targetWord = config?.card?.word?.trim() ?? "";
+  if (targetWord && !sentenceContainsWord(normalizedContent, targetWord)) {
+    return { error: `문장에 "${targetWord}" 단어가 들어가야 해요.` };
+  }
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .update({
+      submission: { content: normalizedContent },
+      result: { submitted: true, likeCount: 0 },
+      status: "done",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .eq("room_id", roomId);
+
+  if (error) return { error: "문장 저장에 실패했습니다." };
+  return {};
+}
+
+export async function toggleHanjaWritingReaction(
+  sessionId: string,
+  roomId: string,
+  targetSessionId: string,
+): Promise<{
+  error?: string;
+  entries?: Awaited<ReturnType<typeof getHanjaWritingBoardForRoom>>;
+}> {
+  if (!sessionId || !roomId || !targetSessionId) return { error: "잘못된 요청입니다." };
+
+  const admin = createSupabaseAdminClient();
+  const [sessionRes, roomRes, targetRes, existingReactionRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, status")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_type")
+      .eq("id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, status")
+      .eq("id", targetSessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("hanja_writing_reactions")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("target_session_id", targetSessionId)
+      .eq("session_id", sessionId)
+      .eq("reaction_type", "like")
+      .maybeSingle(),
+  ]);
+
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+  if (roomRes.data.activity_type !== "hanja_writing") return { error: "활동 종류가 맞지 않습니다." };
+  if (!targetRes.data || targetRes.data.status !== "done") return { error: "문장을 찾을 수 없습니다." };
+  if (targetSessionId === sessionId) return { error: "내 문장에는 좋아요를 누를 수 없어요." };
+  if (sessionRes.data.status !== "done") return { error: "먼저 내 문장을 제출한 뒤 반응할 수 있어요." };
+
+  if (existingReactionRes.data) {
+    const { error } = await admin
+      .schema("writing_helper")
+      .from("hanja_writing_reactions")
+      .delete()
+      .eq("id", existingReactionRes.data.id);
+
+    if (error) return { error: "좋아요를 취소하지 못했습니다." };
+  } else {
+    const { error } = await admin
+      .schema("writing_helper")
+      .from("hanja_writing_reactions")
+      .insert({
+        room_id: roomId,
+        target_session_id: targetSessionId,
+        session_id: sessionId,
+        reaction_type: "like",
+      });
+
+    if (error) return { error: "좋아요를 저장하지 못했습니다." };
+  }
+
+  return {
+    entries: await getHanjaWritingBoardForRoom(roomId, sessionId),
+  };
 }
 
 export async function toggleOneLineReaction(
@@ -885,10 +1099,11 @@ async function getAnonymousQuestionGeneratorResults(sessionId: string, roomId: s
     .select("id, submission")
     .eq("room_id", roomId)
     .eq("status", "done")
-    .neq("id", sessionId)
-    .order("updated_at", { ascending: true });
+    .neq("id", sessionId);
 
-  return (data ?? []).flatMap((session, sessionIndex) => {
+  const shuffledSessions = deterministicShuffle(data ?? [], roomId, (session) => session.id);
+
+  return shuffledSessions.flatMap((session, sessionIndex) => {
     const submission = normalizeQuestionGeneratorSubmission(session.submission);
     if (!submission) return [];
 

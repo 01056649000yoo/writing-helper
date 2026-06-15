@@ -4,32 +4,41 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
-import { getCurrentUser, getTeacherProfile } from "./auth-actions";
-import { getApiKey } from "@/lib/vault";
-import { generateQuestionSets } from "@/lib/gpt";
+import { getCurrentUser } from "./auth-actions";
+import { generateQuestionSets, correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
+import { getTeacherOpenAiAccess, logApiUsage } from "@/lib/service-admin";
+import { buildHanjaWritingBoard } from "@/lib/hanja-writing";
 import { getTeacherQuestionCardSettingsTree, getTeacherQuestionCardSets } from "@/lib/question-card-sets";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
+import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
 import { buildOneLineShareBoard, includesConfiguredKeyword, normalizeKeywordText, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import { serializeOutlineResult } from "@/lib/result-format";
 import type {
   ActivityType,
+  HanjaWordCard,
   OutlineBuilderConfig,
   OneLineShareConfig,
   OneLineShareRoomResult,
   QuestionGeneratorConfig,
   QuestionVotingConfig,
   QuestionVotingRoomResult,
+  HanjaWritingConfig,
 } from "@/features/activities/types";
 import type { SubjectType, GradeLevel, OutlineDepth, RoomStudent, QuestionSets } from "@/types";
+
+export type SavedHanjaWordCard = HanjaWordCard & {
+  id: string;
+  teacherId: string;
+  sourceRoomId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 /** 1단계: 질문 세트만 생성해서 반환 (세션 저장 안함) */
 export async function generateQuestionsPreview(formData: FormData): Promise<{ questionSets?: QuestionSets; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
-
-  const profile = await getTeacherProfile();
-  if (!profile?.vault_secret_id) return { error: "GPT API 키를 먼저 설정해주세요." };
 
   const topic = String(formData.get("topic") ?? "").trim();
   const topicDescription = String(formData.get("topic_description") ?? "").trim();
@@ -39,11 +48,18 @@ export async function generateQuestionsPreview(formData: FormData): Promise<{ qu
 
   if (!topic) return { error: "주제를 입력해주세요." };
 
-  const apiKey = await getApiKey(profile.vault_secret_id);
-  if (!apiKey) return { error: "GPT API 키를 불러올 수 없습니다." };
+  const keyAccess = await getTeacherOpenAiAccess(user.id);
+  if (keyAccess.error || !keyAccess.access) return { error: keyAccess.error ?? "OpenAI API 키를 불러올 수 없습니다." };
 
   try {
-    const questionSets = await generateQuestionSets(apiKey, topic, topicDescription, subjectType, gradeLevel, outlineDepth);
+    await logApiUsage({
+      teacherId: user.id,
+      feature: "generate_questions_preview",
+      model: "gpt-4o",
+      usedSharedApi: keyAccess.access.usedSharedApi,
+      metadata: { subjectType, gradeLevel, outlineDepth, topic },
+    });
+    const questionSets = await generateQuestionSets(keyAccess.access.apiKey, topic, topicDescription, subjectType, gradeLevel, outlineDepth);
     return { questionSets };
   } catch {
     return { error: "질문 생성에 실패했습니다. API 키를 확인해주세요." };
@@ -62,7 +78,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   const subjectType = String(formData.get("subject_type")) as SubjectType;
   const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
   const outlineDepth = (String(formData.get("outline_depth")) || "simple") as OutlineDepth;
-  const durationHours = Math.min(Math.max(Number(formData.get("duration_hours") ?? 4), 4), 48);
+  const durationHours = Math.min(Math.max(Number(formData.get("duration_hours") ?? 4), 4), 168);
   const questionSetsJson = String(formData.get("question_sets_json") ?? "").trim();
 
   if (!classId) return { error: "학급을 선택해주세요." };
@@ -97,11 +113,11 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     is_active: true,
   };
 
-  let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig | OneLineShareConfig;
+  let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig | OneLineShareConfig | HanjaWritingConfig;
 
   if (activityType === "outline_builder") {
-    const profile = await getTeacherProfile();
-    if (!profile?.vault_secret_id) return { error: "GPT API 키를 먼저 설정해주세요." };
+    const keyAccess = await getTeacherOpenAiAccess(user.id);
+    if (keyAccess.error || !keyAccess.access) return { error: keyAccess.error ?? "OpenAI API 키를 먼저 설정해주세요." };
 
     if (!questionSetsJson) return { error: "문항을 먼저 생성해주세요." };
 
@@ -170,16 +186,95 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       return { error: "질문 만들기 결과를 불러오지 못했습니다. 다시 선택해주세요." };
     }
 
+    const sourceQuestionMap = new Map(sourceRoom.questions.map((question) => [question.id, question] as const));
+    const fullPayload = parseVotingQuestionsPayload(formData.get("voting_questions"));
+    const legacyPayload = parseSelectedVotingQuestions(formData.get("selected_questions"));
+
+    const buildCurated = (entries: Array<{ id: string; text: string }>) =>
+      entries
+        .map((question) => {
+          const source = sourceQuestionMap.get(question.id);
+          if (!source) return null;
+          const text = question.text.trim();
+          if (!text) return null;
+          return { id: source.id, text };
+        })
+        .filter((question): question is { id: string; text: string } => question !== null);
+
+    const curatedQuestions = fullPayload
+      ? buildCurated(fullPayload.filter((entry) => entry.included))
+      : buildCurated(legacyPayload ?? sourceRoom.questions);
+
+    if (curatedQuestions.length === 0) {
+      return { error: "고르기에 올릴 질문을 1개 이상 선택해주세요." };
+    }
+
+    if (fullPayload) {
+      const backwriteUpdates: Array<{ sessionId: string; selectionId: string; newText: string }> = [];
+      for (const entry of fullPayload) {
+        const source = sourceQuestionMap.get(entry.id);
+        if (!source) continue;
+        const trimmed = entry.text.trim();
+        if (!trimmed || trimmed === source.text) continue;
+        const sessionId = entry.sourceSessionId ?? source.sourceSessionId;
+        const selectionId = entry.sourceSelectionId ?? source.sourceSelectionId;
+        if (!sessionId || !selectionId) continue;
+        backwriteUpdates.push({ sessionId, selectionId, newText: trimmed });
+      }
+      if (backwriteUpdates.length > 0) {
+        await applyQuestionUpdatesForRoom(sourceRoom.roomId, user.id, backwriteUpdates);
+      }
+    }
+
     topic = sourceRoom.title || sourceRoom.topic || "좋은 질문 고르기";
     topicDescription = sourceRoom.topic || sourceRoom.title || "";
+
+    // 후보 질문은 학생별 묶음 순서가 드러나지 않도록 섞어서 저장한다. (모든 학생에게 동일한 순서)
+    const shuffledQuestions = deterministicShuffle(curatedQuestions, sourceRoom.roomId, (question) => question.id);
 
     activityConfig = {
       sourceRoomId: sourceRoom.roomId,
       sourceRoomTitle: sourceRoom.title,
-      sourceQuestions: sourceRoom.questions,
+      sourceQuestions: shuffledQuestions,
       evaluationCriteria,
-      maxSelections: clampNumber(formData.get("max_selections"), 1, sourceRoom.questions.length, 1),
-      requireReason: formData.get("require_reason") !== "off",
+      maxSelections: clampNumber(formData.get("max_selections"), 1, shuffledQuestions.length, 1),
+    };
+  } else if (activityType === "hanja_writing") {
+    const cardRaw = String(formData.get("hanja_card") ?? "").trim();
+    if (!cardRaw) return { error: "한자 카드 정보가 없습니다. 다시 시도해 주세요." };
+    let parsedCard: unknown;
+    try {
+      parsedCard = JSON.parse(cardRaw);
+    } catch {
+      return { error: "한자 카드 정보를 읽지 못했습니다." };
+    }
+    if (!parsedCard || typeof parsedCard !== "object") {
+      return { error: "한자 카드 정보가 올바르지 않습니다." };
+    }
+    const cardData = parsedCard as Record<string, unknown>;
+    const word = typeof cardData.word === "string" ? cardData.word.trim() : "";
+    if (!word) return { error: "단어가 비어 있습니다." };
+
+    const promptTitle = String(formData.get("prompt_title") ?? "").trim()
+      || `[${word}] 한자 카드로 한 문장 만들기`;
+    const promptDescription = String(formData.get("prompt_description") ?? "").trim()
+      || `단어 "${word}"의 한자 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 한 문장을 써보세요.`;
+
+    topic = promptTitle;
+    topicDescription = promptDescription;
+
+    activityConfig = {
+      promptTitle,
+      promptDescription,
+      card: {
+        word,
+        grade: Number(cardData.grade) || 4,
+        hanja: Array.isArray(cardData.hanja) ? cardData.hanja : [],
+        relatedWords: Array.isArray(cardData.relatedWords) ? cardData.relatedWords : [],
+        definition: typeof cardData.definition === "string" ? cardData.definition : "",
+        example: typeof cardData.example === "string" ? cardData.example : "",
+        category: typeof cardData.category === "string" ? cardData.category : "",
+      },
     };
   } else {
     const promptTitle =
@@ -190,7 +285,11 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       String(formData.get("prompt_description") ?? "").trim()
       || String(formData.get("topic_description") ?? "").trim()
       || "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.";
-    const keywords = normalizeKeywordText(String(formData.get("keywords") ?? ""));
+    const legacyKeywords = normalizeKeywordText(String(formData.get("keywords") ?? ""));
+    const coreFromForm = normalizeKeywordText(String(formData.get("core_keywords") ?? ""));
+    const coreKeywords = coreFromForm.length > 0 ? coreFromForm : legacyKeywords;
+    const auxiliaryKeywords = normalizeKeywordText(String(formData.get("auxiliary_keywords") ?? ""))
+      .filter((keyword) => !coreKeywords.includes(keyword));
 
     topic = promptTitle;
     topicDescription = promptDescription;
@@ -198,7 +297,8 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     activityConfig = {
       promptTitle,
       promptDescription,
-      keywords,
+      coreKeywords,
+      auxiliaryKeywords,
       maxReactionsPerStudent: clampNumber(formData.get("max_reactions_per_student"), 1, 10, 3),
     };
   }
@@ -210,7 +310,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     .from("rooms")
     .insert({
       ...baseRoomPayload,
-      title: activityType === "one_line_share" ? "한줄모아" : topic,
+      title: activityType === "one_line_share" ? "한줄모아" : activityType === "hanja_writing" ? "한자 활용 문장 만들기" : topic,
       topic,
       topic_description: topicDescription,
       activity_type: activityType,
@@ -241,6 +341,13 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 
   if (roomError || !room) return { error: roomError?.message ?? "활동 세션 생성에 실패했습니다." };
 
+  if (activityType === "hanja_writing") {
+    const configCard = normalizeHanjaWordCard((activityConfig as HanjaWritingConfig).card);
+    if (configCard) {
+      await saveTeacherHanjaWordCard(configCard, room.id);
+    }
+  }
+
   await ensureShortLinkForRoom(room.id, user.id, expiresAt);
 
   revalidatePath("/dashboard");
@@ -249,7 +356,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 }
 
 function parseActivityType(value: FormDataEntryValue | null): ActivityType {
-  return value === "question_generator" || value === "question_voting" || value === "one_line_share"
+  return value === "question_generator" || value === "question_voting" || value === "one_line_share" || value === "hanja_writing"
     ? value
     : "outline_builder";
 }
@@ -260,10 +367,63 @@ function isMissingActivityColumnError(message: string) {
     || message.includes("activity_state");
 }
 
+function isMissingTeacherHanjaWordCardsTable(message: string) {
+  return message.includes("teacher_hanja_word_cards");
+}
+
 function clampNumber(value: FormDataEntryValue | null, min: number, max: number, fallback: number) {
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue)) return fallback;
   return Math.min(Math.max(Math.trunc(numberValue), min), max);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseSelectedVotingQuestions(value: FormDataEntryValue | null): Array<{ id: string; text: string }> | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    return parsed
+      .filter((entry): entry is { id: unknown; text: unknown } => typeof entry === "object" && entry !== null)
+      .map((entry) => ({
+        id: typeof entry.id === "string" ? entry.id.trim() : "",
+        text: typeof entry.text === "string" ? entry.text : "",
+      }))
+      .filter((entry) => entry.id.length > 0);
+  } catch {
+    return null;
+  }
+}
+
+type VotingQuestionDraftPayload = {
+  id: string;
+  text: string;
+  included: boolean;
+  sourceSessionId?: string;
+  sourceSelectionId?: string;
+};
+
+function parseVotingQuestionsPayload(value: FormDataEntryValue | null): VotingQuestionDraftPayload[] | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    return parsed
+      .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+      .map((entry) => ({
+        id: typeof entry.id === "string" ? entry.id.trim() : "",
+        text: typeof entry.text === "string" ? entry.text : "",
+        included: entry.included === true,
+        sourceSessionId: typeof entry.sourceSessionId === "string" && entry.sourceSessionId.trim() ? entry.sourceSessionId.trim() : undefined,
+        sourceSelectionId: typeof entry.sourceSelectionId === "string" && entry.sourceSelectionId.trim() ? entry.sourceSelectionId.trim() : undefined,
+      }))
+      .filter((entry) => entry.id.length > 0);
+  } catch {
+    return null;
+  }
 }
 
 export async function updateStudentResult(
@@ -492,6 +652,7 @@ export type QuestionGeneratorRoomResultSummary = {
     cardSetLabel: string;
     originalPrompt: string | null;
     remixedQuestion: string;
+    originalRemixedQuestion?: string;
   }>;
 };
 
@@ -504,6 +665,8 @@ export type QuestionGeneratorSourceRoomSummary = {
   questions: Array<{
     id: string;
     text: string;
+    sourceSessionId: string;
+    sourceSelectionId: string;
   }>;
 };
 
@@ -545,11 +708,200 @@ export async function getQuestionGeneratorRoomResults(roomId: string): Promise<Q
           cardSetLabel: selection.cardSetLabel,
           originalPrompt: selection.originalPrompt,
           remixedQuestion: selection.remixedQuestion,
+          originalRemixedQuestion: selection.originalRemixedQuestion,
         })),
       }];
     });
 
   return results;
+}
+
+async function loadTeacherOpenAiKey(teacherId: string): Promise<{ apiKey?: string; usedSharedApi?: boolean; error?: string }> {
+  const keyAccess = await getTeacherOpenAiAccess(teacherId);
+  if (keyAccess.error || !keyAccess.access) {
+    return { error: keyAccess.error ?? "OpenAI API 키를 불러올 수 없습니다." };
+  }
+  return { apiKey: keyAccess.access.apiKey, usedSharedApi: keyAccess.access.usedSharedApi };
+}
+
+type QuestionUpdate = { sessionId: string; selectionId: string; newText: string };
+
+async function applyQuestionUpdatesForRoom(
+  roomId: string,
+  teacherId: string,
+  updates: QuestionUpdate[],
+): Promise<{ applied: number; error?: string }> {
+  if (updates.length === 0) return { applied: 0 };
+
+  const admin = createSupabaseAdminClient();
+
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("id, teacher_id, activity_type")
+    .eq("id", roomId)
+    .maybeSingle();
+  if (!room || room.teacher_id !== teacherId || room.activity_type !== "question_generator") {
+    return { applied: 0, error: "수정 권한이 없습니다." };
+  }
+
+  const updatesBySession = new Map<string, Map<string, string>>();
+  for (const update of updates) {
+    const trimmed = update.newText.trim();
+    if (!trimmed) continue;
+    if (!updatesBySession.has(update.sessionId)) {
+      updatesBySession.set(update.sessionId, new Map());
+    }
+    updatesBySession.get(update.sessionId)!.set(update.selectionId, trimmed);
+  }
+
+  if (updatesBySession.size === 0) return { applied: 0 };
+
+  const sessionIds = Array.from(updatesBySession.keys());
+  const { data: sessions } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("id, submission, room_id")
+    .in("id", sessionIds)
+    .eq("room_id", roomId);
+
+  let applied = 0;
+  const updatedAt = new Date().toISOString();
+
+  for (const session of sessions ?? []) {
+    const sessionUpdates = updatesBySession.get(session.id);
+    if (!sessionUpdates) continue;
+
+    const submission = normalizeQuestionGeneratorSubmission(session.submission);
+    if (!submission) continue;
+
+    let sessionChanged = false;
+    const nextSelections = submission.selections.map((selection) => {
+      const nextText = sessionUpdates.get(selection.id);
+      if (nextText && nextText !== selection.remixedQuestion) {
+        sessionChanged = true;
+        applied += 1;
+        return {
+          ...selection,
+          remixedQuestion: nextText,
+          originalRemixedQuestion: selection.originalRemixedQuestion ?? selection.remixedQuestion,
+        };
+      }
+      return selection;
+    });
+
+    if (!sessionChanged) continue;
+
+    const { error } = await admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .update({
+        submission: { selections: nextSelections },
+        updated_at: updatedAt,
+      })
+      .eq("id", session.id)
+      .eq("room_id", roomId);
+    if (error) return { applied, error: "질문 수정 저장에 실패했습니다." };
+  }
+
+  return { applied };
+}
+
+export async function updateQuestionGeneratorSelection(
+  roomId: string,
+  sessionId: string,
+  selectionId: string,
+  newText: string,
+): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const result = await applyQuestionUpdatesForRoom(roomId, user.id, [
+    { sessionId, selectionId, newText },
+  ]);
+  if (result.error) return { error: result.error };
+  if (result.applied === 0) return { error: "수정할 질문을 찾지 못했습니다." };
+  return {};
+}
+
+export type SpellingCorrectionCandidate = {
+  sessionId: string;
+  selectionId: string;
+  original: string;
+  corrected: string;
+};
+
+export async function correctQuestionGeneratorSpelling(
+  roomId: string,
+): Promise<{ candidates?: SpellingCorrectionCandidate[]; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const keyResult = await loadTeacherOpenAiKey(user.id);
+  if (keyResult.error || !keyResult.apiKey) return { error: keyResult.error };
+
+  const results = await getQuestionGeneratorRoomResults(roomId);
+  if (results.length === 0) return { candidates: [] };
+
+  const inputs: Array<{ id: string; text: string; sessionId: string; selectionId: string }> = [];
+  for (const result of results) {
+    for (const selection of result.selections) {
+      const text = selection.remixedQuestion.trim();
+      if (!text) continue;
+      inputs.push({
+        id: `${result.sessionId}::${selection.id}`,
+        text,
+        sessionId: result.sessionId,
+        selectionId: selection.id,
+      });
+    }
+  }
+  if (inputs.length === 0) return { candidates: [] };
+
+  try {
+    await logApiUsage({
+      teacherId: user.id,
+      feature: "correct_question_generator_spelling",
+      model: "gpt-4o",
+      usedSharedApi: keyResult.usedSharedApi ?? true,
+      roomId,
+      metadata: { inputCount: inputs.length },
+    });
+    const corrected = await correctKoreanSpelling(
+      keyResult.apiKey,
+      inputs.map(({ id, text }) => ({ id, text })),
+    );
+    const correctedById = new Map(corrected.map((entry) => [entry.id, entry.corrected.trim()]));
+
+    const candidates: SpellingCorrectionCandidate[] = [];
+    for (const input of inputs) {
+      const correctedText = correctedById.get(input.id);
+      if (!correctedText) continue;
+      if (correctedText === input.text) continue;
+      candidates.push({
+        sessionId: input.sessionId,
+        selectionId: input.selectionId,
+        original: input.text,
+        corrected: correctedText,
+      });
+    }
+    return { candidates };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "맞춤법 교정에 실패했습니다.";
+    return { error: message };
+  }
+}
+
+export async function applyQuestionGeneratorSpellingCorrections(
+  roomId: string,
+  updates: QuestionUpdate[],
+): Promise<{ applied?: number; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const result = await applyQuestionUpdatesForRoom(roomId, user.id, updates);
+  if (result.error) return { error: result.error };
+  return { applied: result.applied };
 }
 
 export async function getQuestionGeneratorSourceRooms(classId?: string): Promise<QuestionGeneratorSourceRoomSummary[]> {
@@ -580,7 +932,7 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
     .in("room_id", roomIds)
     .eq("status", "done");
 
-  const questionsByRoom = new Map<string, Array<{ id: string; text: string }>>();
+  const questionsByRoom = new Map<string, Array<{ id: string; text: string; sourceSessionId: string; sourceSelectionId: string }>>();
 
   for (const session of sessions ?? []) {
     const submission = normalizeQuestionGeneratorSubmission(session.submission);
@@ -589,8 +941,10 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
     const current = questionsByRoom.get(session.room_id) ?? [];
     submission.selections.forEach((selection) => {
       current.push({
-        id: `${session.id}-${selection.id}`,
+        id: `${session.id}::${selection.id}`,
         text: selection.remixedQuestion,
+        sourceSessionId: session.id,
+        sourceSelectionId: selection.id,
       });
     });
     questionsByRoom.set(session.room_id, current);
@@ -677,6 +1031,294 @@ export async function getOneLineShareRoomResults(roomId: string): Promise<OneLin
   return buildOneLineShareBoard(entriesRes.data ?? [], reactionsRes.data ?? [], null);
 }
 
+export async function getOrGenerateHanjaCard(
+  word: string,
+  grade: number,
+): Promise<{ card?: GeneratedHanjaCard & { grade: number }; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const trimmedWord = word.trim();
+  if (!trimmedWord) return { error: "단어를 입력해 주세요." };
+  const clampedGrade = Math.min(Math.max(Math.trunc(Number(grade) || 4), 3), 6);
+
+  const admin = createSupabaseAdminClient();
+
+  const { data: cached } = await admin
+    .schema("writing_helper")
+    .from("hanja_word_cards")
+    .select("hanja_data, grade")
+    .eq("word", trimmedWord)
+    .eq("grade", clampedGrade)
+    .maybeSingle();
+
+  if (cached?.hanja_data) {
+    const data = cached.hanja_data as GeneratedHanjaCard;
+    if (isUsableHanjaWordCard(data)) {
+      return { card: { ...data, word: trimmedWord, grade: cached.grade ?? clampedGrade } };
+    }
+    return { error: "이 단어는 한자어 카드로 만들기 어렵습니다. 추천 목록의 단어를 고르거나 다른 한자어를 입력해 주세요." };
+  }
+
+  const keyResult = await loadTeacherOpenAiKey(user.id);
+  if (keyResult.error || !keyResult.apiKey) return { error: keyResult.error };
+
+  try {
+    await logApiUsage({
+      teacherId: user.id,
+      feature: "generate_hanja_card",
+      model: "gpt-4o",
+      usedSharedApi: keyResult.usedSharedApi ?? true,
+      metadata: { word: trimmedWord, grade: clampedGrade },
+    });
+    const generated = await generateHanjaWordCard(keyResult.apiKey, trimmedWord, clampedGrade);
+    if (generated.isHanjaWord !== true || !isUsableHanjaWordCard(generated)) {
+      return {
+        error: generated.rejectionReason
+          ? `이 단어는 한자어 카드로 만들지 않았습니다. ${generated.rejectionReason}`
+          : "이 단어는 한자어로 확인되지 않아 카드를 만들지 않았습니다. 추천 목록의 단어를 고르거나 다른 한자어를 입력해 주세요.",
+      };
+    }
+    await admin
+      .schema("writing_helper")
+      .from("hanja_word_cards")
+      .insert({
+        word: trimmedWord,
+        grade: clampedGrade,
+        hanja_data: generated,
+      });
+    return { card: { ...generated, word: trimmedWord, grade: clampedGrade } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "한자 카드를 생성하지 못했습니다.";
+    return { error: message };
+  }
+}
+
+export async function getTeacherHanjaWordCards(): Promise<{ cards?: SavedHanjaWordCard[]; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .schema("writing_helper")
+    .from("teacher_hanja_word_cards")
+    .select("id, teacher_id, word, grade, card_data, source_room_id, created_at, updated_at")
+    .eq("teacher_id", user.id)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    if (isMissingTeacherHanjaWordCardsTable(error.message)) return { cards: [] };
+    return { error: error.message };
+  }
+
+  return {
+    cards: (data ?? [])
+      .map(normalizeSavedHanjaWordCardRow)
+      .filter((card): card is SavedHanjaWordCard => card !== null),
+  };
+}
+
+export async function saveTeacherHanjaWordCard(
+  input: HanjaWordCard,
+  sourceRoomId?: string | null,
+): Promise<{ card?: SavedHanjaWordCard; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const normalized = normalizeHanjaWordCard(input);
+  if (!normalized) return { error: "저장할 한자 카드 정보가 올바르지 않습니다." };
+
+  const admin = createSupabaseAdminClient();
+  const payload = {
+    teacher_id: user.id,
+    word: normalized.word,
+    grade: normalized.grade,
+    card_data: {
+      hanja: normalized.hanja,
+      relatedWords: normalized.relatedWords,
+      definition: normalized.definition,
+      example: normalized.example,
+      category: normalized.category,
+    },
+    source_room_id: sourceRoomId ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await admin
+    .schema("writing_helper")
+    .from("teacher_hanja_word_cards")
+    .upsert(payload, { onConflict: "teacher_id,word,grade" })
+    .select("id, teacher_id, word, grade, card_data, source_room_id, created_at, updated_at")
+    .single();
+
+  if (error) {
+    if (isMissingTeacherHanjaWordCardsTable(error.message)) {
+      return { error: "단어집 저장 기능을 쓰려면 최신 데이터베이스 마이그레이션을 적용해야 합니다." };
+    }
+    return { error: error.message };
+  }
+
+  const saved = normalizeSavedHanjaWordCardRow(data);
+  if (!saved) return { error: "저장된 한자 카드를 읽지 못했습니다." };
+  revalidatePath("/dashboard/hanja-wordbook");
+  return { card: saved };
+}
+
+export async function deleteTeacherHanjaWordCard(cardId: string): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+  if (!cardId.trim()) return { error: "삭제할 카드를 찾지 못했습니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("teacher_hanja_word_cards")
+    .delete()
+    .eq("id", cardId)
+    .eq("teacher_id", user.id);
+
+  if (error) {
+    if (isMissingTeacherHanjaWordCardsTable(error.message)) {
+      return { error: "단어집 기능을 쓰려면 최신 데이터베이스 마이그레이션을 적용해야 합니다." };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard/hanja-wordbook");
+  return {};
+}
+
+export type HanjaWritingRoomEntry = {
+  sessionId: string;
+  studentNumber: number;
+  studentName: string;
+  content: string;
+  likeCount: number;
+  createdAt: string;
+};
+
+export async function getHanjaWritingRoomResults(roomId: string): Promise<HanjaWritingRoomEntry[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id, activity_type")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== user.id || room.activity_type !== "hanja_writing") return [];
+
+  const [sessionsRes, reactionsRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, student_number, student_name, submission, updated_at")
+      .eq("room_id", roomId)
+      .eq("status", "done")
+      .order("student_number"),
+    admin
+      .schema("writing_helper")
+      .from("hanja_writing_reactions")
+      .select("target_session_id, session_id")
+      .eq("room_id", roomId)
+      .eq("reaction_type", "like"),
+  ]);
+
+  return buildHanjaWritingBoard(sessionsRes.data ?? [], reactionsRes.data ?? [], null).map((entry) => ({
+    sessionId: entry.sessionId,
+    studentNumber: entry.studentNumber,
+    studentName: entry.studentName,
+    content: entry.content,
+    likeCount: entry.likeCount,
+    createdAt: entry.createdAt,
+  }));
+}
+
+function normalizeSavedHanjaWordCardRow(row: {
+  id: string;
+  teacher_id: string;
+  word: string;
+  grade: number;
+  card_data: unknown;
+  source_room_id: string | null;
+  created_at: string;
+  updated_at: string;
+}): SavedHanjaWordCard | null {
+  const card = normalizeHanjaWordCard({
+    word: row.word,
+    grade: row.grade,
+    ...(isRecord(row.card_data) ? row.card_data : {}),
+  });
+  if (!card) return null;
+
+  return {
+    id: row.id,
+    teacherId: row.teacher_id,
+    sourceRoomId: row.source_room_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    ...card,
+  };
+}
+
+function normalizeHanjaWordCard(value: unknown): HanjaWordCard | null {
+  if (!isRecord(value)) return null;
+
+  const word = typeof value.word === "string" ? value.word.trim() : "";
+  if (!word) return null;
+
+  const grade = clampNumber(String(value.grade ?? ""), 3, 6, 4);
+  return {
+    word,
+    grade,
+    hanja: Array.isArray(value.hanja)
+      ? value.hanja
+          .filter(isRecord)
+          .map((entry) => ({
+            char: typeof entry.char === "string" ? entry.char.trim() : "",
+            reading: typeof entry.reading === "string" ? entry.reading.trim() : "",
+            meaning: typeof entry.meaning === "string" ? entry.meaning.trim() : "",
+          }))
+          .filter((entry) => entry.char && entry.reading && entry.meaning)
+      : [],
+    relatedWords: Array.isArray(value.relatedWords)
+      ? value.relatedWords
+          .filter(isRecord)
+          .map((entry) => ({
+            word: typeof entry.word === "string" ? entry.word.trim() : "",
+            hanja: typeof entry.hanja === "string" ? entry.hanja.trim() : "",
+            meaning: typeof entry.meaning === "string" ? entry.meaning.trim() : "",
+            sharedChar: typeof entry.sharedChar === "string" ? entry.sharedChar.trim() : "",
+          }))
+          .filter((entry) => entry.word && entry.meaning)
+      : [],
+    definition: typeof value.definition === "string" ? value.definition.trim() : "",
+    example: typeof value.example === "string" ? value.example.trim() : "",
+    category: typeof value.category === "string" ? value.category.trim() : "",
+  };
+}
+
+function isHanjaCharacter(value: string) {
+  return /^[\u3400-\u4dbf\u4e00-\u9fff]+$/u.test(value);
+}
+
+function isUsableHanjaWordCard(card: GeneratedHanjaCard | HanjaWordCard | null | undefined): card is GeneratedHanjaCard & HanjaWordCard {
+  if (!card) return false;
+  if (!Array.isArray(card.hanja) || card.hanja.length === 0) return false;
+  return card.hanja.every((entry) => (
+    typeof entry.char === "string"
+    && typeof entry.reading === "string"
+    && typeof entry.meaning === "string"
+    && entry.char.trim().length > 0
+    && entry.reading.trim().length > 0
+    && entry.meaning.trim().length > 0
+    && isHanjaCharacter(entry.char.trim())
+  ));
+}
+
 async function getQuestionGeneratorSourceRoomSummary(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   teacherId: string,
@@ -705,8 +1347,10 @@ async function getQuestionGeneratorSourceRoomSummary(
     if (!submission) return [];
 
     return submission.selections.map((selection) => ({
-      id: `${session.id}-${selection.id}`,
+      id: `${session.id}::${selection.id}`,
       text: selection.remixedQuestion,
+      sourceSessionId: session.id,
+      sourceSelectionId: selection.id,
     }));
   });
 

@@ -103,8 +103,8 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-8 text-white shadow-md">
             <h2 className="text-2xl font-bold">✏️ 아지트 글쓰기 활동 꾸러미 완전 정복</h2>
             <p className="text-base text-indigo-100 mt-2 leading-relaxed max-w-3xl">
-              아지트 글쓰기 연구소의 대표 기능인 <strong>'글쓰기 활동 꾸러미'</strong>의 설정 및 4가지 핵심 활동 사용 가이드입니다. 
-              API 키와 질문 카드를 완벽하게 준비한 뒤, 순차적이고 체계적인 학생 글쓰기 활동을 운영해 보세요.
+              아지트 글쓰기 연구소의 대표 기능인 <strong>'글쓰기 활동 꾸러미'</strong>의 설정 및 4가지 핵심 활동 사용 가이드입니다.
+              한자 활용 문장 만들기는 이 꾸러미와 별도로 운영되는 문해력 활동입니다.
             </p>
             <div className="mt-4 flex gap-3">
               <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
@@ -237,7 +237,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
                   <h4 className="text-lg font-bold text-gray-800">좋은 질문 고르기 (Question Voting)</h4>
                 </div>
                 <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                  '질문 만들기' 활동에서 동료 학생들이 제출한 익명화된 전체 질문 풀(Pool)에서, 교사가 설정한 평가 기준에 부합하는 질문을 골라내고 선택 이유를 작성함으로써 **평가 및 분석적 사고**를 경험합니다.
+                  '질문 만들기' 활동에서 동료 학생들이 제출한 익명화된 전체 질문 풀(Pool)에서, 교사가 설정한 평가 기준에 부합하는 질문을 골라냄으로써 **평가 및 분석적 사고**를 경험합니다.
                 </p>
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
                   <div className="flex justify-between">
@@ -272,6 +272,17 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-amber-100">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl px-3 py-1 bg-amber-50 text-amber-600 rounded-xl font-bold">별도</span>
+              <h4 className="text-lg font-bold text-gray-800">한자 활용 문장 만들기</h4>
+            </div>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              이 활동은 글쓰기 활동 꾸러미 4개 모듈과는 별도로 운영되는 문해력 활동입니다. 교사가 한자 카드를 만들고,
+              학생은 단어와 관련 어휘를 읽은 뒤 해당 단어를 살린 문장을 만들어 공유합니다.
+            </p>
           </div>
         </div>
       )}

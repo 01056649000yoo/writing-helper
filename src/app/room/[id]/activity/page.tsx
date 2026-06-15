@@ -7,12 +7,15 @@ import {
   saveAnswers,
   requestOutline,
   getStudentRoomQuestions,
+  submitHanjaWriting,
   submitOneLineShare,
   submitQuestionGenerator,
   submitQuestionVoting,
 } from "@/app/actions/student-actions";
 import { getMatchingConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
+import { normalizeHanjaWritingConfig, sentenceContainsWord } from "@/lib/hanja-writing";
 import type {
+  HanjaWritingConfig,
   OneLineShareConfig,
   QuestionCardRole,
   QuestionCardSet,
@@ -21,8 +24,14 @@ import type {
   QuestionVotingConfig,
 } from "@/features/activities/types";
 import type { StudentLevel, QuestionSets, Question, Answer } from "@/types";
+import {
+  getCardMeta,
+  getCardTheme,
+  getRecommendedGradeChipClass,
+  getRecommendedGradeLabel,
+} from "@/features/activities/question-generator/card-meta";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing";
 type Step =
   | "level"
   | "questions"
@@ -35,6 +44,8 @@ type Step =
   | "question_voting"
   | "one_line_share"
   | "one_line_submitting"
+  | "hanja_writing"
+  | "hanja_submitting"
   | "submitting";
 
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
@@ -56,8 +67,8 @@ const RESEARCH_ROLES: ResearchRole[] = [
   {
     id: "detective",
     title: "탐정 모드",
-    subtitle: "사실/추론",
-    description: "보이는 사실을 살피고, 이유와 흐름을 차근차근 캐내요.",
+    subtitle: "단서/원인/흐름",
+    description: "보이는 단서를 찾고, 왜 그런지와 사건의 앞뒤 흐름을 차근차근 밝혀요.",
     icon: "🕵️",
     accentClassName: "text-sky-700 bg-sky-100",
     surfaceClassName: "from-sky-50 to-cyan-100 ring-sky-200",
@@ -66,8 +77,8 @@ const RESEARCH_ROLES: ResearchRole[] = [
   {
     id: "wizard",
     title: "마법사 모드",
-    subtitle: "상상/비틀기",
-    description: "생각을 넓히고 낯선 방향으로 비틀어 새로운 질문을 만들어요.",
+    subtitle: "상상/반전/비유",
+    description: "익숙한 이야기를 새롭게 바꾸고, 엉뚱하고 반짝이는 발상으로 질문을 넓혀요.",
     icon: "🪄",
     accentClassName: "text-fuchsia-700 bg-fuchsia-100",
     surfaceClassName: "from-fuchsia-50 to-violet-100 ring-fuchsia-200",
@@ -76,22 +87,22 @@ const RESEARCH_ROLES: ResearchRole[] = [
   {
     id: "judge",
     title: "판사 모드",
-    subtitle: "가치/해결",
-    description: "무엇이 더 중요할지 따져 보고, 해결 방향을 찾도록 도와줘요.",
+    subtitle: "가치/판단/해결",
+    description: "여러 입장을 따져 보고, 무엇이 더 중요한지 판단하며 더 나은 해결 방향을 찾아요.",
     icon: "⚖️",
     accentClassName: "text-amber-700 bg-amber-100",
     surfaceClassName: "from-amber-50 to-orange-100 ring-amber-200",
-    cardSetIds: ["value", "solution", "connection"],
+    cardSetIds: ["value", "perspective", "solution"],
   },
   {
     id: "counselor",
     title: "상담사 모드",
-    subtitle: "공감/시점",
-    description: "마음과 관점을 살피며 더 깊고 따뜻한 질문으로 바꿔요.",
+    subtitle: "마음/공감/연결",
+    description: "인물의 마음을 헤아리고, 내 경험과 감각을 이어 더 따뜻하고 가까운 질문으로 바꿔요.",
     icon: "💬",
     accentClassName: "text-emerald-700 bg-emerald-100",
     surfaceClassName: "from-emerald-50 to-teal-100 ring-emerald-200",
-    cardSetIds: ["emotion", "perspective", "sense"],
+    cardSetIds: ["emotion", "connection", "sense"],
   },
 ];
 
@@ -145,6 +156,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [questionGeneratorConfig, setQuestionGeneratorConfig] = useState<QuestionGeneratorConfig | null>(null);
   const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
   const [oneLineShareConfig, setOneLineShareConfig] = useState<OneLineShareConfig | null>(null);
+  const [hanjaWritingConfig, setHanjaWritingConfig] = useState<HanjaWritingConfig | null>(null);
+  const [hanjaContent, setHanjaContent] = useState("");
   const [step, setStep] = useState<Step | null>(null);
   const [levelPending, setLevelPending] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -166,7 +179,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [selectedCategoryLabel, setSelectedCategoryLabel] = useState<string | null>(null);
   const [promptSearch, setPromptSearch] = useState("");
   const [selectedVotingQuestionIds, setSelectedVotingQuestionIds] = useState<string[]>([]);
-  const [votingReason, setVotingReason] = useState("");
   const [oneLineContent, setOneLineContent] = useState("");
   const [stepVisible, setStepVisible] = useState(false);
 
@@ -221,7 +233,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
   const maxSelections = questionGeneratorConfig?.maxSelections ?? 1;
   const votingMaxSelections = questionVotingConfig?.maxSelections ?? 1;
-  const votingRequireReason = questionVotingConfig?.requireReason ?? true;
 
   useEffect(() => {
     if (!selectedResearchRole) return;
@@ -277,7 +288,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       setTopicDescription(typeof data.topic_description === "string" ? data.topic_description : "");
 
       const type = data.activity_type;
-      if (type === "question_generator" || type === "question_voting" || type === "one_line_share") {
+      if (type === "question_generator" || type === "question_voting" || type === "one_line_share" || type === "hanja_writing") {
         setActivityType(type);
       } else {
         setActivityType("outline_builder");
@@ -294,12 +305,25 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           setStep("question_intro");
         }
       } else if (type === "question_voting") {
-        setQuestionVotingConfig(normalizeQuestionVotingConfig(data.activity_config));
+        const votingConfig = normalizeQuestionVotingConfig(data.activity_config);
+        setQuestionVotingConfig(votingConfig);
+        const existingVotingSubmission = data.existing_voting_submission;
+        if (existingVotingSubmission?.selectedQuestionIds?.length) {
+          const allowedIds = new Set(votingConfig.sourceQuestions.map((question) => question.id));
+          setSelectedVotingQuestionIds(
+            existingVotingSubmission.selectedQuestionIds.filter((questionId) => allowedIds.has(questionId))
+          );
+        }
         setStep("question_voting");
       } else if (type === "one_line_share") {
         setOneLineShareConfig(normalizeOneLineShareConfig(data.activity_config));
         setOneLineContent(data.existing_one_line_submission?.content ?? "");
         setStep("one_line_share");
+      } else if (type === "hanja_writing") {
+        setHanjaWritingConfig(normalizeHanjaWritingConfig(data.activity_config));
+        const existingHanja = data.existing_hanja_writing_submission as { content?: string } | null;
+        setHanjaContent(existingHanja?.content ?? "");
+        setStep("hanja_writing");
       } else {
         setStep("level");
       }
@@ -739,6 +763,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 {roleCardSets.map((cardSet) => {
                   const label = buildRoleCardSetLabel(cardSet);
                   const selected = selectedCategoryLabel === label;
+                  const meta = getCardMeta(cardSet.label);
+                  const theme = getCardTheme(cardSet.label);
                   return (
                     <button
                       key={cardSet.id}
@@ -749,13 +775,14 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                         setSelectedPrompt(null);
                         setRemixedQuestion("");
                       }}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                         selected
-                          ? "bg-sky-500 text-white"
-                          : "bg-sky-50 text-sky-700 hover:bg-sky-100"
+                          ? `${theme.badge}`
+                          : `${theme.chip} hover:opacity-80`
                       }`}
                     >
-                      {label}
+                      <span>{meta.emoji}</span>
+                      <span>{label}</span>
                     </button>
                   );
                 })}
@@ -773,14 +800,22 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             </div>
 
             {activeRoleCardSet ? (
-              <div className="rounded-3xl bg-white p-6 shadow-xl">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-sky-600">{activeRoleCardSet.label}</p>
-                    <h2 className="mt-1 text-xl font-bold text-gray-800">예시 질문을 보고 하나 골라보세요.</h2>
+              <div className={`rounded-3xl bg-white p-6 shadow-xl ${getCardTheme(activeRoleCardSet.label).accentBorder}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold ${getCardTheme(activeRoleCardSet.label).chip}`}>
+                        <span>{getCardMeta(activeRoleCardSet.label).emoji}</span>
+                        <span>{activeRoleCardSet.label}</span>
+                      </span>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getRecommendedGradeChipClass(getCardMeta(activeRoleCardSet.label).recommendedGrades)}`}>
+                        {getRecommendedGradeLabel(getCardMeta(activeRoleCardSet.label).recommendedGrades)}
+                      </span>
+                    </div>
+                    <h2 className="mt-2 text-xl font-bold text-gray-800">예시 질문을 보고 하나 골라보세요.</h2>
                     <p className="mt-2 text-sm text-gray-500 leading-relaxed">{activeRoleCardSet.description}</p>
                   </div>
-                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 shrink-0">
                     {activeRoleCardSet.prompts.length}장
                   </span>
                 </div>
@@ -964,15 +999,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         return;
       }
 
-      if (votingRequireReason && !votingReason.trim()) {
-        setError("왜 좋은 질문인지 한 줄 적어주세요.");
-        return;
-      }
-
       setStep("question_submitting");
       const result = await submitQuestionVoting(sessionId, roomId, {
         selectedQuestionIds: selectedVotingQuestionIds,
-        reason: votingReason.trim() || undefined,
       });
 
       if (result.error) {
@@ -991,7 +1020,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         }
 
         if (prev.length >= votingMaxSelections) {
-          return prev;
+          const confirmMessage = votingMaxSelections === 1
+            ? "선택한 질문을 이 질문으로 바꿀까요?"
+            : `이미 ${votingMaxSelections}개를 골랐어요. 가장 먼저 고른 질문 대신 이 질문으로 바꿀까요?`;
+          if (typeof window !== "undefined" && !window.confirm(confirmMessage)) {
+            return prev;
+          }
+          return [...prev.slice(1), questionId];
         }
 
         return [...prev, questionId];
@@ -1055,20 +1090,17 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               <div className="grid gap-3">
                 {votingQuestions.map((question, index) => {
                   const selected = selectedVotingQuestionIds.includes(question.id);
-                  const blocked = !selected && selectedCount >= votingMaxSelections;
+                  const atMax = !selected && selectedCount >= votingMaxSelections;
 
                   return (
                     <button
                       key={question.id}
                       type="button"
                       onClick={() => toggleVotingQuestion(question.id)}
-                      disabled={blocked}
                       className={`rounded-2xl border-2 p-4 text-left transition-colors ${
                         selected
                           ? "border-violet-400 bg-violet-50"
-                          : blocked
-                            ? "border-gray-100 bg-gray-50 text-gray-400"
-                            : "border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/50"
+                          : "border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/50"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -1082,28 +1114,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                             {question.text}
                           </p>
                           <p className="mt-2 text-xs text-gray-400">
-                            {selected ? "선택했어요" : blocked ? `좋은 질문은 ${votingMaxSelections}개까지 고를 수 있어요` : "좋다고 생각하면 눌러서 선택해요"}
+                            {selected ? "선택했어요" : atMax ? "누르면 선택을 바꿀 수 있어요" : "좋다고 생각하면 눌러서 선택해요"}
                           </p>
                         </div>
                       </div>
                     </button>
                   );
                 })}
-              </div>
-            )}
-
-            {votingRequireReason && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  왜 이 질문이 좋다고 생각했나요?
-                </label>
-                <textarea
-                  value={votingReason}
-                  onChange={(event) => setVotingReason(event.target.value)}
-                  rows={3}
-                  placeholder="좋은 질문이라고 생각한 이유를 짧게 적어봐요."
-                  className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-violet-400 resize-none"
-                />
               </div>
             )}
 
@@ -1124,11 +1141,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   }
 
   if (activityType === "one_line_share") {
-    const keywords = oneLineShareConfig?.keywords ?? [];
+    const coreKeywords = oneLineShareConfig?.coreKeywords ?? [];
+    const auxiliaryKeywords = oneLineShareConfig?.auxiliaryKeywords ?? [];
     const normalizedContent = oneLineContent.trim();
-    const matchingKeywords = getMatchingConfiguredKeywords(normalizedContent, keywords);
-    const containsKeyword = keywords.length === 0 || matchingKeywords.length > 0;
-    const missingKeywords = keywords.filter((keyword) => !matchingKeywords.includes(keyword));
+    const matchingCoreKeywords = getMatchingConfiguredKeywords(normalizedContent, coreKeywords);
+    const matchingAuxiliaryKeywords = getMatchingConfiguredKeywords(normalizedContent, auxiliaryKeywords);
+    const missingCoreKeywords = coreKeywords.filter((keyword) => !matchingCoreKeywords.includes(keyword));
+    const containsKeyword = coreKeywords.length === 0 || missingCoreKeywords.length === 0;
 
     function insertKeyword(keyword: string) {
       setOneLineContent((prev) => {
@@ -1146,7 +1165,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       }
 
       if (!containsKeyword) {
-        setError("핵심단어를 한 개 이상 넣어 문장을 다시 써주세요.");
+        setError("핵심단어를 모두 넣어 문장을 다시 써주세요.");
         return;
       }
 
@@ -1189,26 +1208,58 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             </p>
           </div>
 
-          {keywords.length > 0 && (
-            <div className="bg-white rounded-3xl shadow-xl p-6">
-              <p className="text-xs font-bold uppercase tracking-wide text-rose-500">오늘의 핵심단어</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {keywords.map((keyword) => (
-                  <button
-                    key={keyword}
-                    type="button"
-                    onClick={() => insertKeyword(keyword)}
-                    className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-                      matchingKeywords.includes(keyword)
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-rose-100 text-rose-700 hover:bg-rose-200"
-                    }`}
-                  >
-                    #{keyword}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-gray-400">핵심단어를 눌러 문장에 바로 넣을 수 있어요. 제시된 핵심단어 중 하나 이상이 꼭 들어가야 합니다.</p>
+          {(coreKeywords.length > 0 || auxiliaryKeywords.length > 0) && (
+            <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+              {coreKeywords.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-rose-500 text-white px-2 py-0.5 text-[11px] font-bold">필수</span>
+                    <p className="text-xs font-bold uppercase tracking-wide text-rose-500">오늘의 핵심단어</p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {coreKeywords.map((keyword) => (
+                      <button
+                        key={keyword}
+                        type="button"
+                        onClick={() => insertKeyword(keyword)}
+                        className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                          matchingCoreKeywords.includes(keyword)
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                        }`}
+                      >
+                        #{keyword}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-400">핵심단어는 모두 빠짐없이 들어가야 해요. 눌러서 문장에 바로 넣을 수 있어요.</p>
+                </div>
+              )}
+              {auxiliaryKeywords.length > 0 && (
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-gray-200 text-gray-700 px-2 py-0.5 text-[11px] font-bold">선택</span>
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">보조단어 (활용 가능)</p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {auxiliaryKeywords.map((keyword) => (
+                      <button
+                        key={keyword}
+                        type="button"
+                        onClick={() => insertKeyword(keyword)}
+                        className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                          matchingAuxiliaryKeywords.includes(keyword)
+                            ? "bg-sky-100 text-sky-700"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        #{keyword}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-400">보조단어는 꼭 넣지 않아도 돼요. 문장이 더 풍성해질 수 있게 도와줘요.</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -1227,11 +1278,11 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             <div className={`rounded-2xl px-4 py-3 text-sm ${
               containsKeyword ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
             }`}>
-              {keywords.length === 0
+              {coreKeywords.length === 0
                 ? "핵심단어가 없어 자유롭게 한 줄을 써도 괜찮아요."
                 : containsKeyword
-                  ? `좋아요! 핵심단어 ${matchingKeywords.map((keyword) => `#${keyword}`).join(", ")} 이(가) 들어 있어요.`
-                  : `아직 핵심단어가 없어요. ${missingKeywords.map((keyword) => `#${keyword}`).join(", ")} 중 하나를 넣어주세요.`}
+                  ? `좋아요! 핵심단어 ${matchingCoreKeywords.map((keyword) => `#${keyword}`).join(", ")} 가 모두 들어 있어요.${matchingAuxiliaryKeywords.length > 0 ? ` (보조단어 ${matchingAuxiliaryKeywords.map((keyword) => `#${keyword}`).join(", ")}도 활용함)` : ""}`
+                  : `아직 ${missingCoreKeywords.map((keyword) => `#${keyword}`).join(", ")} 핵심단어가 빠졌어요. ${coreKeywords.length}개 핵심단어를 모두 넣어주세요.`}
             </div>
 
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -1245,8 +1296,151 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               {!normalizedContent
                 ? "한 줄을 먼저 적어주세요"
                 : !containsKeyword
-                  ? "핵심단어를 먼저 넣어주세요"
+                  ? "핵심단어를 모두 넣어주세요"
                   : "한 줄 제출하고 친구 문장 보러 가기"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activityType === "hanja_writing" && hanjaWritingConfig) {
+    const card = hanjaWritingConfig.card;
+    const trimmedSentence = hanjaContent.trim();
+    const includesWord = card.word ? sentenceContainsWord(trimmedSentence, card.word) : true;
+
+    async function handleHanjaSubmit() {
+      if (!trimmedSentence) {
+        setError("한 문장을 적어주세요.");
+        return;
+      }
+      if (!includesWord) {
+        setError(`문장에 "${card.word}" 단어가 들어가야 해요.`);
+        return;
+      }
+      setError("");
+      setStep("hanja_submitting");
+      const result = await submitHanjaWriting(sessionId, roomId, trimmedSentence);
+      if (result.error) {
+        setError(result.error);
+        setStep("hanja_writing");
+        return;
+      }
+      router.push(`/room/${roomId}/result?session=${sessionId}`);
+    }
+
+    if (step === "hanja_submitting") {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm text-center">
+            <div className="text-6xl mb-6 animate-bounce">📜</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">문장을 저장하고 있어요</h1>
+            <p className="text-gray-500 text-sm">친구들과 함께 보는 보드에 올리는 중이에요.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4">
+        <div className="max-w-2xl mx-auto pt-8 pb-16 space-y-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
+            <div className="text-5xl mb-2">📜</div>
+            <h1 className="text-2xl font-bold text-gray-800">한자 활용 문장 만들기</h1>
+            <p className="text-gray-500 text-sm leading-relaxed mt-2">
+              {hanjaWritingConfig.promptDescription}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl p-6 border-2 border-amber-200">
+            <div className="text-center">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-500">오늘의 단어</p>
+              <h2 className="mt-2 text-5xl font-bold text-gray-900">{card.word}</h2>
+              {card.definition && (
+                <p className="mt-3 text-sm text-gray-700 leading-relaxed">{card.definition}</p>
+              )}
+            </div>
+
+            {card.hanja.length > 0 && (
+              <div className="mt-5">
+                <p className="text-xs font-bold text-amber-600 mb-2">한자 풀이</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {card.hanja.map((h, idx) => (
+                    <div key={`${h.char}-${idx}`} className="rounded-2xl bg-amber-50/70 border border-amber-100 p-3 flex items-center gap-3">
+                      <span className="text-3xl font-bold text-amber-700">{h.char}</span>
+                      <p className="text-sm font-semibold text-gray-800">{h.meaning} {h.reading}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {card.relatedWords.length > 0 && (
+              <div className="mt-5">
+                <p className="text-xs font-bold text-amber-600 mb-2">관련 단어</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {card.relatedWords.map((r, idx) => (
+                    <div key={`${r.word}-${idx}`} className="rounded-2xl bg-amber-50/70 border border-amber-100 p-3">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-base font-bold text-gray-800">{r.word}</span>
+                        {r.hanja && <span className="text-xs text-amber-700">{r.hanja}</span>}
+                        {r.sharedChar && (
+                          <span className="ml-auto text-[10px] rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">공유 {r.sharedChar}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-600 leading-relaxed">{r.meaning}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {card.example && (
+              <div className="mt-4 rounded-2xl bg-gray-50 p-3">
+                <p className="text-xs font-bold text-gray-500">예시 문장</p>
+                <p className="mt-1 text-sm text-gray-700 leading-relaxed">{card.example}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                "<span className="text-amber-600">{card.word}</span>" 단어로 한 문장 만들기
+              </label>
+              <textarea
+                value={hanjaContent}
+                onChange={(event) => setHanjaContent(event.target.value)}
+                rows={4}
+                placeholder={`예) ${card.example || `${card.word}을(를) 활용한 자연스러운 문장을 써보세요.`}`}
+                className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none"
+              />
+            </div>
+
+            <div className={`rounded-2xl px-4 py-3 text-sm ${
+              includesWord && trimmedSentence ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+            }`}>
+              {!trimmedSentence
+                ? `"${card.word}" 단어가 들어간 한 문장을 적어주세요.`
+                : includesWord
+                  ? `좋아요! "${card.word}" 단어가 문장에 들어 있어요.`
+                  : `아직 "${card.word}" 단어가 빠졌어요. 단어를 꼭 넣어 주세요.`}
+            </div>
+
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
+            <button
+              type="button"
+              onClick={handleHanjaSubmit}
+              disabled={!trimmedSentence || !includesWord}
+              className="w-full py-4 bg-amber-500 text-white rounded-2xl font-bold text-lg hover:bg-amber-600 disabled:opacity-50 transition-colors"
+            >
+              {!trimmedSentence
+                ? "한 문장을 먼저 적어주세요"
+                : !includesWord
+                  ? `"${card.word}" 단어를 넣어주세요`
+                  : "문장 제출하고 친구 문장 보러 가기"}
             </button>
           </div>
         </div>
@@ -1521,7 +1715,6 @@ function normalizeQuestionVotingConfig(value: unknown): QuestionVotingConfig {
       sourceQuestions: [],
       evaluationCriteria: [],
       maxSelections: 1,
-      requireReason: true,
     };
   }
 
@@ -1549,15 +1742,14 @@ function normalizeQuestionVotingConfig(value: unknown): QuestionVotingConfig {
     sourceRoomTitle: typeof raw.sourceRoomTitle === "string" && raw.sourceRoomTitle.trim() ? raw.sourceRoomTitle.trim() : null,
     sourceQuestions: dedupedSourceQuestions,
     evaluationCriteria,
-    maxSelections: normalizeSelectionCount(raw.maxSelections),
-    requireReason: raw.requireReason !== false,
+    maxSelections: normalizeSelectionCount(raw.maxSelections, Math.max(dedupedSourceQuestions.length, 1)),
   };
 }
 
-function normalizeSelectionCount(value: unknown) {
+function normalizeSelectionCount(value: unknown, max: number = 4) {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed)) return 1;
-  return Math.min(Math.max(Math.trunc(parsed), 1), 4);
+  return Math.min(Math.max(Math.trunc(parsed), 1), max);
 }
 
 function dedupeVotingQuestions(questions: Array<{ id: string; text: string }>) {

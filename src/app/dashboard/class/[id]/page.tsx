@@ -14,7 +14,7 @@ import { DraftSessionsPanel } from "./draft-sessions-panel";
 import { ClosedRoomsTabs } from "./closed-rooms-tabs";
 
 type UnifiedRoom =
-  | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; is_active: boolean; created_at: string; expires_at: string | null }
+  | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; activity_type: string | null; is_active: boolean; created_at: string; expires_at: string | null }
   | { kind: "science"; id: string; title: string; topic: string; inquiry_track: "basic" | "integrated" | null; is_active: boolean; created_at: string; expires_at: string | null }
   | { kind: "morals"; id: string; title: string; topic: string; track: "reflection" | "judgement"; is_active: boolean; created_at: string; expires_at: string | null };
 
@@ -37,6 +37,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       title: r.title,
       topic: r.topic,
       subject_type: r.subject_type ?? null,
+      activity_type: r.activity_type ?? null,
       is_active: r.is_active,
       created_at: r.created_at,
       expires_at: r.expires_at ?? null,
@@ -78,6 +79,10 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
             <span className="text-sm bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-medium">{cls.grade_level}</span>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/dashboard/hanja-wordbook"
+              className="px-5 py-2.5 bg-amber-50 text-amber-700 rounded-xl font-semibold text-sm border border-amber-200 hover:bg-amber-100 transition-colors">
+              📚 한자 단어집
+            </Link>
             <Link href={`/dashboard/room/new?class_id=${id}`}
               className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl font-semibold text-sm hover:bg-indigo-600 transition-colors">
               + 활동 만들기
@@ -142,7 +147,7 @@ function ActivityCard({ room, status, now }: { room: UnifiedRoom; status: "activ
 
   if (status === "closed") {
     return (
-      <div className="relative bg-white/60 rounded-2xl hover:bg-white transition-colors opacity-70 hover:opacity-100">
+      <div className={`relative bg-white/60 rounded-2xl hover:bg-white transition-colors opacity-70 hover:opacity-100 border-l-4 ${cardAccentBorder(room)}`}>
         <Link href={href} className="block p-6">
           <div className="flex items-start gap-3 mb-2 pr-16">
             <span className="text-2xl shrink-0">{cardEmoji(room)}</span>
@@ -166,11 +171,7 @@ function ActivityCard({ room, status, now }: { room: UnifiedRoom; status: "activ
 
   return (
     <Link href={href}
-      className={`bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent ${
-        room.kind === "science" ? "hover:border-cyan-100" :
-        room.kind === "morals" ? "hover:border-rose-100" :
-        "hover:border-indigo-100"
-      }`}>
+      className={`bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border-l-4 ${cardAccentBorder(room)}`}>
       <div className="flex items-start justify-between mb-3">
         <span className="text-2xl">{cardEmoji(room)}</span>
         {isActive ? (
@@ -233,7 +234,7 @@ function ExpiryBadge({ expiresAt, now }: { expiresAt: string; now: number }) {
 }
 
 function kindLabel(room: UnifiedRoom): string {
-  if (room.kind === "writing") return "글쓰기";
+  if (room.kind === "writing") return writingActivityMeta(room.activity_type).label;
   if (room.kind === "science") return room.inquiry_track ? `과학 · ${TRACK_META[room.inquiry_track].label}` : "과학";
   return `도덕 · ${MORALS_TRACK_META[room.track].label}`;
 }
@@ -241,25 +242,106 @@ function kindLabel(room: UnifiedRoom): string {
 function kindChipColor(room: UnifiedRoom): string {
   if (room.kind === "science") return "bg-cyan-50 text-cyan-700";
   if (room.kind === "morals") return "bg-rose-50 text-rose-700";
-  return "bg-indigo-50 text-indigo-600";
+  return writingActivityMeta(room.activity_type).chip;
 }
 
 function activeBadgeColor(room: UnifiedRoom): string {
   if (room.kind === "science") return "text-emerald-700 bg-emerald-50";
   if (room.kind === "morals") return "text-rose-700 bg-rose-50";
-  return "text-green-700 bg-green-100";
+  return writingActivityMeta(room.activity_type).activeBadge;
 }
 
 function activeDotColor(room: UnifiedRoom): string {
   if (room.kind === "science") return "bg-emerald-500";
   if (room.kind === "morals") return "bg-rose-500";
-  return "bg-green-500";
+  return writingActivityMeta(room.activity_type).activeDot;
+}
+
+function cardAccentBorder(room: UnifiedRoom): string {
+  if (room.kind === "science") return "border-cyan-300 hover:border-cyan-400";
+  if (room.kind === "morals") return "border-rose-300 hover:border-rose-400";
+  switch (room.activity_type) {
+    case "question_generator": return "border-violet-300 hover:border-violet-400";
+    case "question_voting": return "border-amber-300 hover:border-amber-400";
+    case "one_line_share": return "border-rose-300 hover:border-rose-400";
+    case "hanja_writing": return "border-amber-300 hover:border-orange-400";
+    case "outline_builder":
+    default: return "border-indigo-300 hover:border-indigo-400";
+  }
 }
 
 function cardEmoji(room: UnifiedRoom): string {
   if (room.kind === "science") return "🔬";
   if (room.kind === "morals") return "🪞";
+  const activityMeta = writingActivityMeta(room.activity_type);
+  if (activityMeta.emoji) return activityMeta.emoji;
   return subjectEmoji(room.subject_type);
+}
+
+export type WritingActivityMeta = {
+  label: string;
+  emoji: string;
+  chip: string;
+  border: string;
+  hoverBorder: string;
+  activeBadge: string;
+  activeDot: string;
+};
+
+export function writingActivityMeta(activityType: string | null | undefined): WritingActivityMeta {
+  switch (activityType) {
+    case "question_generator":
+      return {
+        label: "질문 만들기",
+        emoji: "🃏",
+        chip: "bg-violet-50 text-violet-700 border border-violet-100",
+        border: "border-violet-100",
+        hoverBorder: "hover:border-violet-200",
+        activeBadge: "text-violet-700 bg-violet-50",
+        activeDot: "bg-violet-500",
+      };
+    case "question_voting":
+      return {
+        label: "좋은 질문 고르기",
+        emoji: "🗳️",
+        chip: "bg-amber-50 text-amber-700 border border-amber-100",
+        border: "border-amber-100",
+        hoverBorder: "hover:border-amber-200",
+        activeBadge: "text-amber-700 bg-amber-50",
+        activeDot: "bg-amber-500",
+      };
+    case "one_line_share":
+      return {
+        label: "한 줄 모아",
+        emoji: "💬",
+        chip: "bg-rose-50 text-rose-700 border border-rose-100",
+        border: "border-rose-100",
+        hoverBorder: "hover:border-rose-200",
+        activeBadge: "text-rose-700 bg-rose-50",
+        activeDot: "bg-rose-500",
+      };
+    case "hanja_writing":
+      return {
+        label: "한자 활용 문장",
+        emoji: "📜",
+        chip: "bg-amber-50 text-amber-700 border border-amber-100",
+        border: "border-amber-100",
+        hoverBorder: "hover:border-amber-200",
+        activeBadge: "text-amber-700 bg-amber-50",
+        activeDot: "bg-amber-500",
+      };
+    case "outline_builder":
+    default:
+      return {
+        label: "글 개요짜기",
+        emoji: "",
+        chip: "bg-indigo-50 text-indigo-600 border border-indigo-100",
+        border: "border-indigo-100",
+        hoverBorder: "hover:border-indigo-200",
+        activeBadge: "text-green-700 bg-green-100",
+        activeDot: "bg-green-500",
+      };
+  }
 }
 
 function subjectEmoji(type: string | null) {

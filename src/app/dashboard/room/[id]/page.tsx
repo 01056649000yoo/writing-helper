@@ -5,6 +5,7 @@ import os from "os";
 import QRCodeSection from "./qr-section";
 import LiveStudentPanel from "./live-student-panel";
 import {
+  getHanjaWritingRoomResults,
   getRoom,
   getRoomStudents,
   getOneLineShareRoomResults,
@@ -32,6 +33,9 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
     : [];
   const oneLineShareResults = room.activity_type === "one_line_share"
     ? await getOneLineShareRoomResults(id)
+    : [];
+  const hanjaWritingResults = room.activity_type === "hanja_writing"
+    ? await getHanjaWritingRoomResults(id)
     : [];
 
   const headersList = await headers();
@@ -112,6 +116,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
         questionResults={questionResults}
         questionVotingResults={questionVotingResults}
         oneLineShareResults={oneLineShareResults}
+        hanjaWritingResults={hanjaWritingResults}
       />
       </div>
     </div>

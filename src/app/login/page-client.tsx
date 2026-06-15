@@ -57,17 +57,23 @@ export default function LoginPageClient() {
             <MiniFeatureCard emoji="✅" title="질문 고르기" desc="친구들의 좋은 질문에 투표하기" />
             <MiniFeatureCard emoji="📱" title="한줄 모아" desc="실시간 생각 공유와 모아보기" />
 
-            <div className="pt-2">
-              <div className="flex items-center gap-3 mb-5">
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-white/20" />
-                <span className="text-xs font-semibold text-indigo-200 tracking-wider uppercase">교과 연계 글쓰기</span>
+                <span className="text-xs font-semibold text-indigo-200 tracking-wider uppercase">추가 활동</span>
                 <div className="flex-1 h-px bg-white/20" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <SubjectCard emoji="🔬" subject="과학" title="관찰하고 추론하기" />
-                <SubjectCard emoji="🎭" subject="사회" title="입장 바꿔 생각하기" />
-                <SubjectCard emoji="🔢" subject="수학" title="풀이 과정 설명하기" />
-                <SubjectCard emoji="🪞" subject="도덕·국어" title="마음 거울 비추기" />
+              <div className="grid grid-cols-1 gap-3">
+                <CompactFeatureCard
+                  emoji="📜"
+                  title="글쓰기 문해력 활동"
+                  desc="한자 활용 문장 만들기처럼 단어의 뜻을 깊이 살피고 문장으로 확장하는 활동"
+                />
+                <CompactFeatureCard
+                  emoji="📚"
+                  title="과목별 글쓰기 활동"
+                  desc="과학, 사회, 도덕 등 교과 수업과 연결해 설명하고 추론하는 글쓰기 활동"
+                />
               </div>
             </div>
           </div>
@@ -168,7 +174,7 @@ export default function LoginPageClient() {
             >
               <span>
                 <span className="block text-sm font-bold text-sky-900">끄적끄적아지트로 이동</span>
-                <span className="mt-1 block text-xs text-sky-700">기존 아지트 서비스로 돌아가기</span>
+                <span className="mt-1 block text-xs text-sky-700">글쓰기 활동하러 이동하기</span>
               </span>
               <span className="text-lg font-semibold text-sky-700">→</span>
             </a>
@@ -197,13 +203,23 @@ function MiniFeatureCard({ emoji, title, desc }: { emoji: string; title: string;
   );
 }
 
-function SubjectCard({ emoji, subject, title }: { emoji: string; subject: string; title: string }) {
+function CompactFeatureCard({
+  emoji,
+  title,
+  desc,
+}: {
+  emoji: string;
+  title: string;
+  desc: string;
+}) {
   return (
-    <div className="flex items-start gap-2.5 bg-white/10 rounded-xl p-3 cursor-default">
-      <span className="text-xl shrink-0">{emoji}</span>
-      <div>
-        <p className="text-[10px] font-semibold text-indigo-200 mb-0.5">{subject}</p>
-        <p className="text-xs font-medium text-white leading-snug">{title}</p>
+    <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur-sm">
+      <div className="flex items-start gap-3">
+        <span className="text-xl shrink-0">{emoji}</span>
+        <div>
+          <p className="text-sm font-bold text-white">{title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-indigo-100/85">{desc}</p>
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,6 @@ type QuestionVotingRankingItem = {
   questionId: string;
   text: string;
   votes: number;
-  reasons: string[];
 };
 
 const PODIUM_STYLES = [
@@ -59,11 +58,6 @@ export function QuestionVotingTopThree({
             <p className={`mt-3 text-base font-bold leading-relaxed ${style.accent}`}>
               {question.text}
             </p>
-            {question.reasons.length > 0 && (
-              <p className="mt-3 text-xs text-gray-500">
-                선택 이유 {question.reasons.length}개
-              </p>
-            )}
           </div>
         );
       })}
@@ -73,10 +67,8 @@ export function QuestionVotingTopThree({
 
 export function QuestionVotingCompactList({
   ranking,
-  showReasons = false,
 }: {
   ranking: QuestionVotingRankingItem[];
-  showReasons?: boolean;
 }) {
   if (ranking.length === 0) {
     return null;
@@ -99,23 +91,6 @@ export function QuestionVotingCompactList({
                 <p className="text-sm font-medium leading-relaxed text-gray-900">
                   {question.text}
                 </p>
-                {showReasons && question.reasons.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs font-semibold text-violet-600">
-                      선택 이유 {question.reasons.length}개 보기
-                    </summary>
-                    <div className="mt-2 space-y-1 rounded-2xl bg-violet-50/70 p-3">
-                      {question.reasons.map((reason, reasonIndex) => (
-                        <p
-                          key={`${question.questionId}-reason-${reasonIndex}`}
-                          className="text-xs leading-relaxed text-gray-700"
-                        >
-                          • {reason}
-                        </p>
-                      ))}
-                    </div>
-                  </details>
-                )}
               </div>
               <div className="shrink-0 rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
                 {question.votes}표

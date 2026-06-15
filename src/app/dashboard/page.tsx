@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTeacherProfile } from "@/app/actions/auth-actions";
+import { isCurrentUserServiceAdmin } from "@/app/actions/admin-actions";
 import { checkHasApiKey } from "@/app/actions/settings-actions";
 import { getClasses } from "@/app/actions/class-actions";
 import { signOut } from "@/app/actions/auth-actions";
@@ -7,10 +8,11 @@ import { BUILD_LABEL } from "@/lib/build-version";
 import { DashboardTabs } from "./dashboard-tabs";
 
 export default async function DashboardPage() {
-  const [profile, classes, hasKey] = await Promise.all([
+  const [profile, classes, hasKey, isServiceAdmin] = await Promise.all([
     getTeacherProfile(),
     getClasses(),
     checkHasApiKey(),
+    isCurrentUserServiceAdmin(),
   ]);
 
   return (
@@ -27,11 +29,25 @@ export default async function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link
+              href="/dashboard/hanja-wordbook"
+              className="text-base px-5 py-2.5 rounded-xl border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors"
+            >
+              📚 한자 단어집
+            </Link>
+            <Link
               href="/dashboard/settings"
               className="text-base px-5 py-2.5 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
             >
               🃏 질문 카드 설정
             </Link>
+            {isServiceAdmin && (
+              <Link
+                href="/dashboard/admin"
+                className="text-base px-5 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+              >
+                🛠️ 관리자
+              </Link>
+            )}
             <Link href="/dashboard/api-key"
               className={`text-base px-5 py-2.5 rounded-xl border transition-colors ${hasKey ? "border-green-200 text-green-700 bg-green-50" : "border-red-200 text-red-700 bg-red-50"}`}>
               {hasKey ? "✅ API 키 설정됨" : "⚠️ API 키 설정 필요"}
@@ -48,11 +64,11 @@ export default async function DashboardPage() {
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-center justify-between">
             <div>
               <p className="text-lg font-semibold text-amber-800">⚠️ GPT API 키가 필요합니다</p>
-              <p className="text-base text-amber-600 mt-1">AI 기반 활동을 열려면 먼저 OpenAI API 키를 등록해주세요.</p>
+              <p className="text-base text-amber-600 mt-1">AI 기반 활동을 열려면 서비스 관리자 계정에서 먼저 공용 OpenAI API 키를 등록해주세요.</p>
             </div>
             <Link href="/dashboard/api-key"
               className="bg-amber-500 text-white px-6 py-3 rounded-xl text-base font-semibold hover:bg-amber-600">
-              키 등록하기
+              상태 보기
             </Link>
           </div>
         )}

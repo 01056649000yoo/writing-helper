@@ -4,7 +4,8 @@ export type ActivityType =
   | "outline_builder"
   | "question_generator"
   | "question_voting"
-  | "one_line_share";
+  | "one_line_share"
+  | "hanja_writing";
 
 export type ActivityCategory =
   | "writing"
@@ -107,6 +108,7 @@ export type QuestionGeneratorSubmission = {
     cardSetLabel: string;
     originalPrompt: string | null;
     remixedQuestion: string;
+    originalRemixedQuestion?: string;
   }>;
 };
 
@@ -133,12 +135,10 @@ export type QuestionVotingConfig = {
   }>;
   evaluationCriteria: string[];
   maxSelections: number;
-  requireReason: boolean;
 };
 
 export type QuestionVotingSubmission = {
   selectedQuestionIds: string[];
-  reason?: string;
 };
 
 export type QuestionVotingResult = {
@@ -150,14 +150,14 @@ export type QuestionVotingRoomResult = {
     questionId: string;
     text: string;
     votes: number;
-    reasons: string[];
   }>;
 };
 
 export type OneLineShareConfig = {
   promptTitle: string;
   promptDescription: string;
-  keywords: string[];
+  coreKeywords: string[];
+  auxiliaryKeywords: string[];
   maxReactionsPerStudent: number;
 };
 
@@ -188,4 +188,57 @@ export type OneLineShareBoardEntry = {
 
 export type OneLineShareRoomResult = {
   entries: OneLineShareBoardEntry[];
+};
+
+export type HanjaCharInfo = {
+  char: string;
+  reading: string;
+  meaning: string;
+};
+
+export type HanjaRelatedWord = {
+  word: string;
+  hanja: string;
+  meaning: string;
+  sharedChar: string;
+};
+
+export type HanjaWordCard = {
+  word: string;
+  grade: number;
+  hanja: HanjaCharInfo[];
+  relatedWords: HanjaRelatedWord[];
+  definition: string;
+  example: string;
+  category: string;
+};
+
+export type HanjaWritingConfig = {
+  promptTitle: string;
+  promptDescription: string;
+  card: HanjaWordCard;
+};
+
+export type HanjaWritingSubmission = {
+  content: string;
+};
+
+export type HanjaWritingResult = {
+  submitted: boolean;
+  likeCount?: number;
+};
+
+export type HanjaWritingBoardEntry = {
+  sessionId: string;
+  studentNumber: number;
+  studentName: string;
+  content: string;
+  likeCount: number;
+  likedByCurrentSession: boolean;
+  isMine: boolean;
+  createdAt: string;
+};
+
+export type HanjaWritingRoomResult = {
+  entries: HanjaWritingBoardEntry[];
 };

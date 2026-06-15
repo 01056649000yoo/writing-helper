@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { checkHasApiKey } from "@/app/actions/settings-actions";
+import { getApiKeyAccessInfo } from "@/app/actions/settings-actions";
 import { ApiKeyForm } from "./api-key-form";
 
 export default async function ApiKeyPage() {
-  const hasKey = await checkHasApiKey();
+  const access = await getApiKeyAccessInfo();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -18,7 +18,7 @@ export default async function ApiKeyPage() {
           </Link>
         </div>
 
-        <ApiKeyForm hasKey={hasKey} />
+        <ApiKeyForm hasKey={access.hasKey} isAdmin={access.isAdmin} adminEmail={access.adminEmail} />
       </div>
     </div>
   );

@@ -480,3 +480,147 @@ export async function generateAiRolesAndQuestions(
   return (parsed.roles || []) as GeneratedRoleData[];
 }
 
+export type SpellCorrectionInput = { id: string; text: string };
+export type SpellCorrectionResult = { id: string; corrected: string };
+
+export async function correctKoreanSpelling(
+  apiKey: string,
+  inputs: SpellCorrectionInput[],
+): Promise<SpellCorrectionResult[]> {
+  if (inputs.length === 0) return [];
+  const client = createOpenAIClient(apiKey);
+
+  const prompt = `초등학생이 만든 한국어 질문 문장들의 맞춤법·띄어쓰기·문장부호·조사 오류만 교정해 주세요.
+
+규칙:
+- 의미·어조·표현은 절대 바꾸지 마세요. 단어 선택을 더 멋지게 만들거나 의역하지 마세요.
+- 외래어/이름/방언/일부러 쓴 표현은 그대로 두세요.
+- 문장 내용이 이미 맞다면 원문 그대로 반환하세요(빈 문자열 금지).
+- 줄바꿈은 원문 구조를 유지하세요.
+
+입력 형식: 각 항목은 {id, text} 객체.
+출력 형식(JSON): {"results":[{"id":"<id>","corrected":"<교정된 문장>"}, ...]}
+- 입력의 모든 id를 빠짐없이 포함하세요.
+- corrected는 원문이든 교정문이든 빈 문자열 없이 반드시 채워주세요.
+
+입력:
+${JSON.stringify(inputs)}`;
+
+  const response = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+    temperature: 0,
+  });
+
+  const content = response.choices[0].message.content;
+  if (!content) throw new Error("GPT 응답이 비어있습니다.");
+  const parsed = JSON.parse(content) as { results?: unknown };
+  if (!Array.isArray(parsed.results)) return [];
+
+  return parsed.results
+    .filter((entry): entry is { id: string; corrected: string } => {
+      return typeof entry === "object"
+        && entry !== null
+        && typeof (entry as { id?: unknown }).id === "string"
+        && typeof (entry as { corrected?: unknown }).corrected === "string";
+    })
+    .map((entry) => ({ id: entry.id, corrected: entry.corrected }));
+}
+
+export type GeneratedHanjaCard = {
+  word: string;
+  isHanjaWord: boolean;
+  rejectionReason: string;
+  hanja: Array<{ char: string; reading: string; meaning: string }>;
+  relatedWords: Array<{ word: string; hanja: string; meaning: string; sharedChar: string }>;
+  definition: string;
+  example: string;
+  category: string;
+};
+
+export async function generateHanjaWordCard(
+  apiKey: string,
+  word: string,
+  grade: number,
+): Promise<GeneratedHanjaCard> {
+  const client = createOpenAIClient(apiKey);
+
+  const prompt = `초등학교 ${grade}학년 학생을 위한 한자 학습 카드를 만들어 주세요.
+
+대상 단어: "${word}"
+
+요구 사항:
+0. 먼저 이 단어가 사전적으로 널리 쓰이는 한자어인지 판단하세요.
+   - 순우리말, 외래어, 의성어/의태어, 한자 표기가 불분명한 단어, 확신할 수 없는 단어는 한자어로 처리하지 마세요.
+   - 추정해서 한자를 붙이거나 억지로 뜻을 만들면 안 됩니다.
+   - 확실하지 않으면 반드시 isHanjaWord를 false로 두세요.
+1. 한자어인 경우에만 단어를 구성하는 한자(漢字)를 분해하여 각 글자의 음(소리)과 훈(뜻)을 알려주세요.
+   - 한자어가 아니면 hanja는 빈 배열로 반환하세요.
+2. 같은 한자를 공유하는 관련 단어(어휘) 4~6개를 제시해 주세요.
+   - 각 단어의 한자 표기와 초등학생도 이해할 수 있는 짧은 뜻 설명을 포함하세요.
+   - sharedChar에는 대상 단어와 공유하는 한자(예: "家")를 표기하세요.
+   - 한자어가 아니면 relatedWords는 빈 배열로 반환하세요.
+3. 단어의 뜻(definition)은 초등 ${grade}학년이 이해할 수 있는 친근한 말로 1문장 설명해 주세요.
+4. 예시 문장(example)은 학생이 따라 떠올릴 수 있는 일상적인 1문장으로 작성해 주세요.
+5. category는 단어의 의미 분류(예: "가족과 이웃", "감정과 행동", "자연과 환경" 등).
+6. 한자어가 아니면 definition, example, category는 빈 문자열로 두고, rejectionReason에 짧게 이유를 적어 주세요.
+
+반드시 아래 JSON 형식으로만 응답:
+{
+  "word": "${word}",
+  "isHanjaWord": true,
+  "rejectionReason": "",
+  "hanja": [{"char":"한자","reading":"음","meaning":"훈"}, ...],
+  "relatedWords": [{"word":"단어","hanja":"漢字표기","meaning":"뜻","sharedChar":"공유한자"}, ...],
+  "definition": "단어 뜻 한 줄 설명",
+  "example": "예시 문장",
+  "category": "분류"
+}`;
+
+  const response = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
+  });
+
+  const content = response.choices[0].message.content;
+  if (!content) throw new Error("GPT 응답이 비어있습니다.");
+
+  const parsed = JSON.parse(content) as Partial<GeneratedHanjaCard>;
+  return {
+    word: typeof parsed.word === "string" && parsed.word.trim() ? parsed.word.trim() : word,
+    isHanjaWord: parsed.isHanjaWord === true,
+    rejectionReason: typeof parsed.rejectionReason === "string" ? parsed.rejectionReason.trim() : "",
+    hanja: Array.isArray(parsed.hanja)
+      ? parsed.hanja
+          .filter((entry): entry is { char: string; reading: string; meaning: string } =>
+            typeof entry === "object" && entry !== null
+            && typeof (entry as { char?: unknown }).char === "string"
+            && typeof (entry as { reading?: unknown }).reading === "string"
+            && typeof (entry as { meaning?: unknown }).meaning === "string")
+          .map((entry) => ({
+            char: entry.char.trim(),
+            reading: entry.reading.trim(),
+            meaning: entry.meaning.trim(),
+          }))
+      : [],
+    relatedWords: Array.isArray(parsed.relatedWords)
+      ? parsed.relatedWords
+          .filter((entry): entry is { word: string; hanja: string; meaning: string; sharedChar: string } =>
+            typeof entry === "object" && entry !== null
+            && typeof (entry as { word?: unknown }).word === "string"
+            && typeof (entry as { meaning?: unknown }).meaning === "string")
+          .map((entry) => ({
+            word: entry.word.trim(),
+            hanja: typeof entry.hanja === "string" ? entry.hanja.trim() : "",
+            meaning: entry.meaning.trim(),
+            sharedChar: typeof entry.sharedChar === "string" ? entry.sharedChar.trim() : "",
+          }))
+      : [],
+    definition: typeof parsed.definition === "string" ? parsed.definition.trim() : "",
+    example: typeof parsed.example === "string" ? parsed.example.trim() : "",
+    category: typeof parsed.category === "string" ? parsed.category.trim() : "",
+  };
+}

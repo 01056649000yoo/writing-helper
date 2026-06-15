@@ -26,6 +26,9 @@ export function normalizeQuestionGeneratorSubmission(value: unknown): QuestionGe
         ? selection.originalPrompt.trim()
         : null,
       remixedQuestion: typeof selection.remixedQuestion === "string" ? selection.remixedQuestion.trim() : "",
+      originalRemixedQuestion: typeof selection.originalRemixedQuestion === "string" && selection.originalRemixedQuestion.trim()
+        ? selection.originalRemixedQuestion.trim()
+        : undefined,
     }))
     .filter((selection) => selection.remixedQuestion.length > 0);
 

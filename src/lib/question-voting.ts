@@ -39,7 +39,6 @@ export function normalizeQuestionVotingConfig(value: unknown): QuestionVotingCon
         sourceQuestions: dedupedSourceQuestions,
         evaluationCriteria,
         maxSelections: clampNumber(raw.maxSelections, 1, Math.max(dedupedSourceQuestions.length, 1), 1),
-        requireReason: raw.requireReason === true,
       }
     : null;
 }
@@ -58,9 +57,6 @@ export function normalizeQuestionVotingSubmission(value: unknown): QuestionVotin
   return selectedQuestionIds.length > 0
     ? {
         selectedQuestionIds,
-        reason: typeof raw.reason === "string" && raw.reason.trim()
-          ? raw.reason.trim()
-          : undefined,
       }
     : null;
 }
@@ -70,13 +66,12 @@ export function buildQuestionVotingRanking(
   submissions: QuestionVotingSubmission[],
 ): QuestionVotingRoomResult["ranking"] {
   const questionMap = new Map(config.sourceQuestions.map((question) => [question.id, question] as const));
-  const counters = new Map<string, { question: QuestionVotingQuestion; votes: number; reasons: string[] }>();
+  const counters = new Map<string, { question: QuestionVotingQuestion; votes: number }>();
 
   for (const question of config.sourceQuestions) {
     counters.set(question.id, {
       question,
       votes: 0,
-      reasons: [],
     });
   }
 
@@ -85,9 +80,6 @@ export function buildQuestionVotingRanking(
       const entry = counters.get(questionId);
       if (!entry) continue;
       entry.votes += 1;
-      if (submission.reason) {
-        entry.reasons.push(submission.reason);
-      }
     }
   }
 
@@ -96,7 +88,6 @@ export function buildQuestionVotingRanking(
       questionId: entry.question.id,
       text: questionMap.get(entry.question.id)?.text ?? entry.question.text,
       votes: entry.votes,
-      reasons: entry.reasons,
     }))
     .sort((left, right) => {
       if (right.votes !== left.votes) return right.votes - left.votes;

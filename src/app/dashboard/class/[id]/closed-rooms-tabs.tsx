@@ -14,6 +14,7 @@ interface UnifiedRoom {
   title: string;
   topic: string;
   subject_type?: string | null;
+  activity_type?: string | null;
   inquiry_track?: "basic" | "integrated" | null;
   track?: "reflection" | "judgement";
   is_active: boolean;
@@ -26,26 +27,72 @@ interface ClosedRoomsTabsProps {
   now: number;
 }
 
-type TabType = "all" | "writing" | "science" | "morals";
+type TabType =
+  | "all"
+  | "outline_builder"
+  | "question_generator"
+  | "question_voting"
+  | "one_line_share"
+  | "hanja_writing"
+  | "science"
+  | "morals";
 
-export function ClosedRoomsTabs({ closedRooms, now }: ClosedRoomsTabsProps) {
+const WRITING_ACTIVITY_TYPES = [
+  "outline_builder",
+  "question_generator",
+  "question_voting",
+  "one_line_share",
+  "hanja_writing",
+] as const;
+
+type WritingActivityType = typeof WRITING_ACTIVITY_TYPES[number];
+
+function isWritingActivityType(value: string | null | undefined): value is WritingActivityType {
+  return value !== null && value !== undefined && (WRITING_ACTIVITY_TYPES as readonly string[]).includes(value);
+}
+
+function activityTabMeta(type: WritingActivityType): {
+  label: string;
+  emoji: string;
+  activeBg: string;
+} {
+  switch (type) {
+    case "outline_builder":
+      return { label: "개요짜기", emoji: "📝", activeBg: "bg-indigo-500 text-white shadow-xs" };
+    case "question_generator":
+      return { label: "질문 만들기", emoji: "🃏", activeBg: "bg-violet-500 text-white shadow-xs" };
+    case "question_voting":
+      return { label: "좋은 질문 고르기", emoji: "🗳️", activeBg: "bg-amber-500 text-white shadow-xs" };
+    case "one_line_share":
+      return { label: "한 줄 모아", emoji: "💬", activeBg: "bg-rose-500 text-white shadow-xs" };
+    case "hanja_writing":
+      return { label: "한자 활용 문장", emoji: "📜", activeBg: "bg-amber-600 text-white shadow-xs" };
+  }
+}
+
+export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabType>("all");
 
-  const writingRooms = closedRooms.filter((r) => r.kind === "writing");
   const scienceRooms = closedRooms.filter((r) => r.kind === "science");
   const moralsRooms = closedRooms.filter((r) => r.kind === "morals");
+  const writingByActivity: Record<WritingActivityType, UnifiedRoom[]> = {
+    outline_builder: [],
+    question_generator: [],
+    question_voting: [],
+    one_line_share: [],
+    hanja_writing: [],
+  };
+  for (const room of closedRooms) {
+    if (room.kind !== "writing") continue;
+    const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
+    writingByActivity[type].push(room);
+  }
 
   const getFilteredRooms = () => {
-    switch (activeTab) {
-      case "writing":
-        return writingRooms;
-      case "science":
-        return scienceRooms;
-      case "morals":
-        return moralsRooms;
-      default:
-        return closedRooms;
-    }
+    if (activeTab === "all") return closedRooms;
+    if (activeTab === "science") return scienceRooms;
+    if (activeTab === "morals") return moralsRooms;
+    return writingByActivity[activeTab];
   };
 
   const filtered = getFilteredRooms();
@@ -53,6 +100,8 @@ export function ClosedRoomsTabs({ closedRooms, now }: ClosedRoomsTabsProps) {
   function cardEmoji(room: UnifiedRoom): string {
     if (room.kind === "science") return "🔬";
     if (room.kind === "morals") return "🪞";
+    const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
+    if (type !== "outline_builder") return activityTabMeta(type).emoji;
     return subjectEmoji(room.subject_type ?? null);
   }
 
@@ -76,7 +125,10 @@ export function ClosedRoomsTabs({ closedRooms, now }: ClosedRoomsTabsProps) {
   }
 
   function kindLabel(room: UnifiedRoom): string {
-    if (room.kind === "writing") return "글쓰기";
+    if (room.kind === "writing") {
+      const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
+      return activityTabMeta(type).label;
+    }
     if (room.kind === "science")
       return room.inquiry_track ? `과학 · ${TRACK_META[room.inquiry_track].label}` : "과학";
     return room.track ? `도덕 · ${MORALS_TRACK_META[room.track].label}` : "도덕";
@@ -85,7 +137,37 @@ export function ClosedRoomsTabs({ closedRooms, now }: ClosedRoomsTabsProps) {
   function kindChipColor(room: UnifiedRoom): string {
     if (room.kind === "science") return "bg-cyan-50 text-cyan-700 border border-cyan-100";
     if (room.kind === "morals") return "bg-rose-50 text-rose-700 border border-rose-100";
-    return "bg-indigo-50 text-indigo-600 border border-indigo-100";
+    const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
+    switch (type) {
+      case "outline_builder":
+        return "bg-indigo-50 text-indigo-600 border border-indigo-100";
+      case "question_generator":
+        return "bg-violet-50 text-violet-700 border border-violet-100";
+      case "question_voting":
+        return "bg-amber-50 text-amber-700 border border-amber-100";
+      case "one_line_share":
+        return "bg-rose-50 text-rose-700 border border-rose-100";
+      case "hanja_writing":
+        return "bg-amber-50 text-amber-700 border border-amber-100";
+    }
+  }
+
+  function cardAccentBorder(room: UnifiedRoom): string {
+    if (room.kind === "science") return "border-cyan-300 hover:border-cyan-400";
+    if (room.kind === "morals") return "border-rose-300 hover:border-rose-400";
+    const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
+    switch (type) {
+      case "outline_builder":
+        return "border-indigo-300 hover:border-indigo-400";
+      case "question_generator":
+        return "border-violet-300 hover:border-violet-400";
+      case "question_voting":
+        return "border-amber-300 hover:border-amber-400";
+      case "one_line_share":
+        return "border-rose-300 hover:border-rose-400";
+      case "hanja_writing":
+        return "border-amber-300 hover:border-orange-400";
+    }
   }
 
   function renderDeleteBtn(room: UnifiedRoom) {
@@ -94,68 +176,65 @@ export function ClosedRoomsTabs({ closedRooms, now }: ClosedRoomsTabsProps) {
     return <DeleteMoralsRoomButton roomId={room.id} />;
   }
 
+  const inactiveTabClass = "text-gray-500 hover:text-gray-700";
+
+  function tabClass(target: TabType, activeBg: string): string {
+    return `px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+      activeTab === target ? activeBg : inactiveTabClass
+    }`;
+  }
+
+  function emptyMessage(): string {
+    if (activeTab === "all") return "종료된 활동 세션이 전혀 없습니다.";
+    if (activeTab === "science") return "종료된 과학 탐구 활동 세션이 없습니다.";
+    if (activeTab === "morals") return "종료된 도덕 성찰 활동 세션이 없습니다.";
+    return `종료된 ${activityTabMeta(activeTab).label} 세션이 없습니다.`;
+  }
+
   return (
     <div className="space-y-5">
-      {/* 종료 세션 타이틀 & 탭 바 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-3">
+      <div className="flex flex-col gap-3 border-b border-gray-200 pb-3">
         <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
           <span>⚫</span> 종료된 활동 세션 ({closedRooms.length})
         </h2>
-        
-        {/* 과목/종류별 탭 리스트 */}
+
         <div className="flex flex-wrap gap-1 bg-gray-100/80 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "all"
-                ? "bg-white text-gray-800 shadow-xs"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={tabClass("all", "bg-white text-gray-800 shadow-xs")}
           >
             전체 ({closedRooms.length})
           </button>
-          <button
-            onClick={() => setActiveTab("writing")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "writing"
-                ? "bg-indigo-500 text-white shadow-xs"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            ✏️ 글쓰기 ({writingRooms.length})
-          </button>
+          {WRITING_ACTIVITY_TYPES.map((type) => {
+            const meta = activityTabMeta(type);
+            return (
+              <button
+                key={type}
+                onClick={() => setActiveTab(type)}
+                className={tabClass(type, meta.activeBg)}
+              >
+                {meta.emoji} {meta.label} ({writingByActivity[type].length})
+              </button>
+            );
+          })}
           <button
             onClick={() => setActiveTab("science")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "science"
-                ? "bg-cyan-600 text-white shadow-xs"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={tabClass("science", "bg-cyan-600 text-white shadow-xs")}
           >
             🔬 과학 ({scienceRooms.length})
           </button>
           <button
             onClick={() => setActiveTab("morals")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "morals"
-                ? "bg-rose-500 text-white shadow-xs"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={tabClass("morals", "bg-rose-500 text-white shadow-xs")}
           >
             🪞 도덕 ({moralsRooms.length})
           </button>
         </div>
       </div>
 
-      {/* 리스트 출력 */}
       {filtered.length === 0 ? (
         <div className="bg-white/40 border border-dashed border-gray-200 rounded-2xl p-12 text-center">
-          <p className="text-gray-400 text-base font-medium">
-            {activeTab === "writing" && "종료된 글쓰기 활동 세션이 없습니다."}
-            {activeTab === "science" && "종료된 과학 탐구 활동 세션이 없습니다."}
-            {activeTab === "morals" && "종료된 도덕 성찰 활동 세션이 없습니다."}
-            {activeTab === "all" && "종료된 활동 세션이 전혀 없습니다."}
-          </p>
+          <p className="text-gray-400 text-base font-medium">{emptyMessage()}</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -168,7 +247,7 @@ export function ClosedRoomsTabs({ closedRooms, now }: ClosedRoomsTabsProps) {
             return (
               <div
                 key={`${room.kind}-${room.id}`}
-                className="relative bg-white/60 rounded-2xl hover:bg-white transition-all duration-200 opacity-80 hover:opacity-100 border border-transparent hover:border-gray-150 hover:shadow-xs group"
+                className={`relative bg-white/60 rounded-2xl hover:bg-white transition-all duration-200 opacity-80 hover:opacity-100 border-l-4 ${cardAccentBorder(room)} hover:shadow-xs group`}
               >
                 <Link href={href} className="block p-6">
                   <div className="flex items-start gap-3 mb-2 pr-16">
@@ -180,7 +259,7 @@ export function ClosedRoomsTabs({ closedRooms, now }: ClosedRoomsTabsProps) {
                     </h3>
                   </div>
                   <p className="text-sm text-gray-500 mt-1 line-clamp-1">주제: {room.topic}</p>
-                  
+
                   <div className="flex gap-2 mt-3 flex-wrap">
                     <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${kindChipColor(room)}`}>
                       {kindLabel(room)}

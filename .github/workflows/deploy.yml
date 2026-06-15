@@ -14,17 +14,15 @@ jobs:
   deploy:
     runs-on: self-hosted
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: /Users/seunghyeonmaegmini/writing-helper
-
     steps:
-      - name: Pull latest main
-        run: |
-          git fetch origin main
-          git checkout main
-          git reset --hard origin/main
-          echo "BUILD_VERSION=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+      - name: Checkout latest code
+        uses: actions/checkout@v4
+
+      - name: Copy .env.local from host
+        run: cp /Users/seunghyeonmaegmini/writing-helper/.env.local .
+
+      - name: Set BUILD_VERSION
+        run: echo "BUILD_VERSION=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
       - name: Stop legacy launchctl / pm2 processes (no-op if absent)
         run: |
@@ -40,7 +38,7 @@ jobs:
           true
 
       - name: Build docker image
-        run: docker compose build
+        run: docker compose build --no-cache
 
       - name: Restart docker stack
         run: docker compose up -d --remove-orphans

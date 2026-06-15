@@ -22,7 +22,8 @@ export const oneLineShareDefinition: ActivityDefinition<
   createDefaultConfig: () => ({
     promptTitle: "오늘 수업 한 줄 정리",
     promptDescription: "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.",
-    keywords: [],
+    coreKeywords: [],
+    auxiliaryKeywords: [],
     maxReactionsPerStudent: 3,
   }),
   validateConfig: (input) => {
@@ -33,14 +34,19 @@ export const oneLineShareDefinition: ActivityDefinition<
     const promptDescription = typeof raw.promptDescription === "string" && raw.promptDescription.trim()
       ? raw.promptDescription.trim()
       : "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.";
-    const keywords = normalizeKeywords(raw.keywords);
+    const coreFromNew = normalizeKeywords(raw.coreKeywords);
+    const legacy = normalizeKeywords(raw.keywords);
+    const coreKeywords = coreFromNew.length > 0 ? coreFromNew : legacy;
+    const auxiliaryKeywords = normalizeKeywords(raw.auxiliaryKeywords)
+      .filter((keyword) => !coreKeywords.includes(keyword));
 
     return {
       ok: true,
       value: {
         promptTitle,
         promptDescription,
-        keywords,
+        coreKeywords,
+        auxiliaryKeywords,
         maxReactionsPerStudent: clampNumber(raw.maxReactionsPerStudent, 1, 10, 3),
       },
     };

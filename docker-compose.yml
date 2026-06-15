@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BUILD_VERSION: ${BUILD_VERSION:?BUILD_VERSION is required}
+        BUILD_VERSION: ${BUILD_VERSION:-local}
     env_file:
       - .env.local
     environment:

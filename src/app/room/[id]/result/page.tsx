@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { getStudentResult, toggleOneLineReaction } from "@/app/actions/student-actions";
+import { getStudentResult, toggleHanjaWritingReaction, toggleOneLineReaction } from "@/app/actions/student-actions";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import {
   QuestionVotingCompactList,
   QuestionVotingTopThree,
 } from "@/components/question-voting-ranking-summary";
 import type {
+  HanjaWritingBoardEntry,
+  HanjaWritingConfig,
   OneLineShareBoardEntry,
   OneLineShareConfig,
   QuestionGeneratorSubmission,
@@ -17,7 +19,7 @@ import type {
   QuestionVotingSubmission,
 } from "@/features/activities/types";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing";
 
 function parseOutline(text: string) {
   const sections: { title: string; keywords: string; hint: string }[] = [];
@@ -62,12 +64,15 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const [anonymousPeerQuestions, setAnonymousPeerQuestions] = useState<Array<{ id: string; order: number; questionOrder: number; text: string }>>([]);
   const [questionVotingSubmission, setQuestionVotingSubmission] = useState<QuestionVotingSubmission | null>(null);
   const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
-  const [questionVotingRanking, setQuestionVotingRanking] = useState<Array<{ questionId: string; text: string; votes: number; reasons: string[] }>>([]);
+  const [questionVotingRanking, setQuestionVotingRanking] = useState<Array<{ questionId: string; text: string; votes: number }>>([]);
   const [questionVotingClosed, setQuestionVotingClosed] = useState(false);
   const [oneLineShareConfig, setOneLineShareConfig] = useState<OneLineShareConfig | null>(null);
   const [oneLineShareEntry, setOneLineShareEntry] = useState<{ entryId: string; content: string; containsKeywords: boolean; createdAt: string; updatedAt: string } | null>(null);
   const [oneLineShareBoard, setOneLineShareBoard] = useState<OneLineShareBoardEntry[]>([]);
   const [oneLineShareClosed, setOneLineShareClosed] = useState(false);
+  const [hanjaWritingConfig, setHanjaWritingConfig] = useState<HanjaWritingConfig | null>(null);
+  const [hanjaWritingEntry, setHanjaWritingEntry] = useState<{ content: string } | null>(null);
+  const [hanjaWritingBoard, setHanjaWritingBoard] = useState<HanjaWritingBoardEntry[]>([]);
   const [reactionPendingEntryId, setReactionPendingEntryId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -93,6 +98,9 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
       setOneLineShareEntry(data.oneLineShareEntry ?? null);
       setOneLineShareBoard(data.oneLineShareBoard ?? []);
       setOneLineShareClosed(data.oneLineShareClosed ?? false);
+      setHanjaWritingConfig(data.hanjaWritingConfig ?? null);
+      setHanjaWritingEntry(data.hanjaWritingEntry ?? null);
+      setHanjaWritingBoard(data.hanjaWritingBoard ?? []);
       setLoaded(true);
     });
   }, [sessionId, roomId]);
@@ -121,6 +129,14 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const peerOneLineEntries = useMemo(
     () => oneLineShareBoard.filter((entry) => !entry.isMine),
     [oneLineShareBoard],
+  );
+  const hanjaReactionCount = useMemo(
+    () => hanjaWritingBoard.filter((entry) => entry.likedByCurrentSession).length,
+    [hanjaWritingBoard],
+  );
+  const peerHanjaEntries = useMemo(
+    () => hanjaWritingBoard.filter((entry) => !entry.isMine),
+    [hanjaWritingBoard],
   );
 
   function copyCurrentText() {
@@ -280,14 +296,16 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                 <p className="mt-2 text-base font-medium leading-relaxed text-violet-950">{question.text}</p>
               </div>
             ))}
-
-            {questionVotingSubmission.reason && (
-              <div className="rounded-2xl bg-emerald-50 p-4">
-                <p className="text-xs font-semibold text-emerald-700 mb-2">내가 이렇게 고른 이유</p>
-                <p className="text-sm leading-relaxed text-emerald-950">{questionVotingSubmission.reason}</p>
-              </div>
-            )}
           </div>
+
+          {!questionVotingClosed && (
+            <Link
+              href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+              className="block w-full rounded-2xl border border-violet-200 bg-white py-4 text-center font-bold text-violet-700 transition-colors hover:bg-violet-50"
+            >
+              ✏️ 선택 다시 수정하기
+            </Link>
+          )}
 
           {questionVotingClosed && questionVotingRanking.length > 0 && (
             <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
@@ -381,6 +399,102 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
           >
             ✏️ 한 줄 다시 수정하기
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (activityType === "hanja_writing" && hanjaWritingConfig) {
+    const card = hanjaWritingConfig.card;
+    async function handleToggleHanjaReaction(targetSessionId: string) {
+      setReactionPendingEntryId(targetSessionId);
+      const result = await toggleHanjaWritingReaction(sessionId, roomId, targetSessionId);
+      if (result.entries) {
+        setHanjaWritingBoard(result.entries);
+      }
+      setReactionPendingEntryId(null);
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4">
+        <div className="max-w-3xl mx-auto pt-8 pb-16 space-y-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
+            <div className="text-5xl mb-2">📜</div>
+            <h1 className="text-2xl font-bold text-gray-800">문장 완성!</h1>
+            <p className="text-gray-500 mt-1 text-sm">
+              <strong className="text-amber-600">{studentName}</strong>의 한자 활용 문장
+            </p>
+          </div>
+
+          {hanjaWritingEntry && (
+            <div className="bg-white rounded-3xl shadow-xl p-6">
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-amber-600">내가 만든 문장 ({card.word})</p>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                    받은 좋아요 {hanjaWritingBoard.find((entry) => entry.isMine)?.likeCount ?? 0}
+                  </span>
+                </div>
+                <p className="mt-2 text-base font-medium leading-relaxed text-gray-900">{hanjaWritingEntry.content}</p>
+              </div>
+              <Link
+                href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+                className="mt-3 block w-full rounded-2xl border border-amber-200 bg-white py-3 text-center font-semibold text-amber-700 hover:bg-amber-50"
+              >
+                ✏️ 문장 다시 수정하기
+              </Link>
+            </div>
+          )}
+
+          <div className="bg-white rounded-3xl shadow-xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <p className="text-sm font-bold text-gray-800">친구들이 쓴 문장</p>
+                <p className="mt-1 text-xs text-gray-500">문장을 읽고 마음에 드는 문장에 좋아요를 남겨 보세요.</p>
+              </div>
+              <span className="rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-semibold">
+                누른 좋아요 {hanjaReactionCount}
+              </span>
+            </div>
+            <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              내 문장은 위에서 확인하고, 여기서는 친구들 문장만 반응할 수 있어요.
+            </div>
+            {peerHanjaEntries.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">아직 다른 친구의 문장이 없어요. 조금만 기다려 보세요.</p>
+            ) : (
+              <div className="space-y-3">
+                {peerHanjaEntries.map((entry) => (
+                  <div key={entry.sessionId} className="rounded-2xl bg-gray-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500">{entry.studentNumber}번 {entry.studentName}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleHanjaReaction(entry.sessionId)}
+                        disabled={reactionPendingEntryId === entry.sessionId}
+                        className={`shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
+                          entry.likedByCurrentSession
+                            ? "bg-amber-500 text-white hover:bg-amber-600"
+                            : "bg-white text-amber-700 ring-1 ring-amber-200 hover:bg-amber-50"
+                        } disabled:opacity-50`}
+                      >
+                        {reactionPendingEntryId === entry.sessionId
+                          ? "저장 중..."
+                          : entry.likedByCurrentSession
+                            ? `좋아요 ${entry.likeCount}`
+                            : `좋아요 ${entry.likeCount}`}
+                      </button>
+                    </div>
+                    <p className="mt-3 text-[11px] text-gray-400">
+                      {new Date(entry.createdAt).toLocaleString("ko-KR")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

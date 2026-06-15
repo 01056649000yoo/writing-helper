@@ -18,6 +18,7 @@ import {
   normalizeQuestionVotingConfig,
   normalizeQuestionVotingSubmission,
 } from "@/lib/question-voting";
+import { normalizeHanjaWritingConfig } from "@/lib/hanja-writing";
 
 export default async function TeacherResultPage({
   params,
@@ -65,6 +66,8 @@ export default async function TeacherResultPage({
   const isQuestionGenerator = room?.activity_type === "question_generator";
   const isQuestionVoting = room?.activity_type === "question_voting";
   const isOneLineShare = room?.activity_type === "one_line_share";
+  const isHanjaWriting = room?.activity_type === "hanja_writing";
+  const hanjaWritingConfig = isHanjaWriting ? normalizeHanjaWritingConfig(room?.activity_config) : null;
 
   let questionVotingRanking: ReturnType<typeof buildQuestionVotingRanking> = [];
   if (isQuestionVoting && questionVotingConfig) {
@@ -120,7 +123,7 @@ export default async function TeacherResultPage({
               </div>
             </div>
             {/* 학생 개인 QR */}
-            {!isQuestionGenerator && !isQuestionVoting && resultPayload.outline && (
+            {!isQuestionGenerator && !isQuestionVoting && !isHanjaWriting && resultPayload.outline && (
               <StudentResultQr
                 shareUrl={shareUrl}
                 studentName={session.student_name}
@@ -129,7 +132,7 @@ export default async function TeacherResultPage({
             )}
           </div>
 
-          {!isQuestionGenerator && !isQuestionVoting && resultPayload.outline && (
+          {!isQuestionGenerator && !isQuestionVoting && !isHanjaWriting && resultPayload.outline && (
             <OutlineDraftEditor
               roomId={id}
               sessionId={sessionId}
@@ -201,12 +204,6 @@ export default async function TeacherResultPage({
                   })}
                 </div>
 
-                {questionVotingSubmission.reason && (
-                  <div className="rounded-2xl bg-emerald-50 p-4">
-                    <p className="text-xs font-semibold text-emerald-700 mb-2">선택 이유</p>
-                    <p className="text-sm text-emerald-950 leading-relaxed">{questionVotingSubmission.reason}</p>
-                  </div>
-                )}
               </div>
 
               {questionVotingRanking.length > 0 && (
@@ -214,7 +211,7 @@ export default async function TeacherResultPage({
                   <h2 className="font-bold text-violet-800 mb-4">📊 현재 좋은 질문 득표 결과</h2>
                   <div className="space-y-4">
                     <QuestionVotingTopThree ranking={questionVotingRanking} />
-                    <QuestionVotingCompactList ranking={questionVotingRanking} showReasons />
+                    <QuestionVotingCompactList ranking={questionVotingRanking} />
                   </div>
                 </div>
               )}
@@ -250,7 +247,59 @@ export default async function TeacherResultPage({
             </div>
           )}
 
-          {!isQuestionGenerator && !isQuestionVoting && !isOneLineShare && (
+          {isHanjaWriting && hanjaWritingConfig && (
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-6">
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">한자 카드</p>
+                <h2 className="mt-2 text-3xl font-bold text-gray-900">{hanjaWritingConfig.card.word}</h2>
+                {hanjaWritingConfig.card.definition && (
+                  <p className="mt-3 text-sm leading-relaxed text-gray-700">{hanjaWritingConfig.card.definition}</p>
+                )}
+
+                {hanjaWritingConfig.card.hanja.length > 0 && (
+                  <div className="mt-5">
+                    <p className="mb-2 text-xs font-semibold text-amber-700">한자 풀이</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {hanjaWritingConfig.card.hanja.map((entry, index) => (
+                        <div key={`${entry.char}-${index}`} className="rounded-2xl bg-white p-3">
+                          <p className="text-2xl font-bold text-amber-700">{entry.char}</p>
+                          <p className="mt-1 text-sm font-semibold text-gray-800">{entry.meaning} {entry.reading}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {hanjaWritingConfig.card.relatedWords.length > 0 && (
+                  <div className="mt-5">
+                    <p className="mb-2 text-xs font-semibold text-amber-700">관련 단어</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {hanjaWritingConfig.card.relatedWords.map((entry, index) => (
+                        <div key={`${entry.word}-${index}`} className="rounded-2xl bg-white p-3">
+                          <div className="flex items-baseline gap-2">
+                            <p className="text-sm font-bold text-gray-800">{entry.word}</p>
+                            {entry.hanja && <span className="text-xs text-amber-700">{entry.hanja}</span>}
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-gray-600">{entry.meaning}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-amber-100 bg-white p-6">
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">학생이 만든 문장</p>
+                <p className="mt-3 text-base leading-relaxed text-gray-900">
+                  {typeof session.submission?.content === "string" && session.submission.content.trim()
+                    ? session.submission.content
+                    : "아직 제출된 문장이 없습니다."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!isQuestionGenerator && !isQuestionVoting && !isOneLineShare && !isHanjaWriting && (
           <div>
             <h2 className="font-bold text-gray-700 mb-3">💬 학생 답변 내용</h2>
             <div className="space-y-3">

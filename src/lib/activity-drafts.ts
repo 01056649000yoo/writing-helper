@@ -30,6 +30,7 @@ const WRITING_ACTIVITY_SLUGS: ReadonlySet<string> = new Set<ActivityType>([
   "question_generator",
   "question_voting",
   "one_line_share",
+  "hanja_writing",
 ]);
 
 function classifySlug(slug: string): { kind: DraftKind; activitySlug: DraftActivitySlug } | null {

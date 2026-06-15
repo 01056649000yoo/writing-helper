@@ -22,6 +22,12 @@ type RawReaction = {
 export function normalizeOneLineShareConfig(value: unknown): OneLineShareConfig | null {
   if (!isRecord(value)) return null;
 
+  const coreFromNew = normalizeKeywords(value.coreKeywords);
+  const legacyKeywords = normalizeKeywords(value.keywords);
+  const coreKeywords = coreFromNew.length > 0 ? coreFromNew : legacyKeywords;
+  const auxiliaryKeywords = normalizeKeywords(value.auxiliaryKeywords)
+    .filter((keyword) => !coreKeywords.includes(keyword));
+
   return {
     promptTitle: typeof value.promptTitle === "string" && value.promptTitle.trim()
       ? value.promptTitle.trim()
@@ -29,7 +35,8 @@ export function normalizeOneLineShareConfig(value: unknown): OneLineShareConfig 
     promptDescription: typeof value.promptDescription === "string" && value.promptDescription.trim()
       ? value.promptDescription.trim()
       : "핵심단어를 넣어 오늘 알게 된 점이나 내 생각을 한 문장으로 써보세요.",
-    keywords: normalizeKeywords(value.keywords),
+    coreKeywords,
+    auxiliaryKeywords,
     maxReactionsPerStudent: clampNumber(value.maxReactionsPerStudent, 1, 10, 3),
   };
 }
@@ -43,6 +50,11 @@ export function normalizeKeywordText(value: string) {
 
 export function includesConfiguredKeyword(content: string, keywords: string[]) {
   return getMatchingConfiguredKeywords(content, keywords).length > 0 || keywords.length === 0;
+}
+
+export function includesAllConfiguredKeywords(content: string, keywords: string[]) {
+  if (keywords.length === 0) return true;
+  return getMatchingConfiguredKeywords(content, keywords).length === keywords.length;
 }
 
 export function getMatchingConfiguredKeywords(content: string, keywords: string[]) {
