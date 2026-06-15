@@ -19,7 +19,7 @@ import type {
   QuestionVotingSubmission,
 } from "@/features/activities/types";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing" | "word_game";
 
 function parseOutline(text: string) {
   const sections: { title: string; keywords: string; hint: string }[] = [];

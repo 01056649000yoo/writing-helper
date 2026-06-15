@@ -28,7 +28,7 @@ type Session = {
   level: string | null;
   status: string;
 };
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing" | "word_game";
 type QuestionResult = {
   sessionId: string;
   studentNumber: number;

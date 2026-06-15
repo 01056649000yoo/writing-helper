@@ -3,6 +3,7 @@ import { questionGeneratorDefinition } from "./question-generator/definition";
 import { questionVotingDefinition } from "./question-voting/definition";
 import { oneLineShareDefinition } from "./one-line-share/definition";
 import { hanjaWritingDefinition } from "./hanja-writing/definition";
+import { wordGameDefinition } from "./word-game/definition";
 import type { ActivityDefinition, ActivityType } from "./types";
 
 export const activityRegistry = {
@@ -11,7 +12,8 @@ export const activityRegistry = {
   question_voting: questionVotingDefinition,
   one_line_share: oneLineShareDefinition,
   hanja_writing: hanjaWritingDefinition,
-} satisfies Record<ActivityType, ActivityDefinition<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>>;
+  word_game: wordGameDefinition,
+} satisfies Record<ActivityType, ActivityDefinition<any, any, any>>;
 
 export const activityDefinitions = Object.values(activityRegistry);
 

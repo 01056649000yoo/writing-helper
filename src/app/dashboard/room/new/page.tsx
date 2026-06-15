@@ -124,6 +124,11 @@ const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary
     tone: "from-amber-50 via-white to-orange-50",
     summary: "단어 속 한자의 뜻을 살피고, 그 단어를 활용해 한 문장을 만들어 친구와 나누는 활동",
   },
+  word_game: {
+    emoji: "🎮",
+    tone: "from-sky-50 via-white to-indigo-50",
+    summary: "3~6학년 학년별 필수 단어를 활용하여 정해진 시간 동안 낱말을 맞추는 실시간 경쟁 게임",
+  },
 };
 
 const WRITING_BUNDLE_ACTIVITY_IDS: ActivityType[] = [
@@ -332,6 +337,7 @@ const LITERACY_ACTIVITIES: {
   label: string;
   summary: string;
   href?: string;
+  badge?: string;
 }[] = [
   {
     emoji: "📜",
@@ -339,12 +345,15 @@ const LITERACY_ACTIVITIES: {
     label: "한자 활용 문장 만들기",
     summary: "낱말 속 한자의 뜻을 살피고, 한자를 활용해 더 정확하고 풍부한 문장을 써보는 활동",
     href: "__hanja_writing__",
+    badge: "테스트 중",
   },
   {
-    emoji: "🪄",
-    tone: "from-slate-50 via-white to-gray-50",
-    label: "문해력 활동 ②",
-    summary: "곧 새로운 글쓰기 문해력 활동이 추가될 예정이에요.",
+    emoji: "🎮",
+    tone: "from-sky-50 via-white to-indigo-50",
+    label: "필수 단어 맞추기 게임",
+    summary: "3~6학년 필수 단어를 활용하여 정해진 시간 동안 낱말을 맞추는 실시간 경쟁 게임",
+    href: "__word_game__",
+    badge: "준비 중",
   },
   {
     emoji: "🪄",
@@ -407,6 +416,11 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-2xl">{meta.emoji}</span>
+                        {activity.id === "outline_builder" && (
+                          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                            테스트 중
+                          </span>
+                        )}
                       </div>
                       <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
                       <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{meta.summary}</p>
@@ -447,8 +461,8 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-2xl">{activity.emoji}</span>
-                        <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-                          NEW
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm ${activity.badge === "테스트 중" ? "bg-amber-500" : "bg-amber-400"}`}>
+                          {activity.badge || "NEW"}
                         </span>
                       </div>
                       <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
@@ -467,7 +481,7 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-2xl">{activity.emoji}</span>
                         <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-orange-500 shadow-sm">
-                          준비 중
+                          {activity.badge || "준비 중"}
                         </span>
                       </div>
                       <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
@@ -2648,6 +2662,12 @@ function NewRoomForm() {
       {activityType === "question_voting" && <QuestionVotingSetup classId={classId} />}
       {activityType === "one_line_share" && <OneLineShareSetup classId={classId} />}
       {activityType === "hanja_writing" && <HanjaWritingSetup classId={classId} />}
+      {activityType === "word_game" && (
+        <div className="rounded-3xl border border-dashed border-indigo-200 bg-indigo-50/50 p-10 text-center">
+          <p className="text-lg font-bold text-indigo-900">🎮 필수 단어 맞추기 게임</p>
+          <p className="mt-2 text-sm text-indigo-700">실시간 단어 맞추기 경쟁 게임 설정 화면이 곧 준비될 예정입니다.</p>
+        </div>
+      )}
     </PageShell>
   );
 }
@@ -2661,7 +2681,14 @@ export default function NewRoomPage() {
 }
 
 function parseActivityType(value: string | null): ActivityType | null {
-  if (value === "outline_builder" || value === "question_generator" || value === "question_voting" || value === "one_line_share" || value === "hanja_writing") {
+  if (
+    value === "outline_builder" ||
+    value === "question_generator" ||
+    value === "question_voting" ||
+    value === "one_line_share" ||
+    value === "hanja_writing" ||
+    value === "word_game"
+  ) {
     return value;
   }
   return null;

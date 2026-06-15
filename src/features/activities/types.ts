@@ -5,7 +5,8 @@ export type ActivityType =
   | "question_generator"
   | "question_voting"
   | "one_line_share"
-  | "hanja_writing";
+  | "hanja_writing"
+  | "word_game";
 
 export type ActivityCategory =
   | "writing"
@@ -241,4 +242,32 @@ export type HanjaWritingBoardEntry = {
 
 export type HanjaWritingRoomResult = {
   entries: HanjaWritingBoardEntry[];
+};
+
+export type WordGameConfig = {
+  gameMode: string;
+  timeLimit: number;
+  grade: number;
+  wordCount: number;
+};
+
+export type WordGameSubmission = {
+  score: number;
+  correctCount: number;
+  wrongCount: number;
+};
+
+export type WordGameResult = {
+  score: number;
+  correctCount: number;
+  wrongCount: number;
+};
+
+export type WordGameRoomResult = {
+  rankings: Array<{
+    studentNumber: number;
+    studentName: string;
+    score: number;
+    correctCount: number;
+  }>;
 };
