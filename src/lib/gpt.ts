@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import type { QuestionSets, SubjectType, GradeLevel, OutlineDepth, Answer } from "@/types";
+import type { SubjectType, GradeLevel, OutlineDepth } from "@/types";
+import type { OutlineTemplateAnswer } from "@/features/activities/types";
 
 export function createOpenAIClient(apiKey: string) {
   return new OpenAI({ apiKey });
@@ -121,197 +122,54 @@ function getSubjectStructure(subjectType: SubjectType, outlineDepth: OutlineDept
   return { philosophy: structure.philosophy, sections };
 }
 
-export async function generateQuestionSets(
-  apiKey: string,
-  topic: string,
-  topicDescription: string,
-  subjectType: SubjectType,
-  gradeLevel: GradeLevel,
-  outlineDepth: OutlineDepth
-): Promise<QuestionSets> {
-  const client = createOpenAIClient(apiKey);
-
-  const sectionCount = depthSectionCount(outlineDepth);
-  const { philosophy, sections } = getSubjectStructure(subjectType, outlineDepth);
-  const sectionListText = sections.map((title, index) => `${index + 1}. ${title}`).join("\n");
-
-  const gradeDesc = {
-    "저학년": "초등학교 1~2학년 (매우 쉬운 단어, 짧은 문장)",
-    "중학년": "초등학교 3~4학년 (쉬운 단어, 보통 문장)",
-    "고학년": "초등학교 5~6학년 (다양한 어휘, 깊이 있는 사고)",
-  }[gradeLevel];
-
-  const topicSection = topicDescription.trim()
-    ? `- 글 주제: ${topic}\n- 주제 부연 설명: ${topicDescription.trim()}`
-    : `- 글 주제: ${topic}`;
-
-  const prompt = `
-초등학생 글쓰기 교육 전문가로서 아래 조건에 맞는 글쓰기 도움 질문 세트를 만들어주세요.
-
-조건:
-${topicSection}
-- 글 종류: ${subjectType}
-- 글 종류의 짜임새: ${philosophy}
-- 대상: ${gradeDesc}
-- 이 글은 다음 ${sectionCount}개 단계(개요 구조)로 정리됩니다:
-${sectionListText}
-
-[질문 생성 핵심 원칙 — 반드시 준수]
-- 질문은 위 ${sectionCount}개 단계의 순서대로 정렬되어야 합니다.
-- 각 단계마다 그 단계에 들어갈 내용을 끌어내는 질문을 1개씩 만듭니다. (총 ${sectionCount}개 또는 ${sectionCount + 1}개)
-- 질문은 반드시 "${subjectType}"이라는 글 종류의 짜임새에 맞아야 합니다. 예) 편지라면 받는 사람·인사말·전할 말·끝인사를 묻고, 주장하는 글이라면 주장·근거·결론을 묻습니다. 일반적인 "처음/중간/끝" 질문이 아닙니다.
-- 마지막 단계가 "느낀 점·결론·끝인사" 류일 경우 그에 맞는 마무리 질문을 만드세요.
-
-3가지 수준별 질문 세트를 만들어주세요 (단계 순서는 동일):
-1. low (글쓰기가 어려운 학생): 매우 구체적이고 단순한 질문, type은 반드시 "card+input" 사용 — 카드 선택만 해도 넘어갈 수 있으므로 직접 입력은 선택 사항
-2. mid (보통 학생): 적당한 질문, 선택지 + 직접 입력 병행 (card+input)
-3. high (잘 쓰는 학생): 깊이 있는 질문, 직접 입력 위주 (input)
-
-각 수준마다 ${sectionCount}~${sectionCount + 1}개의 질문을 만들어주세요.
-
-[선택지 규칙 - 반드시 준수]
-- type이 "card" 또는 "card+input"인 질문의 choices는 반드시 정확히 10개를 만드세요.
-- 10개 미만은 절대 안 됩니다. 반드시 10개입니다.
-- 학생이 여러 개를 고를 수 있으므로 다양하고 구체적인 보기를 만드세요.
-- 비슷한 보기 없이 서로 다른 내용으로 구성하세요.
-- type이 "input"인 경우에만 choices를 생략할 수 있습니다.
-- 보기 내용은 해당 단계(예: "${sections[0]}", "${sections[sections.length - 1]}")의 성격과 어울려야 합니다.
-- [보편성 규칙 - 절대 금지] 선택지는 반드시 모든 학생이 선택할 수 있는 보편적인 내용이어야 합니다.
-  · 특정 사람 이름(친구 이름, 가족 이름 등) 금지 → "민준이와" ❌, "친구와" ✅
-  · 특정 장소명(우리 학교 이름, 동네 이름 등) 금지 → "한강공원에서" ❌, "공원에서" ✅
-  · 특정 학생에게만 해당하는 개인적 상황 금지 → 누구나 고를 수 있는 상황·감정·행동으로 만드세요.
-
-반드시 아래 JSON 형식으로만 응답하세요:
-{
-  "low": {
-    "questions": [
-      {
-        "step": 1,
-        "question": "질문 내용",
-        "type": "card+input",
-        "choices": ["보기1", "보기2", "보기3", "보기4", "보기5", "보기6", "보기7", "보기8", "보기9", "보기10"],
-        "hint": "힌트 (선택사항)"
-      }
-    ]
-  },
-  "mid": {
-    "questions": [...]
-  },
-  "high": {
-    "questions": [...]
-  }
-}
-
-type은 "card"(선택지만), "input"(직접입력만), "card+input"(선택지+직접입력) 중 하나입니다.
-card 또는 card+input 타입은 choices가 반드시 10개여야 합니다.
-`;
-
-  const response = await client.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    temperature: 0.7,
-  });
-
-  const content = response.choices[0].message.content;
-  if (!content) throw new Error("GPT 응답이 비어있습니다.");
-
-  return JSON.parse(content) as QuestionSets;
-}
-
 export async function generateOutline(
   apiKey: string,
   topic: string,
   topicDescription: string,
   subjectType: SubjectType,
   gradeLevel: GradeLevel,
-  outlineDepth: OutlineDepth,
-  level: string,
-  answers: Answer[]
+  answers: OutlineTemplateAnswer[],
 ): Promise<string> {
   const client = createOpenAIClient(apiKey);
 
-  const sectionCount = depthSectionCount(outlineDepth);
-  const { philosophy, sections } = getSubjectStructure(subjectType, outlineDepth);
+  const { philosophy } = getSubjectStructure(subjectType, "simple");
   const gradeDesc = { "저학년": "1~2학년", "중학년": "3~4학년", "고학년": "5~6학년" }[gradeLevel];
 
-  const answersText = answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join("\n\n");
   const topicContext = topicDescription.trim()
     ? `"${topic}" (${topicDescription.trim()})`
     : `"${topic}"`;
 
-  const isLow = level === "low";
+  const sections = ["처음", "가운데", "끝"] as const;
+  const sectionAnswersText = sections.map((section) => {
+    const sectionItems = answers.filter((a) => a.section === section);
+    if (sectionItems.length === 0) return null;
+    const itemsText = sectionItems.map((a) => `  - ${a.label}: ${a.answer}`).join("\n");
+    return `[${section}]\n${itemsText}`;
+  }).filter(Boolean).join("\n\n");
 
-  const sectionSpecText = sections
-    .map((title, index) => `${index + 1}. ${title}`)
-    .join("\n");
-
-  const exampleSection = sections[0];
-  const exampleMiddleSection = sections[Math.floor(sections.length / 2)];
-
-  const lowFormatExample = `✏️ ${exampleSection} | (학생 답변을 반영한 짧고 분명한 한 문장. 핵심 단어가 자연스럽게 들어가야 함.)
-(보충 표현 1 / 보충 표현 2 / 보충 표현 3)
-
-
-✏️ ${exampleMiddleSection} | (학생 답변에서 뽑은 핵심 단어를 살린 짧은 한 문장.)
-(보충 표현 1 / 보충 표현 2 / 보충 표현 3)
-
-
-✏️ ${sections[sections.length - 1]} | (학생 답변에서 뽑은 마무리 핵심을 담은 짧은 한 문장.)
-(보충 표현 1 / 보충 표현 2 / 보충 표현 3)
-`;
-
-  const midHighFormatExample = `✏️ ${exampleSection} | (학생 답변을 반영한 짧고 분명한 한 문장. 핵심 단어가 자연스럽게 들어가야 함.)
-
-
-✏️ ${exampleMiddleSection} | (학생 답변에서 뽑은 핵심을 살린 짧은 한 문장.)
-
-
-✏️ ${sections[sections.length - 1]} | (학생 답변에서 뽑은 마무리 핵심을 담은 짧은 한 문장.)
-`;
-
-  const levelConfig = {
-    low: {
-      sentenceGuide: "주어와 서술어가 분명한 짧은 한 문장(15자 내외). 학생이 답한 표현을 그대로 살려서 쓰세요.",
-      extraHintGuide: `- 둘째 줄 괄호 ( ... )에는 그 문장과 어울리는 보충 표현 3개를 ' / '로 구분해 적습니다. 학생이 글을 살을 붙일 때 떠올릴 수 있는 짧은 표현이어야 합니다.
-  예) ✏️ 일이 시작된 상황 | 운동장에서 친구와 신나게 축구를 시작했다.
-      (쉬는 시간 종이 울리자 / 가장 좋아하는 친구와 / 공이 데굴데굴)`,
-    },
-    mid: {
-      sentenceGuide: "한 문장(20자 내외). 학생 답변을 바탕으로 그 단계의 핵심 내용을 분명히 드러내세요.",
-      extraHintGuide: "- 둘째 줄 보충(괄호) 줄은 쓰지 마세요. 한 문장만 출력합니다.",
-    },
-    high: {
-      sentenceGuide: "한 문장(25자 내외). 함축적 표현을 살리되, 그 단계의 핵심이 드러나야 합니다.",
-      extraHintGuide: "- 둘째 줄 보충(괄호) 줄은 쓰지 마세요. 한 문장만 출력합니다.",
-    },
-  }[level as "low" | "mid" | "high"] ?? {
-    sentenceGuide: "한 문장(20자 내외). 학생 답변에서 뽑은 핵심을 담아 쓰세요.",
-    extraHintGuide: "- 둘째 줄 보충(괄호) 줄은 쓰지 마세요. 한 문장만 출력합니다.",
-  };
-
-  const prompt = `
-초등학교 ${gradeDesc} 학생이 ${topicContext}을 주제로 "${subjectType}"을 씁니다.
+  const prompt = `초등학교 ${gradeDesc} 학생이 ${topicContext}을 주제로 "${subjectType}"을 씁니다.
 글 종류의 짜임새: ${philosophy}
 
-학생이 답한 내용:
-${answersText}
+학생이 입력한 내용:
+${sectionAnswersText}
 
-위 학생의 답변을 바탕으로 아래 ${sectionCount}개 단계의 개요를 만들어주세요. 단계 제목은 절대 바꾸지 말고 그대로 사용합니다:
-${sectionSpecText}
+위 내용을 바탕으로 처음·가운데·끝 3단계 개요를 만들어주세요.
 
-[작성 규칙 — 반드시 준수]
-- 각 단계마다 "✏️ <단계 제목> | <한 문장 요약>" 형식으로 작성합니다.
-- 한 문장 요약은 ${levelConfig.sentenceGuide}
-- 한 문장 요약은 학생이 답변에서 사용한 핵심 단어를 자연스럽게 포함해야 합니다.
-- "키워드만 나열"은 절대 하지 마세요. 반드시 주어+서술어가 있는 짧은 단답식 문장이어야 합니다.
-- 단계 제목은 위에 적힌 그대로 사용하고, 순서도 그대로입니다.
-- "${subjectType}"의 짜임새에 어울리는 어조로 쓰세요. (예: 편지면 인사·전할 말·끝인사 어조, 주장하는 글이면 단호한 논리 어조)
-${levelConfig.extraHintGuide}
+[작성 규칙]
+- 각 단계마다 "✏️ <단계> | <한 문장 요약>" 형식으로 작성합니다.
+- 한 문장 요약은 20자 내외로 학생이 입력한 핵심 내용이 자연스럽게 드러나야 합니다.
+- 키워드 나열 금지. 반드시 주어+서술어가 있는 짧은 문장이어야 합니다.
+- "${subjectType}"의 글 성격에 맞는 어조로 씁니다.
 - 각 단계 사이에 빈 줄 두 칸을 둡니다.
 
-아래 형식 예시를 그대로 따라주세요:
-${isLow ? lowFormatExample : midHighFormatExample}`;
+출력 예시:
+✏️ 처음 | (학생 내용을 반영한 짧은 한 문장)
+
+
+✏️ 가운데 | (학생 내용을 반영한 짧은 한 문장)
+
+
+✏️ 끝 | (학생 내용을 반영한 짧은 한 문장)`;
 
   const response = await client.chat.completions.create({
     model: "gpt-4o",
@@ -328,54 +186,40 @@ export async function generateDraftFromAnswers(
   topicDescription: string,
   subjectType: SubjectType,
   gradeLevel: GradeLevel,
-  outlineDepth: OutlineDepth,
-  level: string,
-  answers: Answer[]
+  answers: OutlineTemplateAnswer[],
 ): Promise<string> {
   const client = createOpenAIClient(apiKey);
 
-  const levelDesc = { low: "글쓰기가 어려운", mid: "보통 수준의", high: "글을 잘 쓰는" }[level] ?? "보통 수준의";
   const gradeDesc = { "저학년": "1~2학년", "중학년": "3~4학년", "고학년": "5~6학년" }[gradeLevel];
-  const paragraphGuide = outlineDepth === "simple"
-    ? "2~3문단"
-    : outlineDepth === "medium"
-      ? "3~4문단"
-      : "4문단";
+  const { philosophy } = getSubjectStructure(subjectType, "simple");
 
-  const { philosophy, sections } = getSubjectStructure(subjectType, outlineDepth);
-  const sectionListText = sections.map((title, index) => `${index + 1}. ${title}`).join("\n");
-
-  const answersText = answers.map((a) => `Q: ${a.question}\nA: ${a.answer}`).join("\n\n");
   const topicContext = topicDescription.trim()
     ? `"${topic}" (${topicDescription.trim()})`
     : `"${topic}"`;
 
-  const prompt = `
-초등학교 ${gradeDesc} ${levelDesc} 학생이 ${topicContext}을 주제로 "${subjectType}"을 씁니다.
+  const sections = ["처음", "가운데", "끝"] as const;
+  const sectionAnswersText = sections.map((section) => {
+    const sectionItems = answers.filter((a) => a.section === section);
+    if (sectionItems.length === 0) return null;
+    const itemsText = sectionItems.map((a) => `  - ${a.label}: ${a.answer}`).join("\n");
+    return `[${section}]\n${itemsText}`;
+  }).filter(Boolean).join("\n\n");
+
+  const prompt = `초등학교 ${gradeDesc} 학생이 ${topicContext}을 주제로 "${subjectType}"을 씁니다.
 글 종류의 짜임새: ${philosophy}
 
-학생이 답한 내용:
-${answersText}
+학생이 입력한 내용:
+${sectionAnswersText}
 
-이 글은 아래 ${sections.length}단계 흐름을 따릅니다. 문단을 그 흐름에 맞춰 나눠 쓰세요:
-${sectionListText}
+위 내용을 바탕으로, 학생이 고쳐쓰기 좋도록 2~3문단의 짧은 초고를 만들어주세요.
 
-위 답변을 바탕으로, 학생이 고쳐쓰기 좋도록 ${paragraphGuide}의 짧은 초고를 만들어주세요.
-
-[절대 규칙]
-- 완성된 모범답안처럼 너무 매끈하게 쓰지 마세요.
-- 학생이 직접 고쳐 쓸 수 있도록 쉬운 표현, 약간은 투박한 흐름을 유지하세요.
-- 학생이 답한 말과 표현을 최대한 살리세요.
-- 문단은 위 단계 흐름에 맞춰 분명히 나누고, 읽으면 바로 다듬기 좋은 형태로 쓰세요.
-- "${subjectType}"의 짜임새에 어울리는 어조와 형식을 지키세요. (예: 편지면 받는 사람·인사말·끝인사가 있어야 하고, 동시면 행이 짧고 운율이 있어야 함.)
-- 너무 길게 쓰지 마세요.
-- 제목은 쓰지 말고, 문단 글만 작성하세요.
-- 불릿, 번호, 이모지는 쓰지 마세요.
-
-출력 형식:
-- 문단 글만 출력
-- 문단 사이에는 빈 줄 한 줄
-`;
+[규칙]
+- 완성된 모범답안처럼 매끈하게 쓰지 마세요. 학생이 직접 고쳐 쓸 여지를 남기세요.
+- 학생이 입력한 말과 표현을 최대한 살리세요.
+- 처음·가운데·끝 흐름에 맞게 문단을 나눠 쓰세요.
+- "${subjectType}"의 형식을 지키세요. (편지면 받는 사람·인사말·끝인사, 동시면 짧은 행과 운율 등)
+- 제목 없이 본문만 쓰세요. 불릿, 번호, 이모지 사용 금지.
+- 문단 사이는 빈 줄 한 줄.`;
 
   const response = await client.chat.completions.create({
     model: "gpt-4o",

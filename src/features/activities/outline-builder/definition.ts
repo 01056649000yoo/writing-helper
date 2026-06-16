@@ -7,17 +7,16 @@ export const outlineBuilderDefinition: ActivityDefinition<
 > = {
   id: "outline_builder",
   label: "글 개요 짜기",
-  description: "학생 답변을 바탕으로 GPT가 글쓰기 개요를 만들어주는 현재 활동입니다.",
+  description: "처음·가운데·끝 구조로 내용을 입력하면 AI가 개요를 완성해주는 활동입니다.",
   category: "writing",
-  version: 1,
+  version: 2,
   usesAi: true,
   supportsRoomResult: false,
   createDefaultConfig: () => ({
     subjectType: "생활문",
     gradeLevel: "중학년",
     outlineDepth: "simple",
-    questionSets: null,
-    questionsGeneratedAt: null,
+    outlineTemplate: null,
     generateDraft: false,
   }),
   validateConfig: (input) => {
@@ -25,7 +24,6 @@ export const outlineBuilderDefinition: ActivityDefinition<
     return { ok: true, value };
   },
   emptySubmission: () => ({
-    level: null,
     answers: [],
   }),
   emptyResult: () => ({
@@ -36,4 +34,3 @@ export const outlineBuilderDefinition: ActivityDefinition<
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-

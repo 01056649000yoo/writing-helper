@@ -1,5 +1,14 @@
 import type { GradeLevel, OutlineDepth, QuestionSets, SubjectType, StudentLevel, Answer } from "@/types";
 
+export type { OutlineTemplate, OutlineTemplateItem, OutlineSection } from "@/lib/outline-templates";
+
+export type OutlineTemplateAnswer = {
+  section: "처음" | "가운데" | "끝";
+  itemId: string;
+  label: string;
+  answer: string;
+};
+
 export type ActivityType =
   | "outline_builder"
   | "question_generator"
@@ -42,14 +51,21 @@ export type OutlineBuilderConfig = {
   subjectType: SubjectType;
   gradeLevel: GradeLevel;
   outlineDepth: OutlineDepth;
-  questionSets: QuestionSets | null;
-  questionsGeneratedAt: string | null;
+  /** null이면 글 종류 기본 템플릿 사용 */
+  outlineTemplate: import("@/lib/outline-templates").OutlineTemplate | null;
   generateDraft: boolean;
+  /** @deprecated 이전 방식 호환용 — 새 방에는 사용 안 함 */
+  questionSets?: QuestionSets | null;
+  /** @deprecated 이전 방식 호환용 */
+  questionsGeneratedAt?: string | null;
 };
 
 export type OutlineBuilderSubmission = {
-  level: StudentLevel | null;
-  answers: Answer[];
+  answers: OutlineTemplateAnswer[];
+  /** @deprecated 이전 방식 호환용 */
+  level?: StudentLevel | null;
+  /** @deprecated 이전 방식 호환용 */
+  legacyAnswers?: Answer[];
 };
 
 export type OutlineBuilderResult = {

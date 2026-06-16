@@ -5,14 +5,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "./auth-actions";
-import { generateQuestionSets, correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
+import { correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
 import { getTeacherOpenAiAccess, logApiUsage } from "@/lib/service-admin";
 import { buildHanjaWritingBoard } from "@/lib/hanja-writing";
-import { getTeacherQuestionCardSettingsTree, getTeacherQuestionCardSets } from "@/lib/question-card-sets";
+import { getTeacherQuestionCardSettingsTree } from "@/lib/question-card-sets";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
-import { buildOneLineShareBoard, includesConfiguredKeyword, normalizeKeywordText, normalizeOneLineShareConfig } from "@/lib/one-line-share";
+import { buildOneLineShareBoard, normalizeKeywordText } from "@/lib/one-line-share";
 import { serializeOutlineResult } from "@/lib/result-format";
 import type {
   ActivityType,
@@ -20,12 +20,13 @@ import type {
   OutlineBuilderConfig,
   OneLineShareConfig,
   OneLineShareRoomResult,
+  OutlineTemplate,
   QuestionGeneratorConfig,
   QuestionVotingConfig,
   QuestionVotingRoomResult,
   HanjaWritingConfig,
 } from "@/features/activities/types";
-import type { SubjectType, GradeLevel, OutlineDepth, RoomStudent, QuestionSets } from "@/types";
+import type { SubjectType, GradeLevel, OutlineDepth, RoomStudent } from "@/types";
 
 export type SavedHanjaWordCard = HanjaWordCard & {
   id: string;
@@ -35,34 +36,74 @@ export type SavedHanjaWordCard = HanjaWordCard & {
   updatedAt: string;
 };
 
-/** 1단계: 질문 세트만 생성해서 반환 (세션 저장 안함) */
-export async function generateQuestionsPreview(formData: FormData): Promise<{ questionSets?: QuestionSets; error?: string }> {
+
+/** 교사용: 방의 outlineTemplate AI 항목 보충 */
+export async function enhanceOutlineTemplateWithAI(
+  subjectType: SubjectType,
+  gradeLevel: GradeLevel,
+  topic: string,
+  currentTemplate: OutlineTemplate,
+  section: "처음" | "가운데" | "끝",
+): Promise<{ items?: import("@/lib/outline-templates").OutlineTemplateItem[]; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
-
-  const topic = String(formData.get("topic") ?? "").trim();
-  const topicDescription = String(formData.get("topic_description") ?? "").trim();
-  const subjectType = String(formData.get("subject_type")) as SubjectType;
-  const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
-  const outlineDepth = (String(formData.get("outline_depth")) || "simple") as OutlineDepth;
-
-  if (!topic) return { error: "주제를 입력해주세요." };
 
   const keyAccess = await getTeacherOpenAiAccess(user.id);
   if (keyAccess.error || !keyAccess.access) return { error: keyAccess.error ?? "OpenAI API 키를 불러올 수 없습니다." };
 
+  const client = (await import("@/lib/gpt")).createOpenAIClient(keyAccess.access.apiKey);
+  const gradeDesc = { "저학년": "1~2학년", "중학년": "3~4학년", "고학년": "5~6학년" }[gradeLevel] ?? gradeLevel;
+
+  const currentSectionItems = currentTemplate.sections
+    .find((s) => s.key === section)?.items ?? [];
+  const currentLabels = currentSectionItems.map((i) => `"${i.label}"`).join(", ");
+
+  const prompt = `초등학교 ${gradeDesc} "${subjectType}" 글쓰기 개요 짜기 활동에서 "${topic}"을 주제로 합니다.
+현재 "${section}" 단계에 이미 있는 항목: ${currentLabels || "(없음)"}
+
+이 단계에 추가하면 좋을 새로운 항목을 2~3개 제안해주세요.
+- 초등학생이 답할 수 있는 구체적인 내용이어야 합니다.
+- 이미 있는 항목과 겹치지 않아야 합니다.
+
+JSON 형식으로만 응답:
+{
+  "items": [
+    {"id": "new_1", "label": "항목 이름", "prompt": "학생에게 물을 질문", "placeholder": "예) ..."},
+    ...
+  ]
+}`;
+
   try {
     await logApiUsage({
       teacherId: user.id,
-      feature: "generate_questions_preview",
+      feature: "enhance_outline_template",
       model: "gpt-4o",
       usedSharedApi: keyAccess.access.usedSharedApi,
-      metadata: { subjectType, gradeLevel, outlineDepth, topic },
+      metadata: { subjectType, section },
     });
-    const questionSets = await generateQuestionSets(keyAccess.access.apiKey, topic, topicDescription, subjectType, gradeLevel, outlineDepth);
-    return { questionSets };
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+    const content = response.choices[0].message.content;
+    if (!content) return { items: [] };
+    const parsed = JSON.parse(content) as { items?: unknown };
+    if (!Array.isArray(parsed.items)) return { items: [] };
+    return {
+      items: parsed.items
+        .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+        .map((item) => ({
+          id: typeof item.id === "string" ? item.id : `new_${Math.random().toString(36).slice(2, 7)}`,
+          label: typeof item.label === "string" ? item.label : "",
+          prompt: typeof item.prompt === "string" ? item.prompt : "",
+          placeholder: typeof item.placeholder === "string" ? item.placeholder : "",
+        }))
+        .filter((item) => item.label && item.prompt),
+    };
   } catch {
-    return { error: "질문 생성에 실패했습니다. API 키를 확인해주세요." };
+    return { error: "AI 제안을 불러오지 못했습니다." };
   }
 }
 
@@ -79,26 +120,12 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
   const outlineDepth = (String(formData.get("outline_depth")) || "simple") as OutlineDepth;
   const durationHours = Math.min(Math.max(Number(formData.get("duration_hours") ?? 4), 4), 168);
-  const questionSetsJson = String(formData.get("question_sets_json") ?? "").trim();
 
   if (!classId) return { error: "학급을 선택해주세요." };
 
   const admin = createSupabaseAdminClient();
   const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
-  const baseRoomPayload: {
-    teacher_id: string;
-    class_id: string;
-    title: string;
-    topic: string;
-    topic_description: string;
-    subject_type: SubjectType;
-    grade_level: GradeLevel;
-    outline_depth: OutlineDepth;
-    question_sets: QuestionSets | null;
-    questions_generated_at: string | null;
-    expires_at: string;
-    is_active: boolean;
-  } = {
+  const baseRoomPayload = {
     teacher_id: user.id,
     class_id: classId,
     title: topic,
@@ -107,8 +134,8 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     subject_type: subjectType,
     grade_level: gradeLevel,
     outline_depth: outlineDepth,
-    question_sets: null,
-    questions_generated_at: null,
+    question_sets: null as null,
+    questions_generated_at: null as null,
     expires_at: expiresAt,
     is_active: true,
   };
@@ -116,30 +143,26 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig | OneLineShareConfig | HanjaWritingConfig;
 
   if (activityType === "outline_builder") {
-    const keyAccess = await getTeacherOpenAiAccess(user.id);
-    if (keyAccess.error || !keyAccess.access) return { error: keyAccess.error ?? "OpenAI API 키를 먼저 설정해주세요." };
+    const generateDraft = formData.get("generate_draft") === "on";
 
-    if (!questionSetsJson) return { error: "문항을 먼저 생성해주세요." };
-
-    let questionSets: QuestionSets;
-    try {
-      questionSets = JSON.parse(questionSetsJson) as QuestionSets;
-    } catch {
-      return { error: "문항 데이터가 올바르지 않습니다." };
+    // 교사가 커스텀 템플릿을 전달했으면 사용, 없으면 null (런타임에 기본값 사용)
+    const customTemplateJson = String(formData.get("outline_template_json") ?? "").trim();
+    let outlineTemplate: OutlineTemplate | null = null;
+    if (customTemplateJson) {
+      try {
+        outlineTemplate = JSON.parse(customTemplateJson) as OutlineTemplate;
+      } catch {
+        return { error: "템플릿 데이터가 올바르지 않습니다." };
+      }
     }
 
-    const questionsGeneratedAt = new Date().toISOString();
-    const generateDraft = formData.get("generate_draft") === "on";
     activityConfig = {
       subjectType,
       gradeLevel,
       outlineDepth,
-      questionSets,
-      questionsGeneratedAt,
+      outlineTemplate,
       generateDraft,
     };
-    baseRoomPayload.question_sets = questionSets;
-    baseRoomPayload.questions_generated_at = questionsGeneratedAt;
   } else if (activityType === "question_generator") {
     if (!topicDescription) {
       return { error: "학생에게 보여줄 활동 가이드를 주제 부연 설명에 입력해주세요." };
@@ -1396,7 +1419,7 @@ async function getShortCodeForRoom(roomId: string, teacherId: string) {
   return ensureShortLinkForRoom(room.id, teacherId, room.expires_at ?? null);
 }
 
-async function ensureShortLinkForRoom(roomId: string, teacherId: string, expiresAt: string | null) {
+async function ensureShortLinkForRoom(roomId: string, _teacherId: string, expiresAt: string | null) {
   const admin = createSupabaseAdminClient();
 
   for (let attempt = 0; attempt < 5; attempt++) {

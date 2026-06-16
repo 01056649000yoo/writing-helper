@@ -3,7 +3,6 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  setStudentLevel,
   saveAnswers,
   requestOutline,
   getStudentRoomQuestions,
@@ -23,7 +22,8 @@ import type {
   QuestionGeneratorSubmission,
   QuestionVotingConfig,
 } from "@/features/activities/types";
-import type { StudentLevel, QuestionSets, Question, Answer } from "@/types";
+import type { OutlineTemplateAnswer, OutlineTemplate } from "@/features/activities/types";
+import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import {
   getCardMeta,
   getCardTheme,
@@ -34,8 +34,7 @@ import {
 type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing" | "word_game";
 
 type Step =
-  | "level"
-  | "questions"
+  | "outline_sections"
   | "question_intro"
   | "question_path"
   | "question_set"
@@ -160,13 +159,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [hanjaWritingConfig, setHanjaWritingConfig] = useState<HanjaWritingConfig | null>(null);
   const [hanjaContent, setHanjaContent] = useState("");
   const [step, setStep] = useState<Step | null>(null);
-  const [levelPending, setLevelPending] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Answer[]>([]);
-  const [customInput, setCustomInput] = useState("");
-  const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
+  // outline_builder 전용 상태
+  const [outlineTemplate, setOutlineTemplate] = useState<OutlineTemplate | null>(null);
+  const [isLegacyOutlineRoom, setIsLegacyOutlineRoom] = useState(false);
+  const [templateAnswers, setTemplateAnswers] = useState<OutlineTemplateAnswer[]>([]);
+  const [outlineSubmitting, setOutlineSubmitting] = useState(false);
   const [topic, setTopic] = useState("");
   const [topicDescription, setTopicDescription] = useState("");
   const [error, setError] = useState("");
@@ -326,7 +324,17 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         setHanjaContent(existingHanja?.content ?? "");
         setStep("hanja_writing");
       } else {
-        setStep("level");
+        // outline_builder
+        const config = data.activity_config as Record<string, unknown> | null;
+        const subjectType = (config?.subjectType as import("@/types").SubjectType | undefined) ?? "생활문";
+        const template = data.outline_template ?? getDefaultOutlineTemplate(subjectType);
+        setOutlineTemplate(template);
+        setIsLegacyOutlineRoom(data.is_legacy_outline_room ?? false);
+        if (data.is_legacy_outline_room) {
+          router.push(`/room/${roomId}/waiting?session=${sessionId}`);
+        } else {
+          setStep("outline_sections");
+        }
       }
       setPageLoading(false);
     });
@@ -366,69 +374,39 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  async function handleLevelSelect(selectedLevel: StudentLevel) {
-    if (levelPending) return;
-    setLevelPending(true);
-    setError("");
-
-    try {
-      await setStudentLevel(sessionId, selectedLevel);
-
-      const data = await getStudentRoomQuestions(sessionId, roomId);
-      const qs = (data?.question_sets as QuestionSets)?.[selectedLevel]?.questions ?? [];
-
-      if (qs.length === 0) {
-        setError("질문을 불러오지 못했습니다. 다시 시도해주세요.");
-        setLevelPending(false);
-        return;
+  function handleTemplateAnswerChange(itemId: string, section: "처음" | "가운데" | "끝", label: string, value: string) {
+    setTemplateAnswers((prev) => {
+      const existing = prev.find((a) => a.itemId === itemId);
+      if (existing) {
+        return prev.map((a) => a.itemId === itemId ? { ...a, answer: value } : a);
       }
-
-      setQuestions(qs);
-      setStep("questions");
-      setLevelPending(false);
-    } catch {
-      setError("오류가 발생했습니다. 다시 시도해주세요.");
-      setLevelPending(false);
-    }
+      return [...prev, { section, itemId, label, answer: value }];
+    });
   }
 
-  async function handleAnswer(answer: string) {
-    const q = questions[currentQ];
-    const newAnswer: Answer = { step: q.step, question: q.question, answer };
-    const newAnswers = [...answers, newAnswer];
+  async function handleOutlineSectionSubmit() {
+    if (outlineSubmitting) return;
     setError("");
+    setOutlineSubmitting(true);
 
-    const saveResult = await saveAnswers(sessionId, newAnswers);
+    const saveResult = await saveAnswers(sessionId, templateAnswers);
     if (saveResult.error) {
       setError(saveResult.error);
+      setOutlineSubmitting(false);
       return;
     }
 
-    if (currentQ + 1 < questions.length) {
-      setAnswers(newAnswers);
-      setCustomInput("");
-      setSelectedChoices([]);
-      setCurrentQ(currentQ + 1);
-      return;
-    }
-
-    setStep("submitting");
-    const result = await requestOutline(sessionId, newAnswers);
+    const result = await requestOutline(sessionId, templateAnswers);
     if (result.error) {
       setError(result.error);
-      setStep("questions");
+      setOutlineSubmitting(false);
       return;
     }
-    setAnswers(newAnswers);
-    setCustomInput("");
-    setSelectedChoices([]);
     router.push(`/room/${roomId}/waiting?queue=${result.queueId}&session=${sessionId}`);
   }
 
   function toggleChoice(choice: string) {
-    setSelectedChoices((prev) =>
-      prev.includes(choice) ? prev.filter((currentChoice) => currentChoice !== choice) : [...prev, choice]
-    );
+    void choice;
   }
 
   function selectQuestionPrompt(prompt: string) {
@@ -438,11 +416,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     setRemixedQuestion(prompt);
   }
 
-  function handleConfirmChoices() {
-    const answer = selectedChoices.length > 0 ? selectedChoices.join(", ") : customInput.trim();
-    if (!answer) return;
-    handleAnswer(answer);
-  }
 
   async function handleQuestionSelectionSubmit() {
     const normalizedQuestion = remixedQuestion.trim();
@@ -1449,150 +1422,75 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  if (step === "level") {
+  if (step === "outline_sections") {
+    const sections = outlineTemplate?.sections ?? [];
+    const answeredCount = templateAnswers.filter((a) => a.answer.trim()).length;
+    const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="text-5xl mb-3">🤔</div>
-            <h1 className="text-xl font-bold text-gray-800">나는 글쓰기가...</h1>
-            <p className="text-gray-500 text-sm mt-1">주제: <strong>{topic}</strong></p>
-          </div>
-          <div className="space-y-3">
-            {[
-              { level: "low" as StudentLevel, emoji: "😰", label: "어디서 시작할지 모르겠어요", desc: "처음부터 차근차근 도와드릴게요" },
-              { level: "mid" as StudentLevel, emoji: "🙂", label: "조금은 쓸 수 있어요", desc: "내용을 더 풍부하게 만들어봐요" },
-              { level: "high" as StudentLevel, emoji: "😊", label: "잘 쓸 수 있어요!", desc: "더 깊고 멋진 글을 써봐요" },
-            ].map((option) => (
-              <button
-                key={option.level}
-                onClick={() => handleLevelSelect(option.level)}
-                disabled={levelPending}
-                className="w-full p-4 border-2 border-gray-200 rounded-2xl text-left hover:border-orange-400 hover:bg-orange-50 transition-colors disabled:opacity-50"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{option.emoji}</span>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-800">{option.label}</p>
-                    <p className="text-xs text-gray-500">{option.desc}</p>
-                  </div>
-                  {levelPending && <span className="text-gray-300 text-sm animate-spin">⏳</span>}
-                </div>
-              </button>
-            ))}
-          </div>
-          {error && <p className="text-red-500 text-sm text-center mt-4">{error}</p>}
-          {levelPending && (
-            <p className="text-orange-500 text-sm text-center mt-3 animate-pulse">준비 중이에요...</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "submitting") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
-          <div className="text-5xl mb-4 animate-bounce">✨</div>
-          <h1 className="text-xl font-bold text-gray-800">개요를 만들고 있어요!</h1>
-          {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-        </div>
-      </div>
-    );
-  }
-
-  const q = questions[currentQ];
-  if (!q) return null;
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md">
-        <div className="mb-6">
-          <div className="flex justify-between text-xs text-gray-400 mb-2">
-            <span>{currentQ + 1} / {questions.length}</span>
-            <span>{Math.round(((currentQ + 1) / questions.length) * 100)}%</span>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-orange-400 rounded-full transition-all duration-500"
-              style={{ width: `${((currentQ + 1) / questions.length) * 100}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="text-center mb-6">
-          <p className="text-sm text-gray-400 mb-2">주제: {topic}</p>
-          <h2 className="text-xl font-bold text-gray-800 leading-snug">{q.question}</h2>
-          {q.hint && <p className="text-sm text-gray-400 mt-2">💡 {q.hint}</p>}
-        </div>
-
-        {(q.type === "card" || q.type === "card+input") && q.choices && (
-          <div className="space-y-3 mb-2">
-            <p className="text-xs text-center text-orange-500 font-medium">
-              💡 해당하는 것을 모두 골라봐요 (여러 개도 돼요)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {q.choices.map((choice, index) => {
-                const selected = selectedChoices.includes(choice);
-                return (
-                  <button
-                    key={index}
-                    onClick={() => toggleChoice(choice)}
-                    className={`p-3 border-2 rounded-2xl text-sm font-medium text-left transition-all ${
-                      selected
-                        ? "border-orange-400 bg-orange-50 text-orange-700 scale-[1.02]"
-                        : "border-gray-200 hover:border-orange-300 hover:bg-orange-50/50 text-gray-700"
-                    }`}
-                  >
-                    <span className="mr-1">{selected ? "✅" : "⬜"}</span>
-                    {choice}
-                  </button>
-                );
-              })}
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
+        <div className="max-w-lg mx-auto">
+          <div className="bg-white rounded-3xl shadow-xl p-6 mb-4">
+            <div className="text-center">
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">개요 짜기</p>
+              <h1 className="text-lg font-bold text-gray-800 mt-1">주제: {topic}</h1>
+              {topicDescription && (
+                <p className="text-sm text-gray-500 mt-1">{topicDescription}</p>
+              )}
             </div>
+            <div className="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                style={{ width: totalItems > 0 ? `${(answeredCount / totalItems) * 100}%` : "0%" }}
+              />
+            </div>
+            <p className="text-xs text-gray-400 text-center mt-1">{answeredCount} / {totalItems} 항목 작성</p>
           </div>
-        )}
 
-        {(q.type === "input" || q.type === "card+input") && (
-          <div className="space-y-2 mt-3">
-            {q.type === "card+input" && (
-              <p className="text-xs text-center text-gray-400">✏️ 직접 추가하고 싶은 내용이 있으면 써봐요</p>
-            )}
-            <textarea
-              value={customInput}
-              onChange={(event) => setCustomInput(event.target.value)}
-              rows={2}
-              placeholder="직접 써봐요..."
-              className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400 resize-none"
-            />
+          {sections.map(({ key, items }) => (
+            <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
+              <h2 className="text-base font-bold text-orange-500 mb-3 flex items-center gap-2">
+                <span className="inline-block w-6 h-6 rounded-full bg-orange-100 text-orange-500 text-xs font-bold flex items-center justify-center">
+                  {key === "처음" ? "1" : key === "가운데" ? "2" : "3"}
+                </span>
+                {key}
+              </h2>
+              <div className="space-y-4">
+                {items.map((item) => {
+                  const currentAnswer = templateAnswers.find((a) => a.itemId === item.id)?.answer ?? "";
+                  return (
+                    <div key={item.id} className="space-y-1">
+                      <label className="text-sm font-semibold text-gray-700">{item.label}</label>
+                      <textarea
+                        value={currentAnswer}
+                        onChange={(e) => handleTemplateAnswerChange(item.id, key, item.label, e.target.value)}
+                        rows={2}
+                        placeholder={item.placeholder ?? `${item.label}을(를) 써봐요`}
+                        className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400 resize-none transition-colors"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <div className="pb-4">
+            <button
+              onClick={handleOutlineSectionSubmit}
+              disabled={outlineSubmitting || answeredCount === 0}
+              className="w-full py-4 bg-orange-400 text-white rounded-3xl font-bold text-base hover:bg-orange-500 disabled:opacity-40 transition-colors shadow-lg"
+            >
+              {outlineSubmitting ? "개요 만드는 중..." : "개요 완성하기 →"}
+            </button>
+            {error && <p className="text-red-500 text-sm text-center mt-3">{error}</p>}
           </div>
-        )}
-
-        {(q.type === "card" || q.type === "card+input") && (
-          <button
-            onClick={handleConfirmChoices}
-            disabled={selectedChoices.length === 0 && !customInput.trim()}
-            className="w-full mt-4 py-3 bg-orange-400 text-white rounded-2xl font-bold hover:bg-orange-500 disabled:opacity-40 transition-colors"
-          >
-            {selectedChoices.length > 0 ? `${selectedChoices.length}개 선택 완료 →` : "다음으로 →"}
-          </button>
-        )}
-
-        {q.type === "input" && (
-          <button
-            onClick={() => customInput.trim() && handleAnswer(customInput.trim())}
-            disabled={!customInput.trim()}
-            className="w-full mt-4 py-3 bg-orange-400 text-white rounded-2xl font-bold hover:bg-orange-500 disabled:opacity-40 transition-colors"
-          >
-            다음으로 →
-          </button>
-        )}
-
-        {error && <p className="text-red-500 text-sm text-center mt-4">{error}</p>}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
 
 function QuestionWizardHeader({

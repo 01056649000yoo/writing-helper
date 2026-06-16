@@ -13,10 +13,11 @@ import {
   normalizeQuestionVotingConfig,
   normalizeQuestionVotingSubmission,
 } from "@/lib/question-voting";
-import type { StudentLevel, Answer } from "@/types";
+import type { StudentLevel } from "@/types";
 import type {
   OneLineShareConfig,
   OneLineShareSubmission,
+  OutlineTemplateAnswer,
   QuestionGeneratorSubmission,
   QuestionVotingSubmission,
 } from "@/features/activities/types";
@@ -285,7 +286,7 @@ export async function setStudentLevel(
 // 답변 저장 (중간 저장)
 export async function saveAnswers(
   sessionId: string,
-  answers: Answer[]
+  answers: OutlineTemplateAnswer[]
 ): Promise<{ error?: string }> {
   const admin = createSupabaseAdminClient();
   const { error } = await admin
@@ -301,7 +302,7 @@ export async function saveAnswers(
 // 개요 생성 요청 (대기열 등록)
 export async function requestOutline(
   sessionId: string,
-  latestAnswers?: Answer[]
+  latestAnswers?: OutlineTemplateAnswer[]
 ): Promise<{ error?: string; queueId?: string; position?: number }> {
   const admin = createSupabaseAdminClient();
 
@@ -411,25 +412,26 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
   // 3개 병렬 처리
   const results = await Promise.allSettled(
     items.map(async (item) => {
-      // 세션 정보
-      const { data: session } = await admin
-        .schema("writing_helper")
-        .from("student_sessions")
-        .select("level, room_id")
-        .eq("id", item.session_id)
-        .maybeSingle();
-
       // 방 정보 + 교사 API 키
       const { data: room } = await admin
         .schema("writing_helper")
         .from("rooms")
-        .select("topic, topic_description, subject_type, grade_level, outline_depth, teacher_id, activity_config")
+        .select("topic, topic_description, subject_type, grade_level, teacher_id, activity_config")
         .eq("id", item.room_id)
         .maybeSingle();
 
       const keyAccess = await getTeacherOpenAiAccess(room!.teacher_id);
       if (keyAccess.error || !keyAccess.access) throw new Error(keyAccess.error ?? "OpenAI API 키 없음");
       const apiKey = keyAccess.access.apiKey;
+
+      // 새 형식(OutlineTemplateAnswer)인지 확인 — section 필드 존재 여부로 판단
+      const rawAnswers = item.answers as unknown[];
+      const isNewFormat = Array.isArray(rawAnswers) && rawAnswers.length > 0
+        && typeof (rawAnswers[0] as Record<string, unknown>).section === "string";
+
+      if (!isNewFormat) throw new Error("이전 방식 답변은 재처리하지 않습니다.");
+
+      const answers = rawAnswers as OutlineTemplateAnswer[];
 
       await logApiUsage({
         teacherId: room!.teacher_id,
@@ -438,7 +440,7 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
         usedSharedApi: keyAccess.access.usedSharedApi,
         roomId: item.room_id,
         sessionId: item.session_id,
-        metadata: { level: session?.level ?? "mid" },
+        metadata: {},
       });
       const outline = await generateOutline(
         apiKey,
@@ -446,9 +448,7 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
         room!.topic_description ?? "",
         room!.subject_type,
         room!.grade_level,
-        room!.outline_depth,
-        session?.level ?? "mid",
-        item.answers
+        answers,
       );
 
       const activityConfig = room?.activity_config as { generateDraft?: boolean } | null;
@@ -460,16 +460,14 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
             usedSharedApi: keyAccess.access.usedSharedApi,
             roomId: item.room_id,
             sessionId: item.session_id,
-            metadata: { level: session?.level ?? "mid" },
+            metadata: {},
           }), await generateDraftFromAnswers(
             apiKey,
             room!.topic,
             room!.topic_description ?? "",
             room!.subject_type,
             room!.grade_level,
-            room!.outline_depth,
-            session?.level ?? "mid",
-            item.answers
+            answers,
           ))
         : null;
 
@@ -603,8 +601,29 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
     ? ((submissionData?.submission as { content: string }).content)
     : null;
 
+  // outline_builder 신규 방: activity_config.outlineTemplate 추출
+  const outlineTemplate = (() => {
+    const config = data.activity_config as Record<string, unknown> | null;
+    if (!config) return null;
+    const t = config.outlineTemplate;
+    if (!t || typeof t !== "object" || Array.isArray(t)) return null;
+    return t as import("@/lib/outline-templates").OutlineTemplate;
+  })();
+
+  // 기존 방 호환: question_sets가 있으면 레거시로 표시
+  const isLegacyRoom = (() => {
+    if (data.activity_type && data.activity_type !== "outline_builder") return false;
+    const config = data.activity_config as Record<string, unknown> | null;
+    // question_sets가 config에 있거나 루트에 있으면 레거시
+    if (config?.questionSets) return true;
+    if ((data as Record<string, unknown>).question_sets) return true;
+    return false;
+  })();
+
   return {
     ...data,
+    outline_template: outlineTemplate,
+    is_legacy_outline_room: isLegacyRoom,
     existing_submission: normalizeQuestionGeneratorSubmission(submissionData?.submission),
     existing_voting_submission: normalizeQuestionVotingSubmission(submissionData?.submission),
     existing_one_line_submission: oneLineEntry

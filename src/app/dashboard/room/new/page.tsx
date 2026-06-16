@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   createRoom,
-  generateQuestionsPreview,
+  enhanceOutlineTemplateWithAI,
   getOrGenerateHanjaCard,
   getTeacherHanjaWordCards,
   getQuestionGeneratorSourceRooms,
@@ -33,7 +33,9 @@ import {
   type HanjaRecommendedWord,
 } from "@/lib/hanja-recommended-words";
 import { useActivityDraft } from "@/lib/use-activity-draft";
-import type { QuestionSets, Question } from "@/types";
+import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
+import type { OutlineTemplate, OutlineTemplateItem } from "@/lib/outline-templates";
+import type { SubjectType, GradeLevel } from "@/types";
 
 const SUBJECT_TYPES = [
   "생활문", "일기", "편지", "독서감상문", "기행문",
@@ -41,15 +43,11 @@ const SUBJECT_TYPES = [
   "소개하는 글", "동시", "보고서",
 ] as const;
 
-type Step = "form" | "generating" | "preview" | "saving";
-type Level = "low" | "mid" | "high";
-
 type OutlineBuilderDraft = {
   topic: string;
   topic_description: string;
   subject_type: string;
   grade_level: string;
-  outline_depth: string;
   duration_hours: string;
   generate_draft: boolean;
 };
@@ -142,142 +140,6 @@ const WRITING_BUNDLE_DEFINITIONS = activityDefinitions.filter(
   (activity) => WRITING_BUNDLE_ACTIVITY_IDS.includes(activity.id),
 );
 
-function QuestionCard({
-  q,
-  index,
-  onChange,
-  onRemove,
-}: {
-  q: Question;
-  index: number;
-  onChange: (updated: Question) => void;
-  onRemove: () => void;
-}) {
-  const hasChoices = q.type === "card" || q.type === "card+input";
-
-  return (
-    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
-          Q{index + 1}
-        </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-gray-400 hover:text-red-400 text-lg leading-none"
-          title="질문 삭제"
-        >
-          ×
-        </button>
-      </div>
-
-      <textarea
-        value={q.question}
-        onChange={(e) => onChange({ ...q, question: e.target.value })}
-        rows={2}
-        className="w-full px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        placeholder="질문 내용"
-      />
-
-      <div className="flex gap-2 items-center flex-wrap">
-        <span className="text-xs text-gray-500">형식:</span>
-        {(["card", "input", "card+input"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => onChange({ ...q, type: t })}
-            className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
-              q.type === t
-                ? "bg-indigo-500 text-white border-indigo-500"
-                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
-            }`}
-          >
-            {t === "card" ? "🃏 카드 선택" : t === "input" ? "✏️ 직접 입력" : "🃏✏️ 카드+입력"}
-          </button>
-        ))}
-      </div>
-
-      {hasChoices && (
-        <div className="space-y-1">
-          <span className="text-xs text-gray-500">선택지 (한 줄에 하나씩):</span>
-          <textarea
-            value={(q.choices ?? []).join("\n")}
-            onChange={(e) =>
-              onChange({
-                ...q,
-                choices: e.target.value.split("\n"),
-              })
-            }
-            rows={Math.max(10, (q.choices?.length ?? 0) + 1)}
-            className="w-full px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            placeholder={"보기 1\n보기 2\n보기 3"}
-          />
-        </div>
-      )}
-
-      <input
-        type="text"
-        value={q.hint ?? ""}
-        onChange={(e) => onChange({ ...q, hint: e.target.value })}
-        className="w-full px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        placeholder="힌트 (선택사항)"
-      />
-    </div>
-  );
-}
-
-function LevelEditor({
-  level,
-  questions,
-  onChange,
-}: {
-  level: Level;
-  questions: Question[];
-  onChange: (qs: Question[]) => void;
-}) {
-  function updateQ(i: number, updated: Question) {
-    const next = [...questions];
-    next[i] = updated;
-    onChange(next);
-  }
-
-  function removeQ(i: number) {
-    onChange(questions.filter((_, idx) => idx !== i));
-  }
-
-  function addQ() {
-    onChange([
-      ...questions,
-      {
-        step: questions.length + 1,
-        question: "",
-        type: level === "high" ? "input" : "card+input",
-        choices: level !== "high" ? ["", ""] : undefined,
-      },
-    ]);
-  }
-
-  return (
-    <div className="space-y-3">
-      {questions.map((q, i) => (
-        <QuestionCard
-          key={i}
-          q={q}
-          index={i}
-          onChange={(updated) => updateQ(i, updated)}
-          onRemove={() => removeQ(i)}
-        />
-      ))}
-      <button
-        type="button"
-        onClick={addQ}
-        className="w-full py-2 border-2 border-dashed border-indigo-200 rounded-xl text-sm text-indigo-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-      >
-        + 질문 추가
-      </button>
-    </div>
-  );
-}
 
 const COMING_SOON_ACTIVITIES: {
   emoji: string;
@@ -615,15 +477,16 @@ function PageShell({
 }
 
 function OutlineBuilderSetup({ classId }: { classId: string }) {
-  const [step, setStep] = useState<Step>("form");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [activeLevel, setActiveLevel] = useState<Level>("low");
+  const [aiEnhancing, setAiEnhancing] = useState<string | null>(null);
+  const [customTemplate, setCustomTemplate] = useState<OutlineTemplate | null>(null);
+
   const initialDraft = useMemo<OutlineBuilderDraft>(() => ({
     topic: "",
     topic_description: "",
     subject_type: "생활문",
     grade_level: "중학년",
-    outline_depth: "simple",
     duration_hours: "4",
     generate_draft: false,
   }), []);
@@ -631,67 +494,98 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     buildDraftStorageKey(classId, "outline_builder"),
     initialDraft
   );
-  const [formFields, setFormFields] = useState<{
-    topic: string;
-    topic_description: string;
-    subject_type: string;
-    grade_level: string;
-    outline_depth: string;
-    duration_hours: string;
-    generate_draft: boolean;
-  } | null>(null);
-  const [questionSets, setQuestionSets] = useState<QuestionSets | null>(null);
 
-  async function handleGenerate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  const subjectType = draft.subject_type as SubjectType;
+  const effectiveTemplate = customTemplate ?? getDefaultOutlineTemplate(subjectType);
+
+  useEffect(() => {
+    setCustomTemplate(null);
+  }, [subjectType]);
+
+  async function handleAiEnhance(sectionKey: "처음" | "가운데" | "끝") {
+    if (aiEnhancing) return;
+    setAiEnhancing(sectionKey);
     setError("");
-    setStep("generating");
-
-    const fd = new FormData(e.currentTarget);
-    setFormFields({
-      topic: draft.topic,
-      topic_description: draft.topic_description,
-      subject_type: draft.subject_type,
-      grade_level: draft.grade_level,
-      outline_depth: draft.outline_depth,
-      duration_hours: draft.duration_hours,
-      generate_draft: draft.generate_draft,
-    });
-
-    const result = await generateQuestionsPreview(fd);
-    if (result.error) {
+    const result = await enhanceOutlineTemplateWithAI(
+      subjectType,
+      draft.grade_level as GradeLevel,
+      draft.topic,
+      effectiveTemplate,
+      sectionKey,
+    );
+    setAiEnhancing(null);
+    if (result.items) {
+      setCustomTemplate((prev) => {
+        const base = prev ?? getDefaultOutlineTemplate(subjectType);
+        return {
+          sections: base.sections.map((s) =>
+            s.key === sectionKey
+              ? { ...s, items: [...s.items, ...result.items!] }
+              : s
+          ),
+        };
+      });
+    } else if (result.error) {
       setError(result.error);
-      setStep("form");
-      return;
     }
+  }
 
-    setQuestionSets(result.questionSets!);
-    setStep("preview");
+  function updateItemField(sectionKey: string, itemId: string, field: keyof OutlineTemplateItem, value: string) {
+    setCustomTemplate((prev) => {
+      const base = prev ?? getDefaultOutlineTemplate(subjectType);
+      return {
+        sections: base.sections.map((s) =>
+          s.key === sectionKey
+            ? { ...s, items: s.items.map((item) => item.id === itemId ? { ...item, [field]: value } : item) }
+            : s
+        ),
+      };
+    });
+  }
+
+  function removeItem(sectionKey: string, itemId: string) {
+    setCustomTemplate((prev) => {
+      const base = prev ?? getDefaultOutlineTemplate(subjectType);
+      return {
+        sections: base.sections.map((s) =>
+          s.key === sectionKey ? { ...s, items: s.items.filter((item) => item.id !== itemId) } : s
+        ),
+      };
+    });
+  }
+
+  function addItem(sectionKey: string) {
+    const newId = `custom-${Date.now()}`;
+    setCustomTemplate((prev) => {
+      const base = prev ?? getDefaultOutlineTemplate(subjectType);
+      return {
+        sections: base.sections.map((s) =>
+          s.key === sectionKey
+            ? { ...s, items: [...s.items, { id: newId, label: "", prompt: "", placeholder: "" }] }
+            : s
+        ),
+      };
+    });
   }
 
   async function handleCreateRoom() {
-    if (!formFields || !questionSets) return;
-
+    if (saving) return;
     setError("");
-    setStep("saving");
+    setSaving(true);
     const storageKey = buildDraftStorageKey(classId, "outline_builder");
 
     const fd = new FormData();
     fd.set("class_id", classId);
     fd.set("activity_type", "outline_builder");
-    fd.set("topic", formFields.topic);
-    fd.set("topic_description", formFields.topic_description);
-    fd.set("subject_type", formFields.subject_type);
-    fd.set("grade_level", formFields.grade_level);
-    fd.set("outline_depth", formFields.outline_depth);
-    fd.set("duration_hours", formFields.duration_hours);
-    fd.set("generate_draft", formFields.generate_draft ? "on" : "");
-    const cleanedQuestionSets = {
-      low: { questions: questionSets.low.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
-      mid: { questions: questionSets.mid.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
-      high: { questions: questionSets.high.questions.map(q => ({ ...q, choices: q.choices?.map(c => c.trim()).filter(Boolean) })) },
-    };
-    fd.set("question_sets_json", JSON.stringify(cleanedQuestionSets));
+    fd.set("topic", draft.topic);
+    fd.set("topic_description", draft.topic_description);
+    fd.set("subject_type", draft.subject_type);
+    fd.set("grade_level", draft.grade_level);
+    fd.set("duration_hours", draft.duration_hours);
+    fd.set("generate_draft", draft.generate_draft ? "on" : "");
+    if (customTemplate) {
+      fd.set("outline_template_json", JSON.stringify(customTemplate));
+    }
 
     draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
@@ -700,241 +594,158 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
       persistActivityDraft(storageKey, draft);
       draftControls.resumeAutosave();
       setError(result.error);
-      setStep("preview");
-      return;
+      setSaving(false);
     }
   }
 
-  const updateLevel = useCallback((level: Level, qs: Question[]) => {
-    setQuestionSets((prev) => (prev ? { ...prev, [level]: { questions: qs } } : prev));
-  }, []);
-
-  const levelMeta: Record<Level, { label: string; emoji: string; color: string }> = {
-    low: { label: "어려운 학생", emoji: "🐢", color: "text-green-600 border-green-400 bg-green-50" },
-    mid: { label: "보통 학생", emoji: "🐇", color: "text-blue-600 border-blue-400 bg-blue-50" },
-    high: { label: "잘 쓰는 학생", emoji: "🦅", color: "text-purple-600 border-purple-400 bg-purple-50" },
-  };
-
-  if (step === "preview" || step === "saving") {
-    return (
-      <>
-        <div className="flex items-center gap-2 mb-6 text-sm">
-          <StepBadge done>활동 설정</StepBadge>
-          <StepDivider active />
-          <StepBadge active>문항 검토</StepBadge>
-          <StepDivider />
-          <StepBadge>활동 시작</StepBadge>
-        </div>
-
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-800">📋 AI가 만든 문항 검토하기</h2>
-          <p className="mt-2 text-sm text-gray-500">학생 수준별로 문항을 확인하고 수정한 뒤 활동을 시작하세요.</p>
-        </div>
-
-        <div className="flex gap-2 mb-4 border-b border-gray-200 pb-2 overflow-x-auto">
-          {(["low", "mid", "high"] as Level[]).map((lv) => {
-            const meta = levelMeta[lv];
-            const count = questionSets?.[lv].questions.length ?? 0;
-            return (
-              <button
-                key={lv}
-                type="button"
-                onClick={() => setActiveLevel(lv)}
-                className={`flex items-center gap-1 px-4 py-2 rounded-xl text-base font-medium border-2 transition-colors whitespace-nowrap ${
-                  activeLevel === lv ? meta.color : "text-gray-500 border-transparent hover:bg-gray-50"
-                }`}
-              >
-                {meta.emoji} {meta.label}
-                <span className="ml-1 text-xs opacity-70">({count})</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className={`text-xs px-3 py-2 rounded-xl mb-4 ${
-          activeLevel === "low" ? "bg-green-50 text-green-700" :
-          activeLevel === "mid" ? "bg-blue-50 text-blue-700" :
-          "bg-purple-50 text-purple-700"
-        }`}>
-          {activeLevel === "low" && "🐢 글쓰기가 어려운 학생 — 카드 선택 위주, 매우 구체적인 보기"}
-          {activeLevel === "mid" && "🐇 보통 수준의 학생 — 카드 선택 + 직접 입력 병행"}
-          {activeLevel === "high" && "🦅 글쓰기를 잘 하는 학생 — 직접 입력 위주, 깊이 있는 사고"}
-        </div>
-
-        {questionSets && (
-          <LevelEditor
-            level={activeLevel}
-            questions={questionSets[activeLevel].questions}
-            onChange={(qs) => updateLevel(activeLevel, qs)}
-          />
-        )}
-
-        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl mt-4">{error}</p>}
-
-        {step === "saving" && (
-          <div className="bg-indigo-50 rounded-xl p-4 text-center mt-4">
-            <div className="text-2xl mb-2 animate-spin inline-block">⚙️</div>
-            <p className="text-indigo-700 font-medium text-base">활동을 시작하고 있어요...</p>
-          </div>
-        )}
-
-        <div className="flex gap-3 mt-6">
-          <button
-            type="button"
-            onClick={() => setStep("form")}
-            disabled={step === "saving"}
-            className="flex-1 py-4 border-2 border-gray-200 text-gray-600 rounded-xl font-medium text-base hover:border-gray-300 disabled:opacity-50 transition-colors"
-          >
-            ← 설정으로 돌아가기
-          </button>
-          <button
-            type="button"
-            onClick={handleCreateRoom}
-            disabled={step === "saving"}
-            className="flex-1 py-4 bg-indigo-500 text-white rounded-xl font-bold text-base hover:bg-indigo-600 disabled:opacity-50 transition-colors"
-          >
-            {step === "saving" ? "시작 중..." : "🚀 활동 시작하기"}
-          </button>
-        </div>
-      </>
-    );
-  }
-
   return (
-    <>
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <StepBadge active>활동 설정</StepBadge>
-        <StepDivider />
-        <StepBadge>문항 검토</StepBadge>
-        <StepDivider />
-        <StepBadge>활동 시작</StepBadge>
+    <div className="space-y-6">
+      <TopicFields
+        values={{ topic: draft.topic, topic_description: draft.topic_description }}
+        onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+        hint="주제를 자세히 적을수록 AI 예시가 더 정확해집니다."
+        placeholder="예) 지난 주 금요일 학교 뒷산으로 봄 소풍을 다녀왔어요."
+        savedAt={draftControls.savedAt}
+      />
+
+      <div>
+        <label className="block text-base font-medium text-gray-700 mb-3">글의 종류</label>
+        <div className="grid grid-cols-3 gap-2">
+          {SUBJECT_TYPES.map((type) => (
+            <label
+              key={type}
+              className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
+            >
+              <input
+                type="radio"
+                name="subject_type"
+                value={type}
+                checked={draft.subject_type === type}
+                onChange={() => setDraft((prev) => ({ ...prev, subject_type: type }))}
+                className="text-indigo-500 shrink-0"
+              />
+              <span className="text-base text-gray-700">{subjectLabel(type)}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
-      <form onSubmit={handleGenerate} className="space-y-6">
-        <input type="hidden" name="class_id" value={classId} />
-        <input type="hidden" name="activity_type" value="outline_builder" />
+      <div>
+        <label className="block text-base font-medium text-gray-700 mb-3">대상 학년</label>
+        <div className="grid grid-cols-3 gap-2">
+          {(["저학년", "중학년", "고학년"] as const).map((grade) => (
+            <label
+              key={grade}
+              className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
+            >
+              <input
+                type="radio"
+                name="grade_level"
+                value={grade}
+                checked={draft.grade_level === grade}
+                onChange={() => setDraft((prev) => ({ ...prev, grade_level: grade }))}
+                className="text-indigo-500 shrink-0"
+              />
+              <span className="text-base text-gray-700">{gradeLabel(grade)}</span>
+            </label>
+          ))}
+        </div>
+      </div>
 
-        <TopicFields
-          values={{
-            topic: draft.topic,
-            topic_description: draft.topic_description,
-          }}
-          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          hint="설명을 자세히 적을수록 AI가 더 알맞은 글 개요 질문을 만들어줍니다."
-          placeholder="예) 지난 주 금요일 학교 뒷산으로 봄 소풍을 다녀왔어요. 친구들과 도시락을 나눠먹고 계곡에서 물놀이를 했습니다."
-          savedAt={draftControls.savedAt}
+      <DurationField
+        value={draft.duration_hours}
+        onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
+      />
+
+      <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/70">
+        <input
+          type="checkbox"
+          checked={draft.generate_draft}
+          onChange={(e) => setDraft((prev) => ({ ...prev, generate_draft: e.target.checked }))}
+          className="text-indigo-500"
         />
-
         <div>
-          <label className="block text-base font-medium text-gray-700 mb-3">글의 종류</label>
-          <div className="grid grid-cols-3 gap-2">
-            {SUBJECT_TYPES.map((type) => (
-              <label
-                key={type}
-                className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
-              >
-                <input
-                  type="radio"
-                  name="subject_type"
-                  value={type}
-                  checked={draft.subject_type === type}
-                  onChange={() => setDraft((prev) => ({ ...prev, subject_type: type }))}
-                  className="text-indigo-500 shrink-0"
-                />
-                <span className="text-base text-gray-700">{subjectLabel(type)}</span>
-              </label>
-            ))}
-          </div>
+          <p className="text-sm font-semibold text-gray-800">고쳐쓰기용 초안 함께 생성하기</p>
+          <p className="text-xs text-gray-400 mt-1">체크하면 키워드 개요 외에 AI 초안도 함께 만들어줍니다.</p>
+        </div>
+      </label>
+
+      <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-800">개요 항목</h3>
+          {customTemplate && (
+            <button
+              type="button"
+              onClick={() => setCustomTemplate(null)}
+              className="text-xs text-gray-400 hover:text-red-400 underline"
+            >
+              기본값으로 초기화
+            </button>
+          )}
         </div>
 
-        <div>
-          <label className="block text-base font-medium text-gray-700 mb-3">대상 학년</label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["저학년", "중학년", "고학년"] as const).map((grade) => (
-              <label
-                key={grade}
-                className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
+        {effectiveTemplate.sections.map(({ key, items }) => (
+          <div key={key} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-indigo-600">{key}</h4>
+              <button
+                type="button"
+                onClick={() => handleAiEnhance(key)}
+                disabled={!!aiEnhancing}
+                className="text-xs text-indigo-400 hover:text-indigo-600 disabled:opacity-40 border border-indigo-200 rounded-lg px-2 py-1 transition-colors"
               >
-                <input
-                  type="radio"
-                  name="grade_level"
-                  value={grade}
-                  checked={draft.grade_level === grade}
-                  onChange={() => setDraft((prev) => ({ ...prev, grade_level: grade }))}
-                  className="text-indigo-500 shrink-0"
-                />
-                <span className="text-base text-gray-700">{gradeLabel(grade)}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-base font-medium text-gray-700 mb-3">개요 구조</label>
-          <div className="grid grid-cols-3 gap-2">
-            {([
-              { value: "simple", label: "간단히", desc: "처음·중간·끝", emoji: "📄" },
-              { value: "medium", label: "중간", desc: "처음·중간1·중간2·끝", emoji: "📝" },
-              { value: "detailed", label: "자세히", desc: "처음·중간1·2·3·끝", emoji: "📋" },
-            ] as const).map((opt) => (
-              <label
-                key={opt.value}
-                className="flex flex-col border border-gray-200 rounded-xl p-3 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
-              >
-                <div className="flex items-center gap-2">
+                {aiEnhancing === key ? "AI 보완 중..." : "✨ AI 항목 추가"}
+              </button>
+            </div>
+            <div className="space-y-1">
+              {items.map((item) => (
+                <div key={item.id} className="flex items-center gap-2">
                   <input
-                    type="radio"
-                    name="outline_depth"
-                    value={opt.value}
-                    checked={draft.outline_depth === opt.value}
-                    onChange={() => setDraft((prev) => ({ ...prev, outline_depth: opt.value }))}
-                    className="text-indigo-500 shrink-0"
+                    type="text"
+                    value={item.label}
+                    onChange={(e) => updateItemField(key, item.id, "label", e.target.value)}
+                    placeholder="항목 이름"
+                    className="flex-1 px-3 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400"
                   />
-                  <span className="text-sm font-medium text-gray-700">{opt.emoji} {opt.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(key, item.id)}
+                    className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0"
+                  >
+                    ×
+                  </button>
                 </div>
-                <span className="text-xs text-gray-400 mt-1 pl-5">{opt.desc}</span>
-              </label>
-            ))}
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => addItem(key)}
+              className="w-full py-1.5 border border-dashed border-indigo-200 rounded-xl text-xs text-indigo-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+            >
+              + 항목 추가
+            </button>
           </div>
+        ))}
+      </div>
+
+      {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
+
+      {saving && (
+        <div className="bg-indigo-50 rounded-xl p-4 text-center">
+          <div className="text-2xl mb-2 animate-spin inline-block">⚙️</div>
+          <p className="text-indigo-700 font-medium text-base">활동을 시작하고 있어요...</p>
         </div>
+      )}
 
-        <DurationField
-          value={draft.duration_hours}
-          onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
-        />
-
-        <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/70">
-          <input
-            type="checkbox"
-            checked={draft.generate_draft}
-            onChange={(e) => setDraft((prev) => ({ ...prev, generate_draft: e.target.checked }))}
-            className="text-indigo-500"
-          />
-          <div>
-            <p className="text-sm font-semibold text-gray-800">고쳐쓰기용 초안 함께 생성하기</p>
-            <p className="text-xs text-gray-400 mt-1">체크하면 키워드 개요 외에 AI 초안도 함께 만들어줍니다. 기본값: 개요만 제공</p>
-          </div>
-        </label>
-
-        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
-
-        {step === "generating" && (
-          <div className="bg-indigo-50 rounded-xl p-4 text-center">
-            <div className="text-2xl mb-2 animate-spin inline-block">⚙️</div>
-            <p className="text-indigo-700 font-medium text-base">AI가 문항을 만들고 있어요...</p>
-            <p className="text-base text-indigo-500 mt-1">약 10~20초 소요됩니다</p>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={step === "generating"}
-          className="w-full py-4 bg-indigo-500 text-white rounded-xl font-bold text-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
-        >
-          {step === "generating" ? "문항 생성 중..." : "✨ AI 문항 생성하기"}
-        </button>
-      </form>
-    </>
+      <button
+        type="button"
+        onClick={handleCreateRoom}
+        disabled={saving}
+        className="w-full py-4 bg-indigo-500 text-white rounded-xl font-bold text-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+      >
+        {saving ? "시작 중..." : "🚀 활동 시작하기"}
+      </button>
+    </div>
   );
 }
 
