@@ -436,7 +436,7 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
       await logApiUsage({
         teacherId: room!.teacher_id,
         feature: "generate_outline",
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         usedSharedApi: keyAccess.access.usedSharedApi,
         roomId: item.room_id,
         sessionId: item.session_id,
@@ -456,7 +456,7 @@ export async function processOutlineQueue(): Promise<{ processed: number }> {
         ? (await logApiUsage({
             teacherId: room!.teacher_id,
             feature: "generate_draft",
-            model: "gpt-4o",
+            model: "gpt-4o-mini",
             usedSharedApi: keyAccess.access.usedSharedApi,
             roomId: item.room_id,
             sessionId: item.session_id,
