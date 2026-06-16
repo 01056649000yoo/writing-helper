@@ -510,6 +510,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
       subjectType,
       draft.grade_level as GradeLevel,
       draft.topic,
+      draft.topic_description,
       effectiveTemplate,
       sectionKey,
     );

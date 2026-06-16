@@ -42,6 +42,7 @@ export async function enhanceOutlineTemplateWithAI(
   subjectType: SubjectType,
   gradeLevel: GradeLevel,
   topic: string,
+  topicDescription: string,
   currentTemplate: OutlineTemplate,
   section: "처음" | "가운데" | "끝",
 ): Promise<{ items?: import("@/lib/outline-templates").OutlineTemplateItem[]; error?: string }> {
@@ -72,7 +73,9 @@ export async function enhanceOutlineTemplateWithAI(
   const guide = GENRE_GUIDES[subjectType];
   const currentSectionItems = currentTemplate.sections
     .find((s) => s.key === section)?.items ?? [];
-  const currentLabels = currentSectionItems.map((i) => `"${i.label}"`).join(", ");
+  const currentItemsText = currentSectionItems
+    .map((i) => `  - ${i.label}: ${i.prompt}`)
+    .join("\n");
 
   const prompt = `초등학교 ${gradeDesc} "${subjectType}" 글쓰기 개요 짜기 활동입니다.
 
@@ -82,14 +85,17 @@ ${guide.desc}
 ["${section}" 단계에서 다뤄야 할 내용]
 ${guide.sectionFocus[section]}
 
-[주제]
+[활동 주제]
 ${topic || "(미입력)"}
 
-[현재 "${section}" 단계에 이미 있는 항목]
-${currentLabels || "(없음)"}
+[주제 부연설명]
+${topicDescription || "(미입력)"}
 
-위 글 종류의 특성과 "${section}" 단계의 역할에 딱 맞는 새 항목을 2~3개 제안해주세요.
-- 이미 있는 항목과 겹치지 않아야 합니다.
+[현재 "${section}" 단계에 이미 있는 항목 (항목명: 학생에게 묻는 질문)]
+${currentItemsText || "(없음)"}
+
+위 글 종류의 특성과 "${section}" 단계의 역할, 그리고 활동 주제와 부연설명에 딱 맞는 새 항목을 2~3개 제안해주세요.
+- 이미 있는 항목과 겹치지 않아야 합니다 (질문 방향도 포함).
 - 초등학생이 실제로 쓸 수 있는 구체적인 내용이어야 합니다.
 - label은 짧고 명확한 항목 이름, prompt는 학생에게 물어볼 질문, placeholder는 구체적인 예시 답변입니다.
 
