@@ -49,7 +49,6 @@ type OutlineBuilderDraft = {
   subject_type: string;
   grade_level: string;
   duration_hours: string;
-  generate_draft: boolean;
 };
 
 type QuestionGeneratorDraft = {
@@ -488,7 +487,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     subject_type: "생활문",
     grade_level: "중학년",
     duration_hours: "4",
-    generate_draft: false,
   }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<OutlineBuilderDraft>(
     buildDraftStorageKey(classId, "outline_builder"),
@@ -583,7 +581,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("subject_type", draft.subject_type);
     fd.set("grade_level", draft.grade_level);
     fd.set("duration_hours", draft.duration_hours);
-    fd.set("generate_draft", draft.generate_draft ? "on" : "");
     if (customTemplate) {
       fd.set("outline_template_json", JSON.stringify(customTemplate));
     }
@@ -657,19 +654,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
         value={draft.duration_hours}
         onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
       />
-
-      <label className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-4 cursor-pointer has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/70">
-        <input
-          type="checkbox"
-          checked={draft.generate_draft}
-          onChange={(e) => setDraft((prev) => ({ ...prev, generate_draft: e.target.checked }))}
-          className="text-indigo-500"
-        />
-        <div>
-          <p className="text-sm font-semibold text-gray-800">고쳐쓰기용 초안 함께 생성하기</p>
-          <p className="text-xs text-gray-400 mt-1">체크하면 키워드 개요 외에 AI 초안도 함께 만들어줍니다.</p>
-        </div>
-      </label>
 
       <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">

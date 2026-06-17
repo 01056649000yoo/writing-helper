@@ -13,7 +13,6 @@ import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-s
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
 import { buildOneLineShareBoard, normalizeKeywordText } from "@/lib/one-line-share";
-import { serializeOutlineResult } from "@/lib/result-format";
 import type {
   ActivityType,
   HanjaWordCard,
@@ -177,8 +176,6 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig | OneLineShareConfig | HanjaWritingConfig;
 
   if (activityType === "outline_builder") {
-    const generateDraft = formData.get("generate_draft") === "on";
-
     // 교사가 커스텀 템플릿을 전달했으면 사용, 없으면 null (런타임에 기본값 사용)
     const customTemplateJson = String(formData.get("outline_template_json") ?? "").trim();
     let outlineTemplate: OutlineTemplate | null = null;
@@ -195,7 +192,6 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       gradeLevel,
       outlineDepth,
       outlineTemplate,
-      generateDraft,
     };
   } else if (activityType === "question_generator") {
     if (!topicDescription) {
@@ -481,62 +477,6 @@ function parseVotingQuestionsPayload(value: FormDataEntryValue | null): VotingQu
   } catch {
     return null;
   }
-}
-
-export async function updateStudentResult(
-  roomId: string,
-  sessionId: string,
-  outline: string,
-  draft: string,
-): Promise<{ error?: string }> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "로그인이 필요합니다." };
-
-  const trimmedOutline = outline.trim();
-  const trimmedDraft = draft.trim();
-  if (!trimmedOutline && !trimmedDraft) {
-    return { error: "개요와 초고를 모두 비울 수는 없습니다." };
-  }
-
-  const admin = createSupabaseAdminClient();
-
-  const { data: room } = await admin
-    .schema("writing_helper")
-    .from("rooms")
-    .select("teacher_id")
-    .eq("id", roomId)
-    .maybeSingle();
-  if (!room) return { error: "활동 세션을 찾을 수 없습니다." };
-  if (room.teacher_id !== user.id) return { error: "권한이 없습니다." };
-
-  const { data: queue } = await admin
-    .schema("writing_helper")
-    .from("outline_queue")
-    .select("id")
-    .eq("session_id", sessionId)
-    .eq("room_id", roomId)
-    .eq("status", "done")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!queue) return { error: "수정할 결과를 찾을 수 없습니다." };
-
-  const result = serializeOutlineResult({
-    outline: trimmedOutline ? trimmedOutline : null,
-    draft: trimmedDraft ? trimmedDraft : null,
-  });
-
-  const { error } = await admin
-    .schema("writing_helper")
-    .from("outline_queue")
-    .update({ result })
-    .eq("id", queue.id);
-
-  if (error) return { error: error.message };
-
-  revalidatePath(`/dashboard/room/${roomId}/result/${sessionId}`);
-  return {};
 }
 
 export async function deleteRoom(roomId: string): Promise<{ error?: string }> {

@@ -14,6 +14,7 @@ import type {
   HanjaWritingConfig,
   OneLineShareBoardEntry,
   OneLineShareConfig,
+  OutlineTemplateAnswer,
   QuestionGeneratorSubmission,
   QuestionVotingConfig,
   QuestionVotingSubmission,
@@ -21,44 +22,14 @@ import type {
 
 type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing" | "word_game";
 
-function parseOutline(text: string) {
-  const sections: { title: string; keywords: string; hint: string }[] = [];
-  // 새 형식(✏️)과 구형식(📝) 모두 지원
-  const isNewFormat = text.includes("✏️");
-  const splitPattern = isNewFormat ? /(?=✏️)/ : /(?=📝)/;
-  const blocks = text.split(splitPattern);
-  for (const block of blocks) {
-    const trimmed = block.trim();
-    if (!trimmed) continue;
-    const lines = trimmed.split("\n").map((l) => l.trim());
-    const headerLine = lines[0].replace(/^[✏️📝]\s*/, "").trim();
-
-    if (isNewFormat) {
-      // "처음 | 키워드1 · 키워드2" 형식
-      const pipeIdx = headerLine.indexOf("|");
-      const title = pipeIdx === -1 ? headerLine : headerLine.slice(0, pipeIdx).trim();
-      const keywords = pipeIdx === -1 ? headerLine : headerLine.slice(pipeIdx + 1).trim();
-      const hintLine = lines.find((l) => l.startsWith("(") && l.endsWith(")")) ?? "";
-      if (title) sections.push({ title, keywords, hint: hintLine });
-    } else {
-      // 구형식 호환
-      const body = lines.slice(1).filter(Boolean).map((l) => l.replace(/^[•\-*]\s*/, "").trim()).join("\n");
-      if (headerLine) sections.push({ title: headerLine, keywords: body, hint: "" });
-    }
-  }
-  return sections;
-}
-
 export default function StudentResultPage({ params }: { params: Promise<{ id: string }> }) {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session") ?? "";
-  const [outline, setOutline] = useState("");
-  const [draft, setDraft] = useState("");
+  const [outlineAnswers, setOutlineAnswers] = useState<OutlineTemplateAnswer[]>([]);
   const [studentName, setStudentName] = useState("");
   const [topic, setTopic] = useState("");
   const [copied, setCopied] = useState(false);
   const [roomId, setRoomId] = useState("");
-  const [viewMode, setViewMode] = useState<"outline" | "draft">("outline");
   const [activityType, setActivityType] = useState<ActivityType>("outline_builder");
   const [questionSubmission, setQuestionSubmission] = useState<QuestionGeneratorSubmission | null>(null);
   const [anonymousPeerQuestions, setAnonymousPeerQuestions] = useState<Array<{ id: string; order: number; questionOrder: number; text: string }>>([]);
@@ -83,8 +54,14 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (!sessionId || !roomId) return;
     getStudentResult(sessionId, roomId).then((data) => {
-      setOutline(data.outline ?? "");
-      setDraft(data.draft ?? "");
+      const rawAnswers = (data as { outlineAnswers?: unknown }).outlineAnswers;
+      setOutlineAnswers(
+        Array.isArray(rawAnswers)
+          ? (rawAnswers as OutlineTemplateAnswer[]).filter(
+              (a) => a && typeof a === "object" && (a.section === "처음" || a.section === "가운데" || a.section === "끝")
+            )
+          : []
+      );
       setStudentName(data.studentName ?? "");
       setTopic(data.topic ?? "");
       setActivityType((data.activityType as ActivityType) ?? "outline_builder");
@@ -105,13 +82,26 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
     });
   }, [sessionId, roomId]);
 
+  const outlineText = useMemo(() => {
+    if (outlineAnswers.length === 0) return "";
+    const order: OutlineTemplateAnswer["section"][] = ["처음", "가운데", "끝"];
+    return order
+      .map((section) => {
+        const items = outlineAnswers.filter((a) => a.section === section);
+        if (items.length === 0) return null;
+        const lines = items.map((a) => `- ${a.label}: ${a.answer}`).join("\n");
+        return `[${section}]\n${lines}`;
+      })
+      .filter(Boolean)
+      .join("\n\n");
+  }, [outlineAnswers]);
+
   const currentText = useMemo(() => {
     if (activityType === "question_generator") {
       return questionSubmission?.selections.map((selection) => selection.remixedQuestion).join("\n") ?? "";
     }
-
-    return viewMode === "draft" && draft ? draft : outline;
-  }, [activityType, draft, outline, questionSubmission, viewMode]);
+    return outlineText;
+  }, [activityType, outlineText, questionSubmission]);
 
   const selectedVotingQuestions = useMemo(() => {
     if (!questionVotingSubmission || !questionVotingConfig) return [];
@@ -500,7 +490,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  if (!outline) {
+  if (outlineAnswers.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center">
         <div className="text-center">
@@ -511,7 +501,13 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const sections = parseOutline(outline);
+  const sectionOrder: OutlineTemplateAnswer["section"][] = ["처음", "가운데", "끝"];
+  const groupedAnswers = sectionOrder
+    .map((section) => ({
+      section,
+      items: outlineAnswers.filter((a) => a.section === section),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
@@ -525,61 +521,23 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
 
-        {draft && (
-          <div className="bg-white rounded-3xl shadow-xl p-2">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setViewMode("outline")}
-                className={`rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${
-                  viewMode === "outline"
-                    ? "bg-orange-400 text-white"
-                    : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                개요 보기
-              </button>
-              <button
-                onClick={() => setViewMode("draft")}
-                className={`rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${
-                  viewMode === "draft"
-                    ? "bg-orange-400 text-white"
-                    : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                글처럼 보기
-              </button>
-            </div>
-          </div>
-        )}
-
-        {viewMode === "outline" ? (
-          <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
-            {sections.length > 0 ? (
-              sections.map((section, index) => (
-                <div key={index} className={`p-5 ${index < sections.length - 1 ? "border-b border-gray-100" : ""}`}>
-                  <p className="text-xs font-bold text-orange-500 uppercase tracking-wide mb-2">
-                    ✏️ {section.title}
-                  </p>
-                  <p className="text-gray-800 text-sm font-semibold leading-relaxed">
-                    {section.keywords}
-                  </p>
-                  {section.hint && (
-                    <p className="text-gray-400 text-xs mt-1 leading-relaxed">{section.hint}</p>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="p-5">
-                <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">{outline}</p>
+        <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+          {groupedAnswers.map(({ section, items }, sectionIndex) => (
+            <div key={section} className={`p-5 ${sectionIndex < groupedAnswers.length - 1 ? "border-b border-gray-100" : ""}`}>
+              <p className="text-xs font-bold text-orange-500 uppercase tracking-wide mb-3">
+                ✏️ {section}
+              </p>
+              <div className="space-y-3">
+                {items.map((item, i) => (
+                  <div key={i} className="rounded-2xl bg-orange-50/60 px-4 py-3">
+                    <p className="text-xs font-semibold text-orange-700 mb-1">{item.label}</p>
+                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-3xl shadow-xl p-6">
-            <h2 className="text-sm font-bold text-orange-500 uppercase tracking-wide mb-3">고쳐쓰기용 초고</h2>
-            <p className="text-gray-800 text-sm leading-7 whitespace-pre-line">{draft}</p>
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
 
         <button
           onClick={copyCurrentText}
@@ -587,11 +545,18 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
             copied ? "bg-green-500 text-white" : "bg-orange-400 text-white hover:bg-orange-500"
           }`}
         >
-          {copied ? "✅ 복사됐어요!" : viewMode === "draft" ? "📋 초고 복사하기" : "📋 개요 복사하기"}
+          {copied ? "✅ 복사됐어요!" : "📋 개요 복사하기"}
         </button>
 
+        <Link
+          href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+          className="block w-full rounded-2xl border-2 border-orange-200 bg-white py-4 text-center font-bold text-orange-700 hover:bg-orange-50 transition-colors"
+        >
+          ✏️ 개요 다시 만들기
+        </Link>
+
         <p className="text-center text-xs text-gray-400">
-          {viewMode === "draft" ? "초고를 읽고 내 문장으로 고쳐 써봐요 ✍️" : "이 개요를 보면서 글을 완성해봐요 ✍️"}
+          이 개요를 보면서 글을 완성해봐요 ✍️
         </p>
       </div>
     </div>

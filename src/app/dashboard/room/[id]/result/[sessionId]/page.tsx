@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { Answer } from "@/types";
+import type { OutlineTemplateAnswer } from "@/features/activities/types";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/app/actions/auth-actions";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import { StudentResultQr } from "./student-result-qr";
-import { OutlineDraftEditor } from "./outline-draft-editor";
 import { buildOneLineShareBoard } from "@/lib/one-line-share";
-import { parseOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import {
   QuestionVotingCompactList,
@@ -39,16 +37,6 @@ export default async function TeacherResultPage({
 
   if (!session) notFound();
 
-  const { data: queue } = await admin
-    .schema("writing_helper")
-    .from("outline_queue")
-    .select("result")
-    .eq("session_id", sessionId)
-    .eq("status", "done")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   const { data: room } = await admin
     .schema("writing_helper")
     .from("rooms")
@@ -59,7 +47,6 @@ export default async function TeacherResultPage({
   if (room?.teacher_id !== user?.id) notFound();
 
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/share/${sessionId}`;
-  const resultPayload = parseOutlineResult(queue?.result);
   const questionSubmission = normalizeQuestionGeneratorSubmission(session.submission);
   const questionVotingSubmission = normalizeQuestionVotingSubmission(session.submission);
   const questionVotingConfig = normalizeQuestionVotingConfig(room?.activity_config);
@@ -123,7 +110,7 @@ export default async function TeacherResultPage({
               </div>
             </div>
             {/* 학생 개인 QR */}
-            {!isQuestionGenerator && !isQuestionVoting && !isHanjaWriting && resultPayload.outline && (
+            {!isQuestionGenerator && !isQuestionVoting && !isHanjaWriting && !isOneLineShare && Array.isArray(session.answers) && session.answers.length > 0 && (
               <StudentResultQr
                 shareUrl={shareUrl}
                 studentName={session.student_name}
@@ -131,15 +118,6 @@ export default async function TeacherResultPage({
               />
             )}
           </div>
-
-          {!isQuestionGenerator && !isQuestionVoting && !isHanjaWriting && resultPayload.outline && (
-            <OutlineDraftEditor
-              roomId={id}
-              sessionId={sessionId}
-              initialOutline={resultPayload.outline}
-              initialDraft={resultPayload.draft}
-            />
-          )}
 
           {isQuestionGenerator && questionSubmission && (
             <div className="grid gap-4">
@@ -301,15 +279,8 @@ export default async function TeacherResultPage({
 
           {!isQuestionGenerator && !isQuestionVoting && !isOneLineShare && !isHanjaWriting && (
           <div>
-            <h2 className="font-bold text-gray-700 mb-3">💬 학생 답변 내용</h2>
-            <div className="space-y-3">
-              {(session.answers as Answer[]).map((a: Answer, i: number) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 mb-1">Q. {a.question}</p>
-                  <p className="text-sm text-gray-800 font-medium">→ {a.answer}</p>
-                </div>
-              ))}
-            </div>
+            <h2 className="font-bold text-gray-700 mb-3">📝 학생이 쓴 개요</h2>
+            <OutlineAnswersView answers={session.answers} />
           </div>
           )}
         </div>
@@ -323,4 +294,59 @@ function levelLabel(level: string) {
 }
 function levelStyle(level: string) {
   return { low: "bg-orange-100 text-orange-700", mid: "bg-blue-100 text-blue-700", high: "bg-green-100 text-green-700" }[level] ?? "bg-gray-100 text-gray-600";
+}
+
+function OutlineAnswersView({ answers }: { answers: unknown }) {
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return <p className="text-sm text-gray-500">아직 제출된 답변이 없습니다.</p>;
+  }
+
+  const normalized = answers
+    .filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null)
+    .map((a) => ({
+      section: (a.section === "처음" || a.section === "가운데" || a.section === "끝") ? a.section as OutlineTemplateAnswer["section"] : null,
+      label: typeof a.label === "string" ? a.label : (typeof a.question === "string" ? a.question : ""),
+      answer: typeof a.answer === "string" ? a.answer : "",
+    }))
+    .filter((a) => a.label || a.answer);
+
+  const sectionOrder: OutlineTemplateAnswer["section"][] = ["처음", "가운데", "끝"];
+  const grouped = sectionOrder
+    .map((section) => ({
+      section,
+      items: normalized.filter((a) => a.section === section),
+    }))
+    .filter((group) => group.items.length > 0);
+  const ungrouped = normalized.filter((a) => a.section === null);
+
+  return (
+    <div className="space-y-4">
+      {grouped.map(({ section, items }) => (
+        <div key={section} className="bg-gray-50 rounded-2xl p-4">
+          <p className="text-xs font-bold text-indigo-600 mb-2">{section}</p>
+          <div className="space-y-2">
+            {items.map((item, i) => (
+              <div key={i} className="bg-white rounded-xl px-4 py-3">
+                <p className="text-xs text-gray-500 mb-1">{item.label}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {ungrouped.length > 0 && (
+        <div className="bg-gray-50 rounded-2xl p-4">
+          <p className="text-xs font-bold text-gray-500 mb-2">기타</p>
+          <div className="space-y-2">
+            {ungrouped.map((item, i) => (
+              <div key={i} className="bg-white rounded-xl px-4 py-3">
+                <p className="text-xs text-gray-500 mb-1">{item.label}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

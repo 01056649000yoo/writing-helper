@@ -330,6 +330,10 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         const template = data.outline_template ?? getDefaultOutlineTemplate(subjectType);
         setOutlineTemplate(template);
         setIsLegacyOutlineRoom(data.is_legacy_outline_room ?? false);
+        const savedAnswers = (data.existing_outline_answers ?? []) as OutlineTemplateAnswer[];
+        if (savedAnswers.length > 0) {
+          setTemplateAnswers(savedAnswers);
+        }
         if (data.is_legacy_outline_room) {
           router.push(`/room/${roomId}/waiting?session=${sessionId}`);
         } else {
@@ -433,7 +437,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       setOutlineSubmitting(false);
       return;
     }
-    router.push(`/room/${roomId}/waiting?queue=${result.queueId}&session=${sessionId}`);
+    router.push(`/room/${roomId}/result?session=${sessionId}`);
   }
 
   function toggleChoice(choice: string) {

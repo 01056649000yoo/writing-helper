@@ -53,7 +53,6 @@ export type OutlineBuilderConfig = {
   outlineDepth: OutlineDepth;
   /** null이면 글 종류 기본 템플릿 사용 */
   outlineTemplate: import("@/lib/outline-templates").OutlineTemplate | null;
-  generateDraft: boolean;
   /** @deprecated 이전 방식 호환용 — 새 방에는 사용 안 함 */
   questionSets?: QuestionSets | null;
   /** @deprecated 이전 방식 호환용 */

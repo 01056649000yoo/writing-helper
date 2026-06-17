@@ -17,7 +17,6 @@ export const outlineBuilderDefinition: ActivityDefinition<
     gradeLevel: "중학년",
     outlineDepth: "simple",
     outlineTemplate: null,
-    generateDraft: false,
   }),
   validateConfig: (input) => {
     const value = { ...outlineBuilderDefinition.createDefaultConfig(), ...(isRecord(input) ? input : {}) };

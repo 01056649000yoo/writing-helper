@@ -1,27 +1,22 @@
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { CopyButton } from "./copy-button";
-import { parseOutlineResult } from "@/lib/result-format";
 
-function parseOutline(text: string) {
-  const sections: { title: string; content: string }[] = [];
-  const blocks = text.split(/(?=📝)/);
-  for (const block of blocks) {
-    const trimmed = block.trim();
-    if (!trimmed) continue;
-    const firstLine = trimmed.indexOf("\n");
-    const title = trimmed
-      .slice(0, firstLine === -1 ? undefined : firstLine)
-      .replace("📝", "")
-      .trim();
-    const body = firstLine === -1 ? "" : trimmed.slice(firstLine + 1).trim();
-    const content = body
-      .split("\n")
-      .map((l) => l.replace(/^[•\-*]\s*/, "").trim())
-      .filter(Boolean)
-      .join("\n");
-    if (title) sections.push({ title, content });
-  }
-  return sections;
+type OutlineAnswer = {
+  section: "처음" | "가운데" | "끝";
+  label: string;
+  answer: string;
+};
+
+function normalizeAnswers(raw: unknown): OutlineAnswer[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null && !Array.isArray(a))
+    .map((a): OutlineAnswer => ({
+      section: (a.section === "처음" || a.section === "가운데" || a.section === "끝") ? a.section : "처음",
+      label: typeof a.label === "string" ? a.label : "",
+      answer: typeof a.answer === "string" ? a.answer : "",
+    }))
+    .filter((a) => a.label || a.answer);
 }
 
 export default async function SharePage({
@@ -53,16 +48,13 @@ export default async function SharePage({
     );
   }
 
-  // 결과 조회
-  const [{ data: queue }, { data: room }] = await Promise.all([
+  // 학생 세션 답변 + 방 정보
+  const [{ data: sessionAnswers }, { data: room }] = await Promise.all([
     admin
       .schema("writing_helper")
-      .from("outline_queue")
-      .select("result")
-      .eq("session_id", sessionId)
-      .eq("status", "done")
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .from("student_sessions")
+      .select("answers")
+      .eq("id", sessionId)
       .maybeSingle(),
     admin
       .schema("writing_helper")
@@ -72,25 +64,32 @@ export default async function SharePage({
       .maybeSingle(),
   ]);
 
-  if (!queue?.result) {
+  const answers = normalizeAnswers(sessionAnswers?.answers);
+
+  if (answers.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-xl p-10 text-center max-w-sm w-full">
           <div className="text-5xl mb-4">⚙️</div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">개요 생성 중이에요</h1>
-          <p className="text-gray-500 text-sm">잠시 후 다시 스캔해보세요.</p>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">아직 제출된 개요가 없어요</h1>
+          <p className="text-gray-500 text-sm">학생이 개요를 제출한 뒤 다시 스캔해보세요.</p>
         </div>
       </div>
     );
   }
 
-  const resultPayload = parseOutlineResult(queue.result);
-  const sections = parseOutline(resultPayload.outline ?? "");
+  const sectionOrder: OutlineAnswer["section"][] = ["처음", "가운데", "끝"];
+  const grouped = sectionOrder
+    .map((section) => ({ section, items: answers.filter((a) => a.section === section) }))
+    .filter((g) => g.items.length > 0);
+
+  const copyText = grouped
+    .map(({ section, items }) => `[${section}]\n${items.map((i) => `- ${i.label}: ${i.answer}`).join("\n")}`)
+    .join("\n\n");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
       <div className="max-w-lg mx-auto pt-8 pb-16 space-y-4">
-        {/* 헤더 */}
         <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
           <div className="text-5xl mb-2">🎉</div>
           <h1 className="text-2xl font-bold text-gray-800">개요 완성!</h1>
@@ -105,44 +104,25 @@ export default async function SharePage({
           )}
         </div>
 
-        {/* 개요 본문 */}
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
-          {sections.length > 0 ? (
-            sections.map((sec, i) => (
-              <div
-                key={i}
-                className={`p-5 ${i < sections.length - 1 ? "border-b border-gray-100" : ""}`}
-              >
-                <p className="text-xs font-bold text-orange-500 uppercase tracking-wide mb-2">
-                  {sec.title}
-                </p>
-                <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">
-                  {sec.content}
-                </p>
-              </div>
-            ))
-          ) : (
-            <div className="p-5">
-              <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-line">
-                {resultPayload.outline ?? queue.result}
+          {grouped.map(({ section, items }, sectionIndex) => (
+            <div key={section} className={`p-5 ${sectionIndex < grouped.length - 1 ? "border-b border-gray-100" : ""}`}>
+              <p className="text-xs font-bold text-orange-500 uppercase tracking-wide mb-3">
+                ✏️ {section}
               </p>
+              <div className="space-y-3">
+                {items.map((item, i) => (
+                  <div key={i} className="rounded-2xl bg-orange-50/60 px-4 py-3">
+                    <p className="text-xs font-semibold text-orange-700 mb-1">{item.label}</p>
+                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
+          ))}
         </div>
 
-        {resultPayload.draft && (
-          <div className="bg-white rounded-3xl shadow-xl p-5">
-            <h2 className="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-2">
-              글처럼 보기
-            </h2>
-            <p className="text-gray-800 text-sm leading-7 whitespace-pre-line">
-              {resultPayload.draft}
-            </p>
-          </div>
-        )}
-
-        {/* 복사 버튼 */}
-        <CopyButton text={resultPayload.outline ?? queue.result} />
+        <CopyButton text={copyText} />
 
         <p className="text-center text-xs text-gray-400">
           이 개요를 보면서 글을 완성해봐요 ✍️

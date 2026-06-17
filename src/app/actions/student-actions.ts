@@ -1,13 +1,11 @@
 "use server";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
-import { generateDraftFromAnswers, generateOutline } from "@/lib/gpt";
 import { parseOutlineResult, serializeOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildOneLineShareBoard, includesAllConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import { buildHanjaWritingBoard, normalizeHanjaWritingConfig, sentenceContainsWord } from "@/lib/hanja-writing";
-import { getTeacherOpenAiAccess, logApiUsage } from "@/lib/service-admin";
 import {
   buildQuestionVotingRanking,
   normalizeQuestionVotingConfig,
@@ -112,12 +110,9 @@ export async function verifyStudent(
 // 결과 조회
 export async function getStudentResult(sessionId: string, roomId: string) {
   const admin = createSupabaseAdminClient();
-  const [queueRes, sessionRes, roomRes] = await Promise.all([
-    admin.schema("writing_helper").from("outline_queue")
-      .select("result").eq("session_id", sessionId).eq("status", "done")
-      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  const [sessionRes, roomRes] = await Promise.all([
     admin.schema("writing_helper").from("student_sessions")
-      .select("student_name, submission").eq("id", sessionId).maybeSingle(),
+      .select("student_name, submission, answers").eq("id", sessionId).maybeSingle(),
     admin.schema("writing_helper").from("rooms")
       .select("topic, activity_type, activity_config, is_active").eq("id", roomId).maybeSingle(),
   ]);
@@ -225,9 +220,22 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     };
   }
 
+  const rawAnswers = Array.isArray(sessionRes.data?.answers) ? sessionRes.data!.answers as unknown[] : [];
+  const outlineAnswers = rawAnswers
+    .filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null && !Array.isArray(a))
+    .map((a) => ({
+      section: (a.section === "처음" || a.section === "가운데" || a.section === "끝") ? a.section : "처음",
+      itemId: typeof a.itemId === "string" ? a.itemId : "",
+      label: typeof a.label === "string" ? a.label : "",
+      answer: typeof a.answer === "string" ? a.answer : "",
+    }))
+    .filter((a) => a.label || a.answer);
+
   return {
     activityType,
-    ...parseOutlineResult(queueRes.data?.result ?? null),
+    outline: "",
+    draft: "",
+    outlineAnswers,
     studentName: sessionRes.data?.student_name ?? "",
     topic: roomRes.data?.topic ?? "",
     questionGeneratorSubmission: null,
@@ -299,11 +307,11 @@ export async function saveAnswers(
   return {};
 }
 
-// 개요 생성 요청 (대기열 등록)
+// 개요 제출 (AI 호출 없이 학생 답변만 저장하고 세션 완료 처리)
 export async function requestOutline(
   sessionId: string,
   latestAnswers?: OutlineTemplateAnswer[]
-): Promise<{ error?: string; queueId?: string; position?: number }> {
+): Promise<{ error?: string; done?: boolean }> {
   const admin = createSupabaseAdminClient();
 
   if (latestAnswers && latestAnswers.length > 0) {
@@ -316,55 +324,27 @@ export async function requestOutline(
     if (updateError) return { error: "답변 저장 중 오류가 발생했습니다." };
   }
 
-  // 세션 정보 가져오기
   const { data: session } = await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("*, rooms!inner(teacher_id, topic, subject_type, grade_level, outline_depth)")
+    .select("id, answers")
     .eq("id", sessionId)
     .maybeSingle();
 
   if (!session) return { error: "세션을 찾을 수 없습니다." };
-  if (session.gpt_call_count >= 3) return { error: "개요 생성 횟수를 초과했습니다." };
 
   const answersToUse = latestAnswers && latestAnswers.length > 0 ? latestAnswers : session.answers;
-  if (!answersToUse || answersToUse.length === 0) {
-    return { error: "답변이 저장되지 않았습니다. 마지막 질문에 다시 답해보세요." };
+  if (!answersToUse || (Array.isArray(answersToUse) && answersToUse.length === 0)) {
+    return { error: "작성한 항목이 없습니다. 한 가지 이상 골라서 써 보세요." };
   }
 
-  // 현재 대기 순서 계산
-  const { count } = await admin
-    .schema("writing_helper")
-    .from("outline_queue")
-    .select("*", { count: "exact", head: true })
-    .in("status", ["waiting", "processing"]);
-
-  const position = (count ?? 0) + 1;
-
-  // 대기열 등록
-  const { data: queue, error } = await admin
-    .schema("writing_helper")
-    .from("outline_queue")
-    .insert({
-      session_id: sessionId,
-      room_id: session.room_id,
-      status: "waiting",
-      answers: answersToUse,
-      position,
-    })
-    .select("id")
-    .single();
-
-  if (error || !queue) return { error: "대기열 등록에 실패했습니다." };
-
-  // GPT 호출 횟수 증가
   await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .update({ gpt_call_count: session.gpt_call_count + 1 })
+    .update({ status: "done", updated_at: new Date().toISOString() })
     .eq("id", sessionId);
 
-  return { queueId: queue.id, position };
+  return { done: true };
 }
 
 // 대기열 상태 확인 (폴링) — sessionId로 소유권 검증
@@ -390,128 +370,36 @@ export async function checkQueueStatus(queueId: string, sessionId?: string) {
 export async function processOutlineQueue(): Promise<{ processed: number }> {
   const admin = createSupabaseAdminClient();
 
-  // waiting 항목 3개 가져오기
+  // AI 개요/초고 기능 제거 이후로 큐에 신규 항목은 쌓이지 않음.
+  // 이전 데이터에 남아있을 수 있는 waiting/processing 항목은 done으로 정리.
   const { data: items } = await admin
     .schema("writing_helper")
     .from("outline_queue")
-    .select("id, session_id, room_id, answers")
-    .eq("status", "waiting")
+    .select("id, session_id")
+    .in("status", ["waiting", "processing"])
     .order("created_at")
-    .limit(3);
+    .limit(20);
 
   if (!items || items.length === 0) return { processed: 0 };
 
-  // processing 상태로 변경
-  const ids = items.map(i => i.id);
+  const ids = items.map((i) => i.id);
   await admin
     .schema("writing_helper")
     .from("outline_queue")
-    .update({ status: "processing", started_at: new Date().toISOString() })
+    .update({
+      status: "done",
+      result: serializeOutlineResult({ outline: null, draft: null }),
+      completed_at: new Date().toISOString(),
+    })
     .in("id", ids);
 
-  // 3개 병렬 처리
-  const results = await Promise.allSettled(
-    items.map(async (item) => {
-      // 방 정보 + 교사 API 키
-      const { data: room } = await admin
-        .schema("writing_helper")
-        .from("rooms")
-        .select("topic, topic_description, subject_type, grade_level, teacher_id, activity_config")
-        .eq("id", item.room_id)
-        .maybeSingle();
-
-      const keyAccess = await getTeacherOpenAiAccess(room!.teacher_id);
-      if (keyAccess.error || !keyAccess.access) throw new Error(keyAccess.error ?? "OpenAI API 키 없음");
-      const apiKey = keyAccess.access.apiKey;
-
-      // 새 형식(OutlineTemplateAnswer)인지 확인 — section 필드 존재 여부로 판단
-      const rawAnswers = item.answers as unknown[];
-      const isNewFormat = Array.isArray(rawAnswers) && rawAnswers.length > 0
-        && typeof (rawAnswers[0] as Record<string, unknown>).section === "string";
-
-      if (!isNewFormat) throw new Error("이전 방식 답변은 재처리하지 않습니다.");
-
-      const answers = rawAnswers as OutlineTemplateAnswer[];
-
-      await logApiUsage({
-        teacherId: room!.teacher_id,
-        feature: "generate_outline",
-        model: "gpt-4o-mini",
-        usedSharedApi: keyAccess.access.usedSharedApi,
-        roomId: item.room_id,
-        sessionId: item.session_id,
-        metadata: {},
-      });
-      const outline = await generateOutline(
-        apiKey,
-        room!.topic,
-        room!.topic_description ?? "",
-        room!.subject_type,
-        room!.grade_level,
-        answers,
-      );
-
-      const activityConfig = room?.activity_config as { generateDraft?: boolean } | null;
-      const draft = activityConfig?.generateDraft
-        ? (await logApiUsage({
-            teacherId: room!.teacher_id,
-            feature: "generate_draft",
-            model: "gpt-4o-mini",
-            usedSharedApi: keyAccess.access.usedSharedApi,
-            roomId: item.room_id,
-            sessionId: item.session_id,
-            metadata: {},
-          }), await generateDraftFromAnswers(
-            apiKey,
-            room!.topic,
-            room!.topic_description ?? "",
-            room!.subject_type,
-            room!.grade_level,
-            answers,
-          ))
-        : null;
-
-      // 결과 저장
-      await admin
-        .schema("writing_helper")
-        .from("outline_queue")
-        .update({
-          status: "done",
-          result: serializeOutlineResult({ outline, draft }),
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", item.id);
-
-      // 세션 완료 처리
-      await admin
-        .schema("writing_helper")
-        .from("student_sessions")
-        .update({ status: "done", updated_at: new Date().toISOString() })
-        .eq("id", item.session_id);
-    })
-  );
-
-  // 실패한 항목 error 처리
-  for (let i = 0; i < results.length; i++) {
-    if (results[i].status === "rejected") {
-      const item = items[i];
-      const { data: current } = await admin
-        .schema("writing_helper")
-        .from("outline_queue")
-        .select("retry_count")
-        .eq("id", item.id)
-        .maybeSingle();
-
-      const retryCount = (current?.retry_count ?? 0) + 1;
-      await admin
-        .schema("writing_helper")
-        .from("outline_queue")
-        .update({
-          status: retryCount < 3 ? "waiting" : "error",
-          retry_count: retryCount,
-        })
-        .eq("id", item.id);
-    }
+  const sessionIds = Array.from(new Set(items.map((i) => i.session_id).filter(Boolean)));
+  if (sessionIds.length > 0) {
+    await admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .update({ status: "done", updated_at: new Date().toISOString() })
+      .in("id", sessionIds);
   }
 
   return { processed: items.length };
@@ -584,7 +472,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
   const { data: submissionData } = await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("submission, status")
+    .select("submission, status, answers, gpt_call_count")
     .eq("id", sessionId)
     .eq("room_id", roomId)
     .maybeSingle();
@@ -620,10 +508,24 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
     return false;
   })();
 
+  const existingOutlineAnswers = Array.isArray(submissionData?.answers)
+    ? (submissionData!.answers as unknown[])
+        .filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null && !Array.isArray(a))
+        .map((a) => ({
+          section: (a.section === "처음" || a.section === "가운데" || a.section === "끝") ? a.section : "처음",
+          itemId: typeof a.itemId === "string" ? a.itemId : "",
+          label: typeof a.label === "string" ? a.label : "",
+          answer: typeof a.answer === "string" ? a.answer : "",
+        }))
+        .filter((a) => a.itemId)
+    : [];
+
   return {
     ...data,
     outline_template: outlineTemplate,
     is_legacy_outline_room: isLegacyRoom,
+    existing_outline_answers: existingOutlineAnswers,
+    outline_gpt_call_count: typeof submissionData?.gpt_call_count === "number" ? submissionData.gpt_call_count : 0,
     existing_submission: normalizeQuestionGeneratorSubmission(submissionData?.submission),
     existing_voting_submission: normalizeQuestionVotingSubmission(submissionData?.submission),
     existing_one_line_submission: oneLineEntry
