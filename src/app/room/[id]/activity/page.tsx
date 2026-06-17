@@ -380,6 +380,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     );
   }
 
+  function handleTemplateLabelChange(itemId: string, value: string) {
+    setTemplateAnswers((prev) =>
+      prev.map((a) => a.itemId === itemId ? { ...a, label: value } : a)
+    );
+  }
+
   function toggleTemplateItem(item: { id: string; label: string }, section: "처음" | "가운데" | "끝") {
     setTemplateAnswers((prev) => {
       const existing = prev.find((a) => a.itemId === item.id);
@@ -390,19 +396,38 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     });
   }
 
+  function addCustomTemplateItem(section: "처음" | "가운데" | "끝") {
+    const itemId = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setTemplateAnswers((prev) => [...prev, { section, itemId, label: "", answer: "" }]);
+  }
+
+  function removeTemplateItem(itemId: string) {
+    setTemplateAnswers((prev) => prev.filter((a) => a.itemId !== itemId));
+  }
+
   async function handleOutlineSectionSubmit() {
     if (outlineSubmitting) return;
     setError("");
+
+    const submittable = templateAnswers
+      .map((a) => ({ ...a, label: a.label.trim(), answer: a.answer.trim() }))
+      .filter((a) => a.label && a.answer);
+
+    if (submittable.length === 0) {
+      setError("적은 항목이 없어요. 한 가지 이상 골라서 써 보세요.");
+      return;
+    }
+
     setOutlineSubmitting(true);
 
-    const saveResult = await saveAnswers(sessionId, templateAnswers);
+    const saveResult = await saveAnswers(sessionId, submittable);
     if (saveResult.error) {
       setError(saveResult.error);
       setOutlineSubmitting(false);
       return;
     }
 
-    const result = await requestOutline(sessionId, templateAnswers);
+    const result = await requestOutline(sessionId, submittable);
     if (result.error) {
       setError(result.error);
       setOutlineSubmitting(false);
@@ -1452,6 +1477,10 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
           {sections.map(({ key, items }) => {
             const sectionSelectedCount = templateAnswers.filter((a) => a.section === key).length;
+            const teacherItemIds = new Set(items.map((i) => i.id));
+            const customAnswers = templateAnswers.filter(
+              (a) => a.section === key && !teacherItemIds.has(a.itemId)
+            );
             return (
               <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
@@ -1506,6 +1535,43 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       </div>
                     );
                   })}
+
+                  {customAnswers.map((custom) => (
+                    <div key={custom.itemId} className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-3 space-y-2 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold shrink-0">내가 추가</span>
+                        <button
+                          type="button"
+                          onClick={() => removeTemplateItem(custom.itemId)}
+                          className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          × 빼기
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={custom.label}
+                        onChange={(e) => handleTemplateLabelChange(custom.itemId, e.target.value)}
+                        placeholder="항목 이름 (예: 친구 이야기)"
+                        className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
+                      />
+                      <textarea
+                        value={custom.answer}
+                        onChange={(e) => handleTemplateAnswerChange(custom.itemId, e.target.value)}
+                        rows={2}
+                        placeholder="내가 쓸 내용을 적어봐요"
+                        className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none transition-colors"
+                      />
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => addCustomTemplateItem(key)}
+                    className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/30 px-4 py-3 text-sm font-semibold text-amber-700 hover:border-amber-400 hover:bg-amber-50 transition-colors"
+                  >
+                    + 직접 추가하기
+                  </button>
                 </div>
               </div>
             );
