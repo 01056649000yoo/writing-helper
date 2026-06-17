@@ -277,11 +277,6 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-2xl">{meta.emoji}</span>
-                        {activity.id === "outline_builder" && (
-                          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-                            테스트 중
-                          </span>
-                        )}
                       </div>
                       <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
                       <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{meta.summary}</p>
