@@ -74,7 +74,7 @@ export async function enhanceOutlineTemplateWithAI(
   const currentSectionItems = currentTemplate.sections
     .find((s) => s.key === section)?.items ?? [];
   const currentItemsText = currentSectionItems
-    .map((i) => `  - ${i.label}: ${i.prompt}`)
+    .map((i) => `  - ${i.label}`)
     .join("\n");
 
   const prompt = `초등학교 ${gradeDesc} "${subjectType}" 글쓰기 개요 짜기 활동입니다.
@@ -91,18 +91,18 @@ ${topic || "(미입력)"}
 [주제 부연설명]
 ${topicDescription || "(미입력)"}
 
-[현재 "${section}" 단계에 이미 있는 항목 (항목명: 학생에게 묻는 질문)]
+[현재 "${section}" 단계에 이미 있는 항목 (학생에게 묻는 질문)]
 ${currentItemsText || "(없음)"}
 
 위 글 종류의 특성과 "${section}" 단계의 역할, 그리고 활동 주제와 부연설명에 딱 맞는 새 항목을 2~3개 제안해주세요.
 - 이미 있는 항목과 겹치지 않아야 합니다 (질문 방향도 포함).
 - 초등학생이 실제로 쓸 수 있는 구체적인 내용이어야 합니다.
-- label은 짧고 명확한 항목 이름, prompt는 학생에게 물어볼 질문, placeholder는 구체적인 예시 답변입니다.
+- label은 학생에게 묻는 한 문장 질문, placeholder는 구체적인 예시 답변입니다.
 
 JSON 형식으로만 응답:
 {
   "items": [
-    {"id": "new_1", "label": "항목 이름", "prompt": "학생에게 물을 질문", "placeholder": "예) ..."},
+    {"id": "new_1", "label": "학생에게 묻는 질문 한 문장", "placeholder": "예) ..."},
     ...
   ]
 }`;
@@ -131,10 +131,9 @@ JSON 형식으로만 응답:
         .map((item) => ({
           id: typeof item.id === "string" ? item.id : `new_${Math.random().toString(36).slice(2, 7)}`,
           label: typeof item.label === "string" ? item.label : "",
-          prompt: typeof item.prompt === "string" ? item.prompt : "",
           placeholder: typeof item.placeholder === "string" ? item.placeholder : "",
         }))
-        .filter((item) => item.label && item.prompt),
+        .filter((item) => item.label),
     };
   } catch {
     return { error: "AI 제안을 불러오지 못했습니다." };

@@ -374,13 +374,19 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  function handleTemplateAnswerChange(itemId: string, section: "처음" | "가운데" | "끝", label: string, value: string) {
+  function handleTemplateAnswerChange(itemId: string, value: string) {
+    setTemplateAnswers((prev) =>
+      prev.map((a) => a.itemId === itemId ? { ...a, answer: value } : a)
+    );
+  }
+
+  function toggleTemplateItem(item: { id: string; label: string }, section: "처음" | "가운데" | "끝") {
     setTemplateAnswers((prev) => {
-      const existing = prev.find((a) => a.itemId === itemId);
+      const existing = prev.find((a) => a.itemId === item.id);
       if (existing) {
-        return prev.map((a) => a.itemId === itemId ? { ...a, answer: value } : a);
+        return prev.filter((a) => a.itemId !== item.id);
       }
-      return [...prev, { section, itemId, label, answer: value }];
+      return [...prev, { section, itemId: item.id, label: item.label, answer: "" }];
     });
   }
 
@@ -1424,8 +1430,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
   if (step === "outline_sections") {
     const sections = outlineTemplate?.sections ?? [];
+    const selectedCount = templateAnswers.length;
     const answeredCount = templateAnswers.filter((a) => a.answer.trim()).length;
-    const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
@@ -1438,42 +1444,72 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 <p className="text-sm text-gray-500 mt-1">{topicDescription}</p>
               )}
             </div>
-            <div className="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-orange-400 rounded-full transition-all duration-500"
-                style={{ width: totalItems > 0 ? `${(answeredCount / totalItems) * 100}%` : "0%" }}
-              />
+            <div className="mt-4 rounded-2xl bg-orange-50 px-4 py-3 text-center">
+              <p className="text-xs text-orange-700 font-semibold">처음·가운데·끝 항목 중 쓰고 싶은 것만 골라서 써 보세요.</p>
+              <p className="text-xs text-orange-500 mt-1">고른 항목 {selectedCount}개 · 작성 완료 {answeredCount}개</p>
             </div>
-            <p className="text-xs text-gray-400 text-center mt-1">{answeredCount} / {totalItems} 항목 작성</p>
           </div>
 
-          {sections.map(({ key, items }) => (
-            <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
-              <h2 className="text-base font-bold text-orange-500 mb-3 flex items-center gap-2">
-                <span className="inline-block w-6 h-6 rounded-full bg-orange-100 text-orange-500 text-xs font-bold flex items-center justify-center">
-                  {key === "처음" ? "1" : key === "가운데" ? "2" : "3"}
-                </span>
-                {key}
-              </h2>
-              <div className="space-y-4">
-                {items.map((item) => {
-                  const currentAnswer = templateAnswers.find((a) => a.itemId === item.id)?.answer ?? "";
-                  return (
-                    <div key={item.id} className="space-y-1">
-                      <label className="text-sm font-semibold text-gray-700">{item.label}</label>
-                      <textarea
-                        value={currentAnswer}
-                        onChange={(e) => handleTemplateAnswerChange(item.id, key, item.label, e.target.value)}
-                        rows={2}
-                        placeholder={item.placeholder ?? `${item.label}을(를) 써봐요`}
-                        className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400 resize-none transition-colors"
-                      />
-                    </div>
-                  );
-                })}
+          {sections.map(({ key, items }) => {
+            const sectionSelectedCount = templateAnswers.filter((a) => a.section === key).length;
+            return (
+              <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base font-bold text-orange-500 flex items-center gap-2">
+                    <span className="inline-block w-6 h-6 rounded-full bg-orange-100 text-orange-500 text-xs font-bold flex items-center justify-center">
+                      {key === "처음" ? "1" : key === "가운데" ? "2" : "3"}
+                    </span>
+                    {key}
+                  </h2>
+                  <span className="text-xs font-semibold text-orange-400">{sectionSelectedCount}개 고름</span>
+                </div>
+                <div className="space-y-3">
+                  {items.map((item) => {
+                    const selected = templateAnswers.some((a) => a.itemId === item.id);
+                    const currentAnswer = templateAnswers.find((a) => a.itemId === item.id)?.answer ?? "";
+
+                    if (!selected) {
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => toggleTemplateItem(item, key)}
+                          className="w-full text-left rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/40 px-4 py-3 hover:border-orange-300 hover:bg-orange-50 transition-colors"
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="rounded-full bg-orange-100 text-orange-600 px-2.5 py-1 text-xs font-bold shrink-0">+ 쓸래요</span>
+                            <p className="text-sm text-gray-700 flex-1 leading-relaxed">{item.label}</p>
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <div key={item.id} className="rounded-2xl border-2 border-orange-300 bg-white p-3 space-y-2 shadow-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-semibold text-gray-800 flex-1 leading-relaxed">{item.label}</p>
+                          <button
+                            type="button"
+                            onClick={() => toggleTemplateItem(item, key)}
+                            className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          >
+                            × 빼기
+                          </button>
+                        </div>
+                        <textarea
+                          value={currentAnswer}
+                          onChange={(e) => handleTemplateAnswerChange(item.id, e.target.value)}
+                          rows={2}
+                          placeholder={item.placeholder ?? `${item.label} 답을 써봐요`}
+                          className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400 resize-none transition-colors"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           <div className="pb-4">
             <button

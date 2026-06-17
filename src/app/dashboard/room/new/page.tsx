@@ -562,7 +562,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
       return {
         sections: base.sections.map((s) =>
           s.key === sectionKey
-            ? { ...s, items: [...s.items, { id: newId, label: "", prompt: "", placeholder: "" }] }
+            ? { ...s, items: [...s.items, { id: newId, label: "", placeholder: "" }] }
             : s
         ),
       };
@@ -698,23 +698,32 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                 {aiEnhancing === key ? "AI 보완 중..." : "✨ AI 항목 추가"}
               </button>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-3">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center gap-2">
+                <div key={item.id} className="rounded-xl border border-gray-200 p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      value={item.label}
+                      onChange={(e) => updateItemField(key, item.id, "label", e.target.value)}
+                      placeholder="학생에게 묻는 질문 (예: 언제, 어디서 있었던 일인가요?)"
+                      rows={2}
+                      className="flex-1 px-3 py-2 text-sm text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 resize-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeItem(key, item.id)}
+                      className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0 mt-1"
+                    >
+                      ×
+                    </button>
+                  </div>
                   <input
                     type="text"
-                    value={item.label}
-                    onChange={(e) => updateItemField(key, item.id, "label", e.target.value)}
-                    placeholder="항목 이름"
-                    className="flex-1 px-3 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400"
+                    value={item.placeholder}
+                    onChange={(e) => updateItemField(key, item.id, "placeholder", e.target.value)}
+                    placeholder="학생 입력칸에 보일 예시 (예: 예) 지난 토요일 오후, 공원에서...)"
+                    className="w-full px-3 py-2 text-xs text-gray-500 border border-gray-100 bg-gray-50 rounded-lg focus:outline-none focus:border-indigo-400 focus:bg-white focus:text-gray-900"
                   />
-                  <button
-                    type="button"
-                    onClick={() => removeItem(key, item.id)}
-                    className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0"
-                  >
-                    ×
-                  </button>
                 </div>
               ))}
             </div>
