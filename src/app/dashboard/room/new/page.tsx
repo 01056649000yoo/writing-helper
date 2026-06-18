@@ -99,7 +99,7 @@ const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary
   outline_builder: {
     emoji: "📝",
     tone: "from-indigo-50 via-white to-blue-50",
-    summary: "질문에 답하면서 글의 흐름을 잡고, AI가 개요를 정리해주는 활동",
+    summary: "처음·가운데·끝 개요 틀에 내용을 채우면 AI가 개요와 글 초안을 자동으로 정리해주는 활동",
   },
   question_generator: {
     emoji: "❓",

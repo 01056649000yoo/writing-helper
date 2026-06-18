@@ -7,7 +7,7 @@ export const outlineBuilderDefinition: ActivityDefinition<
 > = {
   id: "outline_builder",
   label: "글 개요 짜기",
-  description: "처음·가운데·끝 구조로 내용을 입력하면 AI가 개요를 완성해주는 활동입니다.",
+  description: "교사가 준비한 글 종류별 개요 틀에 학생이 내용을 채우면, AI가 개요와 초안을 자동으로 정리해주는 활동입니다.",
   category: "writing",
   version: 2,
   usesAi: true,
