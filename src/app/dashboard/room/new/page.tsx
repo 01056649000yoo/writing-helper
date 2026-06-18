@@ -206,7 +206,6 @@ const LITERACY_ACTIVITIES: {
     label: "한자 활용 문장 만들기",
     summary: "낱말 속 한자의 뜻을 살피고, 한자를 활용해 더 정확하고 풍부한 문장을 써보는 활동",
     href: "__hanja_writing__",
-    badge: "테스트 중",
   },
   {
     emoji: "🎮",
