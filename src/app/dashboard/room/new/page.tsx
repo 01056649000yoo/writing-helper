@@ -169,6 +169,7 @@ const COMING_SOON_ACTIVITIES: {
     summary:
       "사회·역사 속 인물이 되어 '내가 만약 ~라면?' 가정 아래 상황·선택·이유를 논리적으로 쓰는 활동",
     effect: "공감 능력과 비판적 사고력을 동시에 성장",
+    status: "testing",
   },
   {
     emoji: "🔢",
@@ -178,6 +179,7 @@ const COMING_SOON_ACTIVITIES: {
     summary:
       "답이 아닌 '어떻게 풀었나, 왜 이 식을 세웠나'를 친구에게 설명하듯 글로 쓰는 활동",
     effect: "수학 개념 이해도를 스스로 점검하는 메타인지 훈련",
+    status: "testing",
   },
   {
     emoji: "🪞",
@@ -230,6 +232,7 @@ const LITERACY_ACTIVITIES: {
 ];
 
 function ActivitySelectionScreen({ classId }: { classId: string }) {
+  const [subjectOpen, setSubjectOpen] = useState(false);
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto py-4">
@@ -357,18 +360,22 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
           {/* ── 파트 3: 과목별 글쓰기 활동 ── */}
           <div className="border-t border-gray-100">
             <section className="p-5">
-              <div className="flex items-center justify-between gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setSubjectOpen((v) => !v)}
+                className="w-full flex items-center justify-between gap-2 mb-4"
+              >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-lg">📚</span>
                   <h2 className="text-sm font-bold text-gray-800 truncate">과목별 글쓰기 활동</h2>
                   <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600">
-                    {COMING_SOON_ACTIVITIES.length}개
+                    테스트 중
                   </span>
                 </div>
-                <span className="shrink-0 text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">교과 연계</span>
-              </div>
+                <span className="shrink-0 text-gray-400 text-sm">{subjectOpen ? "▲" : "▼"}</span>
+              </button>
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {subjectOpen && <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {COMING_SOON_ACTIVITIES.map((activity) => {
                   const resolvedHref = activity.href === "__science__"
                     ? (classId ? `/dashboard/science/new?class_id=${classId}` : null)
@@ -417,7 +424,7 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                     </div>
                   );
                 })}
-              </div>
+              </div>}
             </section>
           </div>
         </div>
