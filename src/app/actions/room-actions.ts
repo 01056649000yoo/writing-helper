@@ -333,6 +333,8 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       easyStart,
     });
 
+    topic = "스피드 매치";
+
     activityConfig = {
       gameMode: "speed_match",
       mode,

@@ -2588,16 +2588,20 @@ function WordGameSetup({ classId }: { classId: string }) {
               { value: "team", label: "팀전" },
               { value: "individual", label: "개인전" },
             ]} />
-            <SelectField label="팀 수" name="word_game_team_count" value={draft.team_count} onChange={(value) => setDraft((prev) => ({ ...prev, team_count: value }))} options={[
-              { value: "2", label: "2팀" },
-              { value: "3", label: "3팀" },
-              { value: "4", label: "4팀" },
-            ]} />
-            <SelectField label="팀 배정" name="word_game_team_mode" value={draft.team_mode} onChange={(value) => setDraft((prev) => ({ ...prev, team_mode: value as WordGameDraft["team_mode"] }))} options={[
-              { value: "number_alternate", label: "번호순 교차" },
-              { value: "random_balanced", label: "랜덤 균등" },
-              { value: "number_block", label: "번호 구간" },
-            ]} />
+            {draft.mode === "team" && (
+              <>
+                <SelectField label="팀 수" name="word_game_team_count" value={draft.team_count} onChange={(value) => setDraft((prev) => ({ ...prev, team_count: value }))} options={[
+                  { value: "2", label: "2팀" },
+                  { value: "3", label: "3팀" },
+                  { value: "4", label: "4팀" },
+                ]} />
+                <SelectField label="팀 배정" name="word_game_team_mode" value={draft.team_mode} onChange={(value) => setDraft((prev) => ({ ...prev, team_mode: value as WordGameDraft["team_mode"] }))} options={[
+                  { value: "number_alternate", label: "번호순 교차" },
+                  { value: "random_balanced", label: "랜덤 균등" },
+                  { value: "number_block", label: "번호 구간" },
+                ]} />
+              </>
+            )}
           </div>
 
           <div className="mt-5 space-y-3">
