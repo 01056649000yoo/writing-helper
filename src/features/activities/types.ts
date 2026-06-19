@@ -260,13 +260,34 @@ export type HanjaWritingRoomResult = {
 };
 
 export type WordGameConfig = {
-  gameMode: string;
+  gameMode: "speed_match";
+  mode: "individual" | "team";
+  questionMode: "definition_to_word";
   timeLimit: number;
-  grade: number;
+  grade: 3 | 4 | 5 | 6;
+  levelFilter: 1 | 2 | 3 | "mixed";
+  categoryFilter: string[];
   wordCount: number;
+  allowHints: boolean;
+  easyStart: boolean;
+  recoveryBonus: boolean;
+  growthBonus: boolean;
+  showLiveTeamBoard: boolean;
+  teamCount: 2 | 3 | 4;
+  teamMode: "number_alternate" | "random_balanced" | "number_block";
+  teams: WordGameTeam[];
+  questions: WordGameQuestion[];
 };
 
 export type WordGameSubmission = {
+  answers: WordGameAnswer[];
+  startedAt: string | null;
+  completedAt: string | null;
+  elapsedMs: number;
+  usedHints: number;
+  currentIndex: number;
+  totalQuestions: number;
+  teamId: string | null;
   score: number;
   correctCount: number;
   wrongCount: number;
@@ -276,6 +297,13 @@ export type WordGameResult = {
   score: number;
   correctCount: number;
   wrongCount: number;
+  timeBonus: number;
+  recoveryBonus: number;
+  growthBonus: number;
+  completionBonus: number;
+  usedHints: number;
+  elapsedMs: number;
+  teamId: string | null;
 };
 
 export type WordGameRoomResult = {
@@ -284,5 +312,81 @@ export type WordGameRoomResult = {
     studentName: string;
     score: number;
     correctCount: number;
+    wrongCount: number;
+    usedHints: number;
+    currentIndex: number;
+    totalQuestions: number;
+    teamId: string | null;
+    status: "in_progress" | "done";
   }>;
+  teams: Array<{
+    teamId: string;
+    teamName: string;
+    color: string;
+    memberCount: number;
+    activeCount: number;
+    completedCount: number;
+    averageScore: number;
+    averageGrowthBonus: number;
+    averageCorrectRate: number;
+    tugOffset: number;
+  }>;
+  progress: {
+    totalStudents: number;
+    connectedStudents: number;
+    activeStudents: number;
+    completedStudents: number;
+    averageCorrectRate: number;
+  };
+  hardWords: Array<{
+    word: string;
+    wrongCount: number;
+    correctCount: number;
+  }>;
+};
+
+export type WordGameQuestion = {
+  id: string;
+  word: string;
+  category: string;
+  level: 1 | 2 | 3;
+  prompt: string;
+  choices: string[];
+  answer: string;
+  definition: string;
+  example: string;
+};
+
+export type WordGameAnswer = {
+  questionId: string;
+  selectedChoice: string;
+  isCorrect: boolean;
+  usedHint: boolean;
+  answeredAt: string;
+  responseMs: number;
+};
+
+export type WordGameTeam = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+export type WordGameTeamAssignment = {
+  teamId: string;
+  teamName: string;
+  color: string;
+};
+
+export type WordGameStudentProgress = {
+  studentNumber: number;
+  studentName: string;
+  status: "not_joined" | "in_progress" | "done";
+  score: number;
+  correctCount: number;
+  wrongCount: number;
+  usedHints: number;
+  currentIndex: number;
+  totalQuestions: number;
+  teamId: string | null;
 };

@@ -32,6 +32,7 @@ import {
   type HanjaRecommendedGrade,
   type HanjaRecommendedWord,
 } from "@/lib/hanja-recommended-words";
+import { getVocabCategories } from "@/lib/vocabulary";
 import { useActivityDraft } from "@/lib/use-activity-draft";
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import type { OutlineTemplate, OutlineTemplateItem } from "@/lib/outline-templates";
@@ -215,7 +216,7 @@ const LITERACY_ACTIVITIES: {
     label: "필수 단어 맞추기 게임",
     summary: "3~6학년 필수 단어를 활용하여 정해진 시간 동안 낱말을 맞추는 실시간 경쟁 게임",
     href: "__word_game__",
-    badge: "준비 중",
+    badge: "테스트 중",
   },
   {
     emoji: "🪄",
@@ -310,7 +311,9 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 {LITERACY_ACTIVITIES.map((activity) => {
                   const resolvedHref = activity.href === "__hanja_writing__"
                     ? (classId ? `/dashboard/room/new?class_id=${classId}&activity_type=hanja_writing` : null)
-                    : null;
+                    : activity.href === "__word_game__"
+                      ? (classId ? `/dashboard/room/new?class_id=${classId}&activity_type=word_game` : null)
+                      : null;
                   return resolvedHref ? (
                     <Link
                       key={activity.label}
@@ -2452,6 +2455,230 @@ function StepDivider({ active = false }: { active?: boolean }) {
   return <div className={`h-px flex-1 ${active ? "bg-indigo-400" : "bg-gray-300"}`} />;
 }
 
+type WordGameDraft = {
+  grade: string;
+  level: string;
+  word_count: string;
+  time_limit: string;
+  mode: "individual" | "team";
+  team_count: string;
+  team_mode: "number_alternate" | "random_balanced" | "number_block";
+  allow_hints: boolean;
+  easy_start: boolean;
+  recovery_bonus: boolean;
+  growth_bonus: boolean;
+  categories: string[];
+};
+
+function WordGameSetup({ classId }: { classId: string }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const allCategories = useMemo(() => getVocabCategories(4), []);
+  const initialDraft = useMemo<WordGameDraft>(() => ({
+    grade: "4",
+    level: "mixed",
+    word_count: "10",
+    time_limit: "90",
+    mode: "team",
+    team_count: "2",
+    team_mode: "number_alternate",
+    allow_hints: true,
+    easy_start: true,
+    recovery_bonus: true,
+    growth_bonus: true,
+    categories: [],
+  }), []);
+  const [draft, setDraft, draftControls] = useActivityDraft<WordGameDraft>(
+    buildDraftStorageKey(classId, "word_game"),
+    initialDraft,
+  );
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const storageKey = buildDraftStorageKey(classId, "word_game");
+    const formData = new FormData(event.currentTarget);
+    formData.set("class_id", classId);
+    formData.set("activity_type", "word_game");
+    draftControls.suspendAutosave();
+    clearActivityDraft(storageKey);
+    const result = await createRoom(formData);
+    if (result?.error) {
+      persistActivityDraft(storageKey, draft);
+      draftControls.resumeAutosave();
+      setError(result.error);
+      setSaving(false);
+    }
+  }
+
+  const categories = getVocabCategories(Number(draft.grade) as 3 | 4 | 5 | 6);
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-5 text-sm text-sky-900">
+        학년별 필수 어휘로 빠르게 맞히는 경쟁형 활동입니다. 팀전에서는 평균 점수와 성장 보너스를 함께 반영해 실력 차가 큰 반에서도 운영하기 좋게 설계합니다.
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-3xl bg-white p-6 shadow-xl">
+          <h3 className="text-lg font-bold text-gray-800">문제 설정</h3>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <SelectField label="학년" name="word_game_grade" value={draft.grade} onChange={(value) => setDraft((prev) => ({ ...prev, grade: value, categories: [] }))} options={[
+              { value: "3", label: "3학년" },
+              { value: "4", label: "4학년" },
+              { value: "5", label: "5학년" },
+              { value: "6", label: "6학년" },
+            ]} />
+            <SelectField label="난이도" name="word_game_level" value={draft.level} onChange={(value) => setDraft((prev) => ({ ...prev, level: value }))} options={[
+              { value: "mixed", label: "혼합" },
+              { value: "1", label: "1단계" },
+              { value: "2", label: "2단계" },
+              { value: "3", label: "3단계" },
+            ]} />
+            <SelectField label="문항 수" name="word_game_word_count" value={draft.word_count} onChange={(value) => setDraft((prev) => ({ ...prev, word_count: value }))} options={[
+              { value: "8", label: "8문항" },
+              { value: "10", label: "10문항" },
+              { value: "12", label: "12문항" },
+              { value: "15", label: "15문항" },
+            ]} />
+            <SelectField label="제한 시간" name="word_game_time_limit" value={draft.time_limit} onChange={(value) => setDraft((prev) => ({ ...prev, time_limit: value }))} options={[
+              { value: "60", label: "60초" },
+              { value: "90", label: "90초" },
+              { value: "120", label: "120초" },
+              { value: "180", label: "180초" },
+            ]} />
+          </div>
+
+          <div className="mt-5">
+            <p className="text-sm font-semibold text-gray-700">카테고리 선택</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {categories.length === 0 && allCategories.slice(0, 8).map((category) => (
+                <span key={category} className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500">{category}</span>
+              ))}
+              {categories.map((category) => {
+                const checked = draft.categories.includes(category);
+                return (
+                  <label key={category} className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${checked ? "bg-sky-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                    <input
+                      type="checkbox"
+                      name="word_game_categories"
+                      value={category}
+                      checked={checked}
+                      onChange={() => setDraft((prev) => ({
+                        ...prev,
+                        categories: checked
+                          ? prev.categories.filter((item) => item !== category)
+                          : [...prev.categories, category],
+                      }))}
+                      className="sr-only"
+                    />
+                    {category}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-white p-6 shadow-xl">
+          <h3 className="text-lg font-bold text-gray-800">진행 방식</h3>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <SelectField label="모드" name="word_game_mode" value={draft.mode} onChange={(value) => setDraft((prev) => ({ ...prev, mode: value as WordGameDraft["mode"] }))} options={[
+              { value: "team", label: "팀전" },
+              { value: "individual", label: "개인전" },
+            ]} />
+            <SelectField label="팀 수" name="word_game_team_count" value={draft.team_count} onChange={(value) => setDraft((prev) => ({ ...prev, team_count: value }))} options={[
+              { value: "2", label: "2팀" },
+              { value: "3", label: "3팀" },
+              { value: "4", label: "4팀" },
+            ]} />
+            <SelectField label="팀 배정" name="word_game_team_mode" value={draft.team_mode} onChange={(value) => setDraft((prev) => ({ ...prev, team_mode: value as WordGameDraft["team_mode"] }))} options={[
+              { value: "number_alternate", label: "번호순 교차" },
+              { value: "random_balanced", label: "랜덤 균등" },
+              { value: "number_block", label: "번호 구간" },
+            ]} />
+          </div>
+
+          <div className="mt-5 space-y-3">
+            <ToggleField label="힌트 허용" checked={draft.allow_hints} onChange={(checked) => setDraft((prev) => ({ ...prev, allow_hints: checked }))} name="word_game_allow_hints" />
+            <ToggleField label="쉬운 문제로 시작" checked={draft.easy_start} onChange={(checked) => setDraft((prev) => ({ ...prev, easy_start: checked }))} name="word_game_easy_start" />
+            <ToggleField label="회복 보너스" checked={draft.recovery_bonus} onChange={(checked) => setDraft((prev) => ({ ...prev, recovery_bonus: checked }))} name="word_game_recovery_bonus" />
+            <ToggleField label="성장 보너스" checked={draft.growth_bonus} onChange={(checked) => setDraft((prev) => ({ ...prev, growth_bonus: checked }))} name="word_game_growth_bonus" />
+          </div>
+        </div>
+      </div>
+
+      {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="w-full rounded-2xl bg-indigo-500 py-4 text-lg font-bold text-white transition-colors hover:bg-indigo-600 disabled:opacity-50"
+      >
+        {saving ? "스피드 매치 방 만드는 중..." : "스피드 매치 시작하기"}
+      </button>
+    </form>
+  );
+}
+
+function SelectField({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-semibold text-gray-700">{label}</span>
+      <select
+        name={name}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ToggleField({
+  label,
+  checked,
+  onChange,
+  name,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  name: string;
+}) {
+  return (
+    <label className="flex items-center justify-between rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700">
+      <span className="font-medium">{label}</span>
+      <input type="hidden" name={name} value="off" />
+      <input
+        type="checkbox"
+        name={name}
+        value="on"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded border-gray-300 text-indigo-500"
+      />
+    </label>
+  );
+}
+
 function NewRoomForm() {
   const searchParams = useSearchParams();
   const classId = searchParams.get("class_id") ?? "";
@@ -2461,6 +2688,14 @@ function NewRoomForm() {
     return <ActivitySelectionScreen classId={classId} />;
   }
 
+  if (activityType === "word_game") {
+    return (
+      <PageShell classId={classId} activityType={activityType}>
+        <WordGameSetup classId={classId} />
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell classId={classId} activityType={activityType}>
       {activityType === "outline_builder" && <OutlineBuilderSetup classId={classId} />}
@@ -2468,7 +2703,7 @@ function NewRoomForm() {
       {activityType === "question_voting" && <QuestionVotingSetup classId={classId} />}
       {activityType === "one_line_share" && <OneLineShareSetup classId={classId} />}
       {activityType === "hanja_writing" && <HanjaWritingSetup classId={classId} />}
-      {activityType === "word_game" && (
+      {false && (
         <div className="rounded-3xl border border-dashed border-indigo-200 bg-indigo-50/50 p-10 text-center">
           <p className="text-lg font-bold text-indigo-900">🎮 필수 단어 맞추기 게임</p>
           <p className="mt-2 text-sm text-indigo-700">실시간 단어 맞추기 경쟁 게임 설정 화면이 곧 준비될 예정입니다.</p>

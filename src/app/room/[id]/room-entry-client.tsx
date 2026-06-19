@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { verifyStudent } from "@/app/actions/student-actions";
 
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share";
+type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "word_game";
 
 type EntryShellProps = {
   roomId: string;
@@ -28,6 +28,10 @@ export function RoomEntryClient({
 
   if (activityType === "one_line_share") {
     return <OneLineShareEntry roomId={roomId} topic={topic} />;
+  }
+
+  if (activityType === "word_game") {
+    return <WordGameEntry roomId={roomId} topic={topic} />;
   }
 
   return <OutlineBuilderEntry roomId={roomId} topic={topic} />;
@@ -101,6 +105,24 @@ function OneLineShareEntry({ roomId, topic }: EntryShellProps) {
       subtitle="내 번호와 이름을 입력하고 핵심단어를 담은 한 줄을 나눠요"
       helper="한 줄을 쓰고 나면 친구 문장을 읽으며 좋아요로 반응할 수 있어요."
       buttonLabel="한줄모아 시작"
+    />
+  );
+}
+
+function WordGameEntry({ roomId, topic }: EntryShellProps) {
+  return (
+    <EntryShell
+      roomId={roomId}
+      topic={topic}
+      shellClassName="from-sky-50 to-indigo-100"
+      topicClassName="bg-sky-50 text-sky-700"
+      buttonClassName="bg-indigo-500 hover:bg-indigo-600"
+      inputFocusClassName="focus:border-indigo-400"
+      emoji="🎯"
+      title="스피드 매치"
+      subtitle="번호와 이름을 입력하고 제한 시간 안에 필수 어휘를 빠르게 맞혀 보세요"
+      helper="힌트와 회복 보너스가 있어서 끝까지 도전하기 좋아요."
+      buttonLabel="게임 시작"
     />
   );
 }

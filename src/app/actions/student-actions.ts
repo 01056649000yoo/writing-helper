@@ -6,6 +6,7 @@ import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-s
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildOneLineShareBoard, includesAllConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import { buildHanjaWritingBoard, normalizeHanjaWritingConfig, sentenceContainsWord } from "@/lib/hanja-writing";
+import { assignWordGameTeam, calculateWordGameResult } from "@/lib/word-game";
 import {
   buildQuestionVotingRanking,
   normalizeQuestionVotingConfig,
@@ -18,6 +19,9 @@ import type {
   OutlineTemplateAnswer,
   QuestionGeneratorSubmission,
   QuestionVotingSubmission,
+  WordGameConfig,
+  WordGameResult,
+  WordGameSubmission,
 } from "@/features/activities/types";
 
 // 학생 인증 (번호+이름 대조)
@@ -112,7 +116,7 @@ export async function getStudentResult(sessionId: string, roomId: string) {
   const admin = createSupabaseAdminClient();
   const [sessionRes, roomRes] = await Promise.all([
     admin.schema("writing_helper").from("student_sessions")
-      .select("student_name, submission, answers").eq("id", sessionId).maybeSingle(),
+      .select("student_name, submission, answers, result").eq("id", sessionId).maybeSingle(),
     admin.schema("writing_helper").from("rooms")
       .select("topic, activity_type, activity_config, is_active").eq("id", roomId).maybeSingle(),
   ]);
@@ -220,6 +224,32 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     };
   }
 
+  if (activityType === "word_game") {
+    return {
+      activityType,
+      outline: "",
+      draft: "",
+      studentName: sessionRes.data?.student_name ?? "",
+      topic: roomRes.data?.topic ?? "",
+      questionGeneratorSubmission: null,
+      anonymousPeerQuestions: [],
+      questionVotingSubmission: null,
+      questionVotingConfig: null,
+      questionVotingRanking: [],
+      questionVotingClosed: false,
+      oneLineShareConfig: null,
+      oneLineShareEntry: null,
+      oneLineShareBoard: [],
+      oneLineShareClosed: false,
+      hanjaWritingConfig: null,
+      hanjaWritingEntry: null,
+      hanjaWritingBoard: [],
+      wordGameConfig: normalizeWordGameConfig(roomRes.data?.activity_config),
+      wordGameSubmission: normalizeWordGameSubmission(sessionRes.data?.submission),
+      wordGameResult: normalizeWordGameResult(sessionRes.data?.submission, sessionRes.data?.result),
+    };
+  }
+
   const rawAnswers = Array.isArray(sessionRes.data?.answers) ? sessionRes.data!.answers as unknown[] : [];
   const outlineAnswers = rawAnswers
     .filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null && !Array.isArray(a))
@@ -251,6 +281,9 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     hanjaWritingConfig: null,
     hanjaWritingEntry: null,
     hanjaWritingBoard: [],
+    wordGameConfig: null,
+    wordGameSubmission: null,
+    wordGameResult: null,
   };
 }
 
@@ -472,7 +505,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
   const { data: submissionData } = await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("submission, status, answers, gpt_call_count")
+    .select("submission, status, answers, gpt_call_count, result")
     .eq("id", sessionId)
     .eq("room_id", roomId)
     .maybeSingle();
@@ -535,6 +568,8 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
         } satisfies OneLineShareSubmission)
       : null,
     existing_hanja_writing_submission: hanjaSubmissionContent ? { content: hanjaSubmissionContent } : null,
+    existing_word_game_submission: normalizeWordGameSubmission(submissionData?.submission),
+    existing_word_game_result: normalizeWordGameResult(submissionData?.submission, submissionData?.result),
     session_status: submissionData?.status ?? "in_progress",
   };
 }
@@ -845,6 +880,122 @@ export async function submitHanjaWriting(
   return {};
 }
 
+export async function saveWordGameProgress(
+  sessionId: string,
+  roomId: string,
+  submission: WordGameSubmission
+): Promise<{ error?: string }> {
+  if (!sessionId || !roomId) return { error: "잘못된 요청입니다." };
+
+  const admin = createSupabaseAdminClient();
+  const [sessionRes, roomRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, student_number")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_type, activity_config")
+      .eq("id", roomId)
+      .maybeSingle(),
+  ]);
+
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+  if (roomRes.data.activity_type !== "word_game") return { error: "활동 종류가 맞지 않습니다." };
+
+  const config = normalizeWordGameConfig(roomRes.data.activity_config);
+  const team = config.mode === "team"
+    ? assignWordGameTeam(sessionRes.data.student_number, config.teams, config.teamMode)
+    : null;
+  const nextSubmission = sanitizeWordGameSubmission(submission, config, team?.teamId ?? null);
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .update({
+      submission: nextSubmission,
+      result: {
+        score: nextSubmission.score,
+        correctCount: nextSubmission.correctCount,
+        wrongCount: nextSubmission.wrongCount,
+        usedHints: nextSubmission.usedHints,
+        elapsedMs: nextSubmission.elapsedMs,
+        teamId: nextSubmission.teamId,
+      },
+      status: "in_progress",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .eq("room_id", roomId);
+
+  if (error) return { error: "진행 상황 저장에 실패했습니다." };
+  return {};
+}
+
+export async function submitWordGame(
+  sessionId: string,
+  roomId: string,
+  submission: WordGameSubmission
+): Promise<{ error?: string; result?: WordGameResult }> {
+  if (!sessionId || !roomId) return { error: "잘못된 요청입니다." };
+
+  const admin = createSupabaseAdminClient();
+  const [sessionRes, roomRes] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, student_number")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("is_active, activity_type, activity_config")
+      .eq("id", roomId)
+      .maybeSingle(),
+  ]);
+
+  if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
+  if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+  if (roomRes.data.activity_type !== "word_game") return { error: "활동 종류가 맞지 않습니다." };
+
+  const config = normalizeWordGameConfig(roomRes.data.activity_config);
+  const team = config.mode === "team"
+    ? assignWordGameTeam(sessionRes.data.student_number, config.teams, config.teamMode)
+    : null;
+  const nextSubmission = sanitizeWordGameSubmission(submission, config, team?.teamId ?? null);
+  const result = calculateWordGameResult(nextSubmission.answers, nextSubmission.elapsedMs, config.allowHints);
+  result.teamId = team?.teamId ?? null;
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .update({
+      submission: {
+        ...nextSubmission,
+        completedAt: nextSubmission.completedAt ?? new Date().toISOString(),
+        currentIndex: config.questions.length,
+        score: result.score,
+        correctCount: result.correctCount,
+        wrongCount: result.wrongCount,
+      },
+      result,
+      status: "done",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .eq("room_id", roomId);
+
+  if (error) return { error: "게임 결과 저장에 실패했습니다." };
+  return { result };
+}
+
 export async function toggleHanjaWritingReaction(
   sessionId: string,
   roomId: string,
@@ -1037,6 +1188,123 @@ async function getAnonymousQuestionGeneratorResults(sessionId: string, roomId: s
   });
 }
 
+function normalizeWordGameConfig(value: unknown): WordGameConfig {
+  const raw = isRecord(value) ? value : {};
+  const teamCount = raw.teamCount === 3 || raw.teamCount === 4 ? raw.teamCount : 2;
+  return {
+    gameMode: "speed_match",
+    mode: raw.mode === "individual" ? "individual" : "team",
+    questionMode: "definition_to_word",
+    timeLimit: typeof raw.timeLimit === "number" ? raw.timeLimit : 90,
+    grade: raw.grade === 3 || raw.grade === 4 || raw.grade === 5 || raw.grade === 6 ? raw.grade : 4,
+    levelFilter: raw.levelFilter === 1 || raw.levelFilter === 2 || raw.levelFilter === 3 ? raw.levelFilter : "mixed",
+    categoryFilter: Array.isArray(raw.categoryFilter) ? raw.categoryFilter.filter((item): item is string => typeof item === "string") : [],
+    wordCount: typeof raw.wordCount === "number" ? raw.wordCount : 10,
+    allowHints: raw.allowHints !== false,
+    easyStart: raw.easyStart !== false,
+    recoveryBonus: raw.recoveryBonus !== false,
+    growthBonus: raw.growthBonus !== false,
+    showLiveTeamBoard: raw.showLiveTeamBoard !== false,
+    teamCount,
+    teamMode: raw.teamMode === "random_balanced" || raw.teamMode === "number_block" ? raw.teamMode : "number_alternate",
+    teams: Array.isArray(raw.teams)
+      ? raw.teams
+          .filter(isRecord)
+          .map((team, index) => ({
+            id: typeof team.id === "string" ? team.id : `team-${index + 1}`,
+            name: typeof team.name === "string" ? team.name : `${String.fromCharCode(65 + index)}팀`,
+            color: typeof team.color === "string" ? team.color : ["#f97316", "#0ea5e9", "#22c55e", "#a855f7"][index] ?? "#f97316",
+          }))
+      : Array.from({ length: teamCount }, (_, index) => ({
+          id: `team-${index + 1}`,
+          name: `${String.fromCharCode(65 + index)}팀`,
+          color: ["#f97316", "#0ea5e9", "#22c55e", "#a855f7"][index] ?? "#f97316",
+        })),
+    questions: Array.isArray(raw.questions)
+      ? raw.questions.filter((question): question is WordGameConfig["questions"][number] => {
+          return isRecord(question)
+            && typeof question.id === "string"
+            && typeof question.word === "string"
+            && typeof question.category === "string"
+            && (question.level === 1 || question.level === 2 || question.level === 3)
+            && typeof question.prompt === "string"
+            && typeof question.answer === "string"
+            && typeof question.definition === "string"
+            && typeof question.example === "string"
+            && Array.isArray(question.choices)
+            && question.choices.every((choice) => typeof choice === "string");
+        })
+      : [],
+  };
+}
+
+function normalizeWordGameSubmission(value: unknown): WordGameSubmission | null {
+  if (!isRecord(value)) return null;
+  return {
+    answers: Array.isArray(value.answers)
+      ? value.answers.filter((answer): answer is WordGameSubmission["answers"][number] => {
+          return isRecord(answer)
+            && typeof answer.questionId === "string"
+            && typeof answer.selectedChoice === "string"
+            && typeof answer.isCorrect === "boolean"
+            && typeof answer.usedHint === "boolean"
+            && typeof answer.answeredAt === "string"
+            && typeof answer.responseMs === "number";
+        })
+      : [],
+    startedAt: typeof value.startedAt === "string" ? value.startedAt : null,
+    completedAt: typeof value.completedAt === "string" ? value.completedAt : null,
+    elapsedMs: typeof value.elapsedMs === "number" ? value.elapsedMs : 0,
+    usedHints: typeof value.usedHints === "number" ? value.usedHints : 0,
+    currentIndex: typeof value.currentIndex === "number" ? value.currentIndex : 0,
+    totalQuestions: typeof value.totalQuestions === "number" ? value.totalQuestions : 0,
+    teamId: typeof value.teamId === "string" ? value.teamId : null,
+    score: typeof value.score === "number" ? value.score : 0,
+    correctCount: typeof value.correctCount === "number" ? value.correctCount : 0,
+    wrongCount: typeof value.wrongCount === "number" ? value.wrongCount : 0,
+  };
+}
+
+function normalizeWordGameResult(submissionValue: unknown, resultValue: unknown): WordGameResult | null {
+  const raw = isRecord(resultValue) ? resultValue : isRecord(submissionValue) ? submissionValue : null;
+  if (!raw) return null;
+  return {
+    score: typeof raw.score === "number" ? raw.score : 0,
+    correctCount: typeof raw.correctCount === "number" ? raw.correctCount : 0,
+    wrongCount: typeof raw.wrongCount === "number" ? raw.wrongCount : 0,
+    timeBonus: typeof raw.timeBonus === "number" ? raw.timeBonus : 0,
+    recoveryBonus: typeof raw.recoveryBonus === "number" ? raw.recoveryBonus : 0,
+    growthBonus: typeof raw.growthBonus === "number" ? raw.growthBonus : 0,
+    completionBonus: typeof raw.completionBonus === "number" ? raw.completionBonus : 0,
+    usedHints: typeof raw.usedHints === "number" ? raw.usedHints : 0,
+    elapsedMs: typeof raw.elapsedMs === "number" ? raw.elapsedMs : 0,
+    teamId: typeof raw.teamId === "string" ? raw.teamId : null,
+  };
+}
+
+function sanitizeWordGameSubmission(
+  submission: WordGameSubmission,
+  config: WordGameConfig,
+  teamId: string | null
+): WordGameSubmission {
+  const normalizedAnswers = Array.isArray(submission.answers)
+    ? submission.answers.slice(0, config.questions.length)
+    : [];
+  return {
+    answers: normalizedAnswers,
+    startedAt: typeof submission.startedAt === "string" ? submission.startedAt : null,
+    completedAt: typeof submission.completedAt === "string" ? submission.completedAt : null,
+    elapsedMs: typeof submission.elapsedMs === "number" ? submission.elapsedMs : 0,
+    usedHints: typeof submission.usedHints === "number" ? submission.usedHints : 0,
+    currentIndex: typeof submission.currentIndex === "number" ? submission.currentIndex : normalizedAnswers.length,
+    totalQuestions: config.questions.length,
+    teamId,
+    score: typeof submission.score === "number" ? submission.score : 0,
+    correctCount: typeof submission.correctCount === "number" ? submission.correctCount : 0,
+    wrongCount: typeof submission.wrongCount === "number" ? submission.wrongCount : 0,
+  };
+}
+
 async function getQuestionVotingRankingForRoom(roomId: string, config: NonNullable<ReturnType<typeof normalizeQuestionVotingConfig>>) {
   const admin = createSupabaseAdminClient();
   const { data } = await admin
@@ -1051,6 +1319,10 @@ async function getQuestionVotingRankingForRoom(roomId: string, config: NonNullab
     .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission));
 
   return buildQuestionVotingRanking(config, submissions);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function getOneLineShareBoardForSession(sessionId: string, roomId: string) {

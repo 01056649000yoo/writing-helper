@@ -13,6 +13,7 @@ import {
 } from "@/app/actions/student-actions";
 import { getMatchingConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import { normalizeHanjaWritingConfig, sentenceContainsWord } from "@/lib/hanja-writing";
+import { WordGamePlayer } from "@/components/word-game-player";
 import type {
   HanjaWritingConfig,
   OneLineShareConfig,
@@ -21,6 +22,8 @@ import type {
   QuestionGeneratorConfig,
   QuestionGeneratorSubmission,
   QuestionVotingConfig,
+  WordGameConfig,
+  WordGameSubmission,
 } from "@/features/activities/types";
 import type { OutlineTemplateAnswer, OutlineTemplate } from "@/features/activities/types";
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
@@ -157,6 +160,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
   const [oneLineShareConfig, setOneLineShareConfig] = useState<OneLineShareConfig | null>(null);
   const [hanjaWritingConfig, setHanjaWritingConfig] = useState<HanjaWritingConfig | null>(null);
+  const [wordGameConfig, setWordGameConfig] = useState<WordGameConfig | null>(null);
+  const [wordGameSubmission, setWordGameSubmission] = useState<WordGameSubmission | null>(null);
   const [hanjaContent, setHanjaContent] = useState("");
   const [step, setStep] = useState<Step | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
@@ -287,7 +292,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       setTopicDescription(typeof data.topic_description === "string" ? data.topic_description : "");
 
       const type = data.activity_type;
-      if (type === "question_generator" || type === "question_voting" || type === "one_line_share" || type === "hanja_writing") {
+      if (type === "question_generator" || type === "question_voting" || type === "one_line_share" || type === "hanja_writing" || type === "word_game") {
         setActivityType(type);
       } else {
         setActivityType("outline_builder");
@@ -323,6 +328,10 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         const existingHanja = data.existing_hanja_writing_submission as { content?: string } | null;
         setHanjaContent(existingHanja?.content ?? "");
         setStep("hanja_writing");
+      } else if (type === "word_game") {
+        setWordGameConfig(data.activity_config as WordGameConfig);
+        setWordGameSubmission((data.existing_word_game_submission as WordGameSubmission | null) ?? null);
+        setStep("submitting");
       } else {
         // outline_builder
         const config = data.activity_config as Record<string, unknown> | null;
@@ -375,6 +384,18 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (activityType === "word_game" && wordGameConfig) {
+    return (
+      <WordGamePlayer
+        roomId={roomId}
+        sessionId={sessionId}
+        topic={topic}
+        config={wordGameConfig}
+        existingSubmission={wordGameSubmission}
+      />
     );
   }
 

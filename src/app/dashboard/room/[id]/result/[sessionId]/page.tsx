@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { OutlineTemplateAnswer } from "@/features/activities/types";
+import type { OutlineTemplateAnswer, WordGameConfig, WordGameResult, WordGameSubmission } from "@/features/activities/types";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/app/actions/auth-actions";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
@@ -17,6 +17,7 @@ import {
   normalizeQuestionVotingSubmission,
 } from "@/lib/question-voting";
 import { normalizeHanjaWritingConfig } from "@/lib/hanja-writing";
+import { assignWordGameTeam } from "@/lib/word-game";
 
 export default async function TeacherResultPage({
   params,
@@ -54,7 +55,11 @@ export default async function TeacherResultPage({
   const isQuestionVoting = room?.activity_type === "question_voting";
   const isOneLineShare = room?.activity_type === "one_line_share";
   const isHanjaWriting = room?.activity_type === "hanja_writing";
+  const isWordGame = room?.activity_type === "word_game";
   const hanjaWritingConfig = isHanjaWriting ? normalizeHanjaWritingConfig(room?.activity_config) : null;
+  const wordGameConfig = isWordGame ? normalizeWordGameConfig(room?.activity_config) : null;
+  const wordGameSubmission = isWordGame ? normalizeWordGameSubmission(session.submission) : null;
+  const wordGameResult = isWordGame ? normalizeWordGameResult(session.submission, session.result) : null;
 
   let questionVotingRanking: ReturnType<typeof buildQuestionVotingRanking> = [];
   if (isQuestionVoting && questionVotingConfig) {
@@ -277,7 +282,130 @@ export default async function TeacherResultPage({
             </div>
           )}
 
-          {!isQuestionGenerator && !isQuestionVoting && !isOneLineShare && !isHanjaWriting && (
+          {isWordGame && wordGameConfig && wordGameSubmission && wordGameResult && (
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-sky-100 bg-sky-50 p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-sky-600">스피드 매치 결과</p>
+                    <h2 className="mt-1 text-lg font-bold text-gray-900">단어 실력과 성장 흐름 요약</h2>
+                    <p className="mt-2 text-sm text-sky-900/80">
+                      총 {wordGameSubmission.totalQuestions}문제 중 {wordGameResult.correctCount}문제를 맞혔어요.
+                    </p>
+                  </div>
+                  {wordGameConfig.mode === "team" && (
+                    (() => {
+                      const team = assignWordGameTeam(
+                        session.student_number,
+                        wordGameConfig.teams,
+                        wordGameConfig.teamMode,
+                      );
+                      if (!team) return null;
+                      return (
+                        <div
+                          className="rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm"
+                          style={{ backgroundColor: team.color }}
+                        >
+                          {team.teamName}
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <MetricCard label="점수" value={String(wordGameResult.score)} tone="sky" />
+                  <MetricCard label="정답" value={String(wordGameResult.correctCount)} tone="emerald" />
+                  <MetricCard label="오답" value={String(wordGameResult.wrongCount)} tone="rose" />
+                  <MetricCard label="힌트" value={String(wordGameResult.usedHints)} tone="amber" />
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-sky-800">
+                    시간 보너스 {wordGameResult.timeBonus}
+                  </div>
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-indigo-700">
+                    회복 보너스 {wordGameResult.recoveryBonus}
+                  </div>
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-violet-700">
+                    성장 보너스 {wordGameResult.growthBonus}
+                  </div>
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-cyan-700">
+                    완주 보너스 {wordGameResult.completionBonus}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-sky-100 bg-white p-6">
+                <h2 className="font-bold text-sky-900">문항별 응답 보기</h2>
+                <div className="mt-4 space-y-3">
+                  {wordGameSubmission.answers.map((answer, index) => {
+                    const question = wordGameConfig.questions.find((item) => item.id === answer.questionId);
+                    if (!question) return null;
+
+                    return (
+                      <div
+                        key={answer.questionId}
+                        className={`rounded-2xl border p-4 ${
+                          answer.isCorrect
+                            ? "border-emerald-100 bg-emerald-50"
+                            : "border-rose-100 bg-rose-50"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500">
+                              {index + 1}번 · {question.category} · 레벨 {question.level}
+                            </p>
+                            <p className="mt-2 text-sm leading-relaxed text-gray-700">{question.definition}</p>
+                          </div>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              answer.isCorrect
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-rose-100 text-rose-700"
+                            }`}
+                          >
+                            {answer.isCorrect ? "정답" : "오답"}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-3">
+                          <div className="rounded-xl bg-white px-4 py-3">
+                            <p className="text-xs text-gray-500">학생 선택</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{answer.selectedChoice}</p>
+                          </div>
+                          <div className="rounded-xl bg-white px-4 py-3">
+                            <p className="text-xs text-gray-500">정답</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{question.answer}</p>
+                          </div>
+                          <div className="rounded-xl bg-white px-4 py-3">
+                            <p className="text-xs text-gray-500">풀이 속도</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">
+                              {(answer.responseMs / 1000).toFixed(1)}초
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                          {answer.usedHint && (
+                            <span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-700">
+                              힌트 사용
+                            </span>
+                          )}
+                          <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+                            예문: {question.example}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!isQuestionGenerator && !isQuestionVoting && !isOneLineShare && !isHanjaWriting && !isWordGame && (
           <div>
             <h2 className="font-bold text-gray-700 mb-3">📝 학생이 쓴 개요</h2>
             <OutlineAnswersView answers={session.answers} />
@@ -294,6 +422,161 @@ function levelLabel(level: string) {
 }
 function levelStyle(level: string) {
   return { low: "bg-orange-100 text-orange-700", mid: "bg-blue-100 text-blue-700", high: "bg-green-100 text-green-700" }[level] ?? "bg-gray-100 text-gray-600";
+}
+
+function MetricCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "sky" | "emerald" | "rose" | "amber";
+}) {
+  const styles = {
+    sky: "bg-sky-100 text-sky-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+    rose: "bg-rose-100 text-rose-700",
+    amber: "bg-amber-100 text-amber-700",
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl px-4 py-5 ${styles}`}>
+      <p className="text-sm font-semibold">{label}</p>
+      <p className="mt-2 text-3xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function normalizeWordGameConfig(value: unknown): WordGameConfig | null {
+  if (!isRecord(value)) return null;
+  if (value.gameMode !== "speed_match") return null;
+  if (value.questionMode !== "definition_to_word") return null;
+  if (value.mode !== "individual" && value.mode !== "team") return null;
+  if (
+    value.teamMode !== "number_alternate"
+    && value.teamMode !== "number_block"
+    && value.teamMode !== "random_balanced"
+  ) {
+    return null;
+  }
+  if (!(value.grade === 3 || value.grade === 4 || value.grade === 5 || value.grade === 6)) return null;
+  if (!(value.levelFilter === 1 || value.levelFilter === 2 || value.levelFilter === 3 || value.levelFilter === "mixed")) return null;
+
+  const questions = Array.isArray(value.questions)
+    ? value.questions.filter((item): item is WordGameConfig["questions"][number] => {
+        if (!isRecord(item)) return false;
+        return (
+          typeof item.id === "string"
+          && typeof item.word === "string"
+          && typeof item.category === "string"
+          && (item.level === 1 || item.level === 2 || item.level === 3)
+          && typeof item.prompt === "string"
+          && Array.isArray(item.choices)
+          && item.choices.every((choice) => typeof choice === "string")
+          && typeof item.answer === "string"
+          && typeof item.definition === "string"
+          && typeof item.example === "string"
+        );
+      })
+    : [];
+
+  const teams = Array.isArray(value.teams)
+    ? value.teams.filter((item): item is WordGameConfig["teams"][number] => {
+        if (!isRecord(item)) return false;
+        return typeof item.id === "string" && typeof item.name === "string" && typeof item.color === "string";
+      })
+    : [];
+  const teamCount: 2 | 3 | 4 = teams.length === 3 || teams.length === 4 ? teams.length : 2;
+
+  return {
+    gameMode: "speed_match",
+    mode: value.mode,
+    questionMode: "definition_to_word",
+    timeLimit: typeof value.timeLimit === "number" ? value.timeLimit : 180,
+    grade: value.grade,
+    levelFilter: value.levelFilter,
+    categoryFilter: Array.isArray(value.categoryFilter)
+      ? value.categoryFilter.filter((item): item is string => typeof item === "string")
+      : [],
+    wordCount: typeof value.wordCount === "number" ? value.wordCount : questions.length,
+    allowHints: Boolean(value.allowHints),
+    easyStart: Boolean(value.easyStart),
+    recoveryBonus: Boolean(value.recoveryBonus),
+    growthBonus: Boolean(value.growthBonus),
+    showLiveTeamBoard: Boolean(value.showLiveTeamBoard),
+    teamCount,
+    teamMode: value.teamMode,
+    teams,
+    questions,
+  };
+}
+
+function normalizeWordGameSubmission(value: unknown): WordGameSubmission | null {
+  if (!isRecord(value)) return null;
+  const answers = Array.isArray(value.answers)
+    ? value.answers.filter((item): item is WordGameSubmission["answers"][number] => {
+        if (!isRecord(item)) return false;
+        return (
+          typeof item.questionId === "string"
+          && typeof item.selectedChoice === "string"
+          && typeof item.isCorrect === "boolean"
+          && typeof item.usedHint === "boolean"
+          && typeof item.answeredAt === "string"
+          && typeof item.responseMs === "number"
+        );
+      })
+    : [];
+
+  return {
+    answers,
+    startedAt: typeof value.startedAt === "string" ? value.startedAt : null,
+    completedAt: typeof value.completedAt === "string" ? value.completedAt : null,
+    elapsedMs: typeof value.elapsedMs === "number" ? value.elapsedMs : 0,
+    usedHints: typeof value.usedHints === "number" ? value.usedHints : 0,
+    currentIndex: typeof value.currentIndex === "number" ? value.currentIndex : answers.length,
+    totalQuestions: typeof value.totalQuestions === "number" ? value.totalQuestions : answers.length,
+    teamId: typeof value.teamId === "string" ? value.teamId : null,
+    score: typeof value.score === "number" ? value.score : 0,
+    correctCount: typeof value.correctCount === "number" ? value.correctCount : answers.filter((item) => item.isCorrect).length,
+    wrongCount: typeof value.wrongCount === "number" ? value.wrongCount : answers.filter((item) => !item.isCorrect).length,
+  };
+}
+
+function normalizeWordGameResult(submission: unknown, value: unknown): WordGameResult | null {
+  const normalizedSubmission = normalizeWordGameSubmission(submission);
+  if (!normalizedSubmission) return null;
+  if (!isRecord(value)) {
+    return {
+      score: normalizedSubmission.score,
+      correctCount: normalizedSubmission.correctCount,
+      wrongCount: normalizedSubmission.wrongCount,
+      timeBonus: 0,
+      recoveryBonus: 0,
+      growthBonus: 0,
+      completionBonus: 0,
+      usedHints: normalizedSubmission.usedHints,
+      elapsedMs: normalizedSubmission.elapsedMs,
+      teamId: normalizedSubmission.teamId,
+    };
+  }
+
+  return {
+    score: typeof value.score === "number" ? value.score : normalizedSubmission.score,
+    correctCount: typeof value.correctCount === "number" ? value.correctCount : normalizedSubmission.correctCount,
+    wrongCount: typeof value.wrongCount === "number" ? value.wrongCount : normalizedSubmission.wrongCount,
+    timeBonus: typeof value.timeBonus === "number" ? value.timeBonus : 0,
+    recoveryBonus: typeof value.recoveryBonus === "number" ? value.recoveryBonus : 0,
+    growthBonus: typeof value.growthBonus === "number" ? value.growthBonus : 0,
+    completionBonus: typeof value.completionBonus === "number" ? value.completionBonus : 0,
+    usedHints: typeof value.usedHints === "number" ? value.usedHints : normalizedSubmission.usedHints,
+    elapsedMs: typeof value.elapsedMs === "number" ? value.elapsedMs : normalizedSubmission.elapsedMs,
+    teamId: typeof value.teamId === "string" ? value.teamId : normalizedSubmission.teamId,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function OutlineAnswersView({ answers }: { answers: unknown }) {
