@@ -103,6 +103,120 @@ textarea {
   box-shadow: var(--ui-focus-ring);
 }
 
+/* 아지트 글쓰기와 같은 맞춤법 물결 밑줄·안내 계약 */
+.lab-spelling,
+.lab-spelling__field {
+  position: relative;
+  width: 100%;
+}
+
+.lab-spelling__overlay,
+.lab-spelling__control {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  word-break: normal;
+  overflow-wrap: break-word;
+  letter-spacing: normal;
+  word-spacing: normal;
+  tab-size: 4;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  text-transform: none;
+  text-indent: 0;
+  white-space: pre-wrap;
+}
+
+.lab-spelling__control {
+  position: relative;
+  z-index: 1;
+  display: block;
+  background-color: transparent !important;
+  caret-color: currentColor;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.lab-spelling__overlay {
+  position: absolute !important;
+  z-index: 0;
+  inset: 0;
+  height: 100%;
+  overflow: hidden !important;
+  border-color: transparent !important;
+  background: white !important;
+  color: transparent !important;
+  pointer-events: none;
+  user-select: none;
+}
+
+.lab-spelling__mark {
+  border-radius: 3px;
+  background-color: rgb(239 68 68 / 0.14);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3' viewBox='0 0 6 3'%3E%3Cpath d='M0 2.2 Q1.5 0.2 3 2.2 T6 2.2' fill='none' stroke='%23DC3545' stroke-width='1.1' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  background-size: 6px 3px;
+}
+
+.lab-spelling__notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #f4cccc;
+  border-radius: 12px;
+  background: #fff8f8;
+  color: #8b3a3a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.lab-spelling__notice > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lab-spelling__suggestion {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 11px;
+  border: 1px solid #e7b3b3;
+  border-radius: 10px;
+  background: white;
+  color: #a12f3f;
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.lab-spelling__notice small {
+  color: #8b6a6a;
+  font-weight: 750;
+}
+
+@media (max-width: 600px) {
+  .lab-spelling__notice {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lab-spelling__notice > div {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .lab-spelling__suggestion {
+    flex: 0 0 auto;
+  }
+}
+
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]) {
   cursor: pointer;

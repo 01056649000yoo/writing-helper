@@ -26,6 +26,7 @@ import type {
 import { isActivityType } from "@/features/activities/types";
 import type { OutlineTemplateAnswer, OutlineTemplate } from "@/features/activities/types";
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
+import { StudentSpellingTextarea } from "@/components/student-spelling-textarea";
 import {
   getCardMeta,
   getCardTheme,
@@ -882,7 +883,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     if (step === "question_rewrite") {
       return (
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl space-y-4">
+          <div className="w-full max-w-[1200px] space-y-4">
             <QuestionWizardHeader currentStep={3} completedCount={questionSelections.length} maxSelections={maxSelections} />
 
             <div className="bg-white rounded-3xl shadow-xl p-8">
@@ -918,9 +919,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     내가 완성한 질문
                   </label>
                   <p className="mb-3 text-sm text-gray-500">선택한 힌트를 바탕으로 미션에 맞는 나만의 질문을 완성해 보세요!</p>
-                  <textarea
+                  <StudentSpellingTextarea
                     value={remixedQuestion}
-                    onChange={(event) => setRemixedQuestion(event.target.value)}
+                    onValueChange={setRemixedQuestion}
                     rows={5}
                     placeholder="오늘의 미션에 맞는 질문으로 바꿔 써보세요."
                     className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-sky-400 resize-none"
@@ -1176,7 +1177,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-rose-50 to-pink-100 p-4">
-        <div className="max-w-2xl mx-auto pt-8 pb-16 space-y-4">
+        <div className="max-w-[1200px] mx-auto pt-8 pb-16 space-y-4">
           <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
             <div className="text-5xl mb-3">💬</div>
             <h1 className="text-2xl font-bold text-gray-800">한줄모아</h1>
@@ -1246,9 +1247,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">내 한 줄</label>
-              <textarea
+              <StudentSpellingTextarea
                 value={oneLineContent}
-                onChange={(event) => setOneLineContent(event.target.value)}
+                onValueChange={setOneLineContent}
                 rows={4}
                 placeholder="예) 증발은 물이 눈에 보이지 않게 공기 중으로 올라가는 변화라는 것을 새롭게 알게 되었다."
                 className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-rose-400 resize-none"
@@ -1338,7 +1339,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4">
-        <div className="max-w-2xl mx-auto pt-8 pb-16 space-y-4">
+        <div className="max-w-[1200px] mx-auto pt-8 pb-16 space-y-4">
           <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
             <div className="text-5xl mb-2">📜</div>
             <h1 className="text-2xl font-bold text-gray-800">한자 활용 문장 만들기</h1>
@@ -1412,9 +1413,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       {index + 1}번째 문장
                     </label>
-                    <textarea
+                    <StudentSpellingTextarea
                       value={content}
-                      onChange={(event) => updateHanjaContent(index, event.target.value)}
+                      onValueChange={(nextValue) => updateHanjaContent(index, nextValue)}
                       rows={3}
                       placeholder={`예) ${card.example || `${card.word}을(를) 활용한 자연스러운 문장을 써보세요.`}`}
                       className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none"
@@ -1470,7 +1471,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-[1200px] mx-auto">
           <div className="bg-white rounded-3xl shadow-xl p-6 mb-4">
             <div className="text-center">
               <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">개요 짜기</p>
@@ -1535,9 +1536,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                             × 빼기
                           </button>
                         </div>
-                        <textarea
+                        <StudentSpellingTextarea
                           value={currentAnswer}
-                          onChange={(e) => handleTemplateAnswerChange(item.id, e.target.value)}
+                          onValueChange={(nextValue) => handleTemplateAnswerChange(item.id, nextValue)}
                           rows={2}
                           placeholder={item.placeholder ?? `${item.label} 답을 써봐요`}
                           className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400 resize-none transition-colors"
@@ -1565,9 +1566,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                         placeholder="항목 이름 (예: 친구 이야기)"
                         className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
                       />
-                      <textarea
+                      <StudentSpellingTextarea
                         value={custom.answer}
-                        onChange={(e) => handleTemplateAnswerChange(custom.itemId, e.target.value)}
+                        onValueChange={(nextValue) => handleTemplateAnswerChange(custom.itemId, nextValue)}
                         rows={2}
                         placeholder="내가 쓸 내용을 적어봐요"
                         className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none transition-colors"
