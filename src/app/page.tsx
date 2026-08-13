@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { withBasePath } from "@/lib/app-path";
 
 export default function Home() {
-  redirect("/dashboard");
+  redirect(withBasePath("/dashboard"));
 }

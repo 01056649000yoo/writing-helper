@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { withBasePath } from "@/lib/app-path";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
   const appOrigin = process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin;
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=missing_code", appOrigin));
+    return NextResponse.redirect(new URL(withBasePath("/login?error=missing_code"), appOrigin));
   }
 
   const cookieStore = await cookies();
@@ -32,8 +33,8 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, appOrigin));
+    return NextResponse.redirect(new URL(withBasePath(`/login?error=${encodeURIComponent(error.message)}`), appOrigin));
   }
 
-  return NextResponse.redirect(new URL(next, appOrigin));
+  return NextResponse.redirect(new URL(withBasePath(next), appOrigin));
 }

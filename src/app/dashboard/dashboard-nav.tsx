@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { withoutBasePath } from "@/lib/app-path";
 
 const primaryItems = [
   { href: "/dashboard", label: "학급·활동", section: "home" },
@@ -18,7 +19,7 @@ function isCurrentSection(pathname: string, section: (typeof primaryItems)[numbe
 }
 
 export function DashboardNav() {
-  const pathname = usePathname();
+  const pathname = withoutBasePath(usePathname());
 
   return (
     <nav className="lab-shell__nav" aria-label="연구소 주요 메뉴">

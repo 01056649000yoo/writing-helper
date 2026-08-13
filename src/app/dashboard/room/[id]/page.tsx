@@ -14,6 +14,7 @@ import {
   closeRoom,
 } from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
+import { withBasePath } from "@/lib/app-path";
 
 export default async function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -48,8 +49,8 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
     host = networkIp ? `${networkIp}:${port}` : rawHost;
   }
   const protocol = isLocalhost ? "http" : forwardedProto || "https";
-  const sessionJoinUrl = `${protocol}://${host}/room/${id}`;
-  const shortUrl = room.short_code ? `${protocol}://${host}/s/${room.short_code}` : null;
+  const sessionJoinUrl = `${protocol}://${host}${withBasePath(`/room/${id}`)}`;
+  const shortUrl = room.short_code ? `${protocol}://${host}${withBasePath(`/s/${room.short_code}`)}` : null;
   // eslint-disable-next-line react-hooks/purity
   const renderNow = Date.now();
 

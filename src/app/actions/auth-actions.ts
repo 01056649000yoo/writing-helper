@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, createSupabaseAdminClient } from "@/lib/supabase-server";
+import { withBasePath } from "@/lib/app-path";
 
 type AuthResult = { error?: string; success?: boolean; email?: string };
 
@@ -10,6 +11,10 @@ function isValidSchoolName(schoolName: string) {
 }
 
 export async function signUp(formData: FormData): Promise<AuthResult> {
+  if (process.env.LAB_ALLOW_SIGNUP === "false") {
+    return { error: "통합 연구소는 끄적끄적 아지트에서 승인된 교사만 이용할 수 있습니다." };
+  }
+
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -62,13 +67,13 @@ export async function signIn(_prevState: unknown, formData: FormData): Promise<{
 
   if (error) return { error: "이메일 또는 비밀번호가 올바르지 않습니다." };
 
-  redirect("/dashboard");
+  redirect(withBasePath("/dashboard"));
 }
 
 export async function signOut() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect(withBasePath("/login"));
 }
 
 export async function requestPasswordReset(formData: FormData): Promise<AuthResult> {

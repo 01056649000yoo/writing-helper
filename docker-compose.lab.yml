@@ -1,0 +1,45 @@
+name: writing-helper-lab
+
+services:
+  writing-helper-lab:
+    container_name: writing-helper-lab-app
+    image: writing-helper:integrated-lab
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-lab-local}
+        NEXT_PUBLIC_SUPABASE_URL: https://api.xn--vz0ba242ncqcba79xhwx.site
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY:?ANON_KEY is required}
+        NEXT_PUBLIC_APP_URL: https://xn--vz0ba242ncqcba79xhwx.site/lab
+        NEXT_PUBLIC_BASE_PATH: /lab
+        NEXT_PUBLIC_LAB_SIGNUP_ENABLED: "false"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      SUPABASE_INTERNAL_URL: http://agit-kong:8000
+      NEXT_PUBLIC_SUPABASE_URL: https://api.xn--vz0ba242ncqcba79xhwx.site
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY:?ANON_KEY is required}
+      NEXT_PUBLIC_APP_URL: https://xn--vz0ba242ncqcba79xhwx.site/lab
+      NEXT_PUBLIC_BASE_PATH: /lab
+      NEXT_PUBLIC_LAB_SIGNUP_ENABLED: "false"
+      LAB_ALLOW_SIGNUP: "false"
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?SERVICE_ROLE_KEY is required}
+      AGIT_AI_INTERNAL_URL: http://agit-edge-functions:9000/vibe-ai
+    ports:
+      - "127.0.0.1:3001:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/lab/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    networks:
+      - agit-internal
+
+networks:
+  agit-internal:
+    external: true
+    name: agit_default

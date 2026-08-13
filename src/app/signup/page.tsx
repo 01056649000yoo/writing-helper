@@ -5,10 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/app/actions/auth-actions";
 
+const signupEnabled = process.env.NEXT_PUBLIC_LAB_SIGNUP_ENABLED !== "false";
+
 export default function SignupPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+
+  if (!signupEnabled) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-lg text-center">
+          <div className="text-6xl mb-4">🧪</div>
+          <h1 className="text-2xl font-bold text-gray-800">통합 연구소 계정 안내</h1>
+          <p className="mt-4 text-base leading-relaxed text-gray-500">
+            별도 회원가입은 받지 않습니다. 끄적끄적 아지트에서 승인된 교사 계정으로 로그인해주세요.
+          </p>
+          <Link href="/login" className="mt-7 inline-flex rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white hover:bg-indigo-700">
+            로그인으로 돌아가기
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { withoutBasePath } from "@/lib/app-path";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/room", "/auth", "/share"];
 
@@ -8,7 +9,7 @@ function isPublicPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+  const pathname = withoutBasePath(request.nextUrl.pathname);
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();
@@ -35,6 +36,7 @@ export async function proxy(request: NextRequest) {
 
   if (!user) {
     const loginUrl = request.nextUrl.clone();
+    // request.nextUrl.clone()은 basePath를 보존하므로 앱 내부 경로만 지정한다.
     loginUrl.pathname = "/login";
     return NextResponse.redirect(loginUrl);
   }

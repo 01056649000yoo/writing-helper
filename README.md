@@ -36,6 +36,23 @@ docker compose --env-file .env.local up -d
 docker compose down
 ```
 
+### 통합 DB `/lab` 병행 컨테이너
+
+기존 `helper.` 운영 컨테이너는 롤백용으로 유지하고, 통합 DB를 보는 이미지는 별도 Compose 프로젝트와
+`127.0.0.1:3001`에서 실행합니다. 통합 Supabase 환경파일의 값을 복사하지 않고 그 파일을 직접 읽습니다.
+
+```bash
+docker compose --env-file /Users/seunghyeonmaegmini/agit-supabase/.env -f docker-compose.lab.yml build
+docker compose --env-file /Users/seunghyeonmaegmini/agit-supabase/.env -f docker-compose.lab.yml up -d --remove-orphans
+curl --fail http://127.0.0.1:3001/lab/login
+```
+
+- Next.js `basePath`는 `/lab`로 빌드되며 루트형 기존 이미지와 섞어 쓰지 않습니다.
+- 통합 컨테이너는 `agit_default` 비공개 네트워크만 사용하고, 통합 Kong과 아지트 AI 함수로 내부 연결합니다.
+- 통합 환경에서는 별도 교사 회원가입을 화면과 서버 액션 양쪽에서 차단합니다.
+- Caddy는 `/lab*`을 `127.0.0.1:3001`로 전달하되 경로를 제거하는 `handle_path`는 사용하지 않습니다.
+- 전환 전까지 `helper.` 도메인과 3000번 기존 컨테이너를 유지합니다.
+
 핵심 원칙:
 
 - 앱 자체는 Docker 컨테이너로만 실행
@@ -49,9 +66,9 @@ docker compose down
 1. GitHub `main` 푸시
 2. 맥미니의 GitHub Actions 자체 호스팅 러너가 체크아웃
 3. `npm ci`와 `npm run lint` 검사
-4. Docker 이미지 빌드
-5. Compose 스택 교체
-6. 컨테이너 버전과 로그인 URL 확인
+4. 기존 연구소와 통합 `/lab` Docker 이미지 빌드
+5. 두 Compose 스택을 각각 교체
+6. 3000번 기존 로그인과 3001번 `/lab/login`을 각각 확인
 
 ## UI 디자인 계약
 
@@ -73,6 +90,9 @@ NEXT_PUBLIC_APP_URL=...
 SUPABASE_INTERNAL_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
+
+통합 `/lab` 배포는 `/Users/seunghyeonmaegmini/agit-supabase/.env`의 기존 `ANON_KEY`와
+`SERVICE_ROLE_KEY`를 Compose 치환에 사용합니다. 값을 연구소 저장소나 `.env.local`로 복사하지 않습니다.
 
 ## Notes
 

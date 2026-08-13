@@ -3,6 +3,7 @@
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { withBasePath } from "@/lib/app-path";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "./auth-actions";
 import { correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
@@ -392,7 +393,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/class/${classId}`);
-  redirect(`/dashboard/room/${room.id}`);
+  redirect(withBasePath(`/dashboard/room/${room.id}`));
 }
 
 function parseActivityType(value: FormDataEntryValue | null): ActivityType {

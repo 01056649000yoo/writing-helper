@@ -16,6 +16,8 @@ const loginInputClass =
   "[&:-webkit-autofill]:caret-gray-900 " +
   "[&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]";
 
+const signupEnabled = process.env.NEXT_PUBLIC_LAB_SIGNUP_ENABLED !== "false";
+
 export default function LoginPageClient() {
   const [state, formAction, pending] = useActionState(signIn, null);
 
@@ -155,12 +157,18 @@ export default function LoginPageClient() {
                   이용을 위해 <strong>새로운 회원가입</strong>이 필요합니다.
                 </p>
               </div>
-              <p className="text-gray-500">
-                아직 계정이 없으신가요?{" "}
-                <Link href="/signup" className="text-indigo-600 font-bold hover:underline underline-offset-4 ml-1">
-                  회원가입
-                </Link>
-              </p>
+              {signupEnabled ? (
+                <p className="text-gray-500">
+                  아직 계정이 없으신가요?{" "}
+                  <Link href="/signup" className="text-indigo-600 font-bold hover:underline underline-offset-4 ml-1">
+                    회원가입
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-sm leading-relaxed text-gray-500">
+                  통합 연구소는 끄적끄적 아지트에서 승인된 교사 계정으로 이용합니다.
+                </p>
+              )}
             </div>
 
             <a

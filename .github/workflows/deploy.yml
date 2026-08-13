@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 30
     env:
       RUNTIME_ENV_FILE: /Users/seunghyeonmaegmini/writing-helper/.env.local
+      INTEGRATED_ENV_FILE: /Users/seunghyeonmaegmini/agit-supabase/.env
     steps:
       - name: Checkout latest code
         uses: actions/checkout@v7
@@ -38,10 +39,16 @@ jobs:
         run: npm run lint && npm test
 
       - name: Build docker image
-        run: docker compose --env-file "$RUNTIME_ENV_FILE" build --no-cache
+        run: docker compose --env-file "$RUNTIME_ENV_FILE" build
+
+      - name: Build integrated lab image
+        run: docker compose --env-file "$INTEGRATED_ENV_FILE" -f docker-compose.lab.yml build
 
       - name: Restart docker stack
         run: docker compose --env-file "$RUNTIME_ENV_FILE" up -d --remove-orphans
+
+      - name: Restart integrated lab stack
+        run: docker compose --env-file "$INTEGRATED_ENV_FILE" -f docker-compose.lab.yml up -d --remove-orphans
 
       - name: Verify deployment
         run: |
@@ -49,6 +56,18 @@ jobs:
           docker exec writing-helper-app sh -c 'env | grep NEXT_PUBLIC_BUILD_VERSION'
           for attempt in {1..12}; do
             if curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Verify integrated lab deployment
+        run: |
+          docker ps --filter "name=writing-helper-lab-app" --format "{{.Status}}"
+          docker exec writing-helper-lab-app printenv NEXT_PUBLIC_BASE_PATH
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3001/lab/login >/dev/null; then
               exit 0
             fi
             sleep 2
