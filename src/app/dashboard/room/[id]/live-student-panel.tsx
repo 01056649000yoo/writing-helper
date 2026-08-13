@@ -1108,7 +1108,7 @@ export default function LiveStudentPanel({
 
         {sessions.length === 0 && students.length > 0 && (
           <p className="text-center text-gray-400 text-sm py-2 animate-pulse">
-            학생이 QR 코드로 접속하면 여기에 표시돼요
+            학생이 활동에 입장하면 여기에 표시돼요
           </p>
         )}
       </div>

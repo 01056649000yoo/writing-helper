@@ -577,6 +577,15 @@ export async function getRoom(roomId: string) {
 
   if (!data) return null;
 
+  // 통합 /lab의 학생은 아지트 대시보드에서 로그인 상태로 바로 입장한다.
+  // 입장용 단축주소는 구 helper 호환 화면에서만 만들고 유지한다.
+  if (isIntegratedLab()) {
+    return {
+      ...data,
+      short_code: null,
+    };
+  }
+
   const shortCode = await getShortCodeForRoom(roomId, user.id);
   return {
     ...data,

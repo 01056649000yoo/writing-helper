@@ -15,6 +15,7 @@ import {
 } from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
 import { withBasePath } from "@/lib/app-path";
+import { isIntegratedLab } from "@/lib/lab-roster";
 
 export default async function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,19 +39,25 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   const hanjaWritingResults = room.activity_type === "hanja_writing"
     ? await getHanjaWritingRoomResults(id)
     : [];
-  const headersList = await headers();
-  const rawHost = headersList.get("host") ?? "localhost:3002";
-  const forwardedProto = headersList.get("x-forwarded-proto");
-  const isLocalhost = rawHost.startsWith("localhost") || rawHost.startsWith("127.0.0.1");
-  let host = rawHost;
-  if (isLocalhost) {
-    const port = rawHost.split(":")[1] ?? "3002";
-    const networkIp = getLocalNetworkIp();
-    host = networkIp ? `${networkIp}:${port}` : rawHost;
+  const integratedLab = isIntegratedLab();
+  let sessionJoinUrl = "";
+  let shortUrl: string | null = null;
+
+  if (!integratedLab) {
+    const headersList = await headers();
+    const rawHost = headersList.get("host") ?? "localhost:3002";
+    const forwardedProto = headersList.get("x-forwarded-proto");
+    const isLocalhost = rawHost.startsWith("localhost") || rawHost.startsWith("127.0.0.1");
+    let host = rawHost;
+    if (isLocalhost) {
+      const port = rawHost.split(":")[1] ?? "3002";
+      const networkIp = getLocalNetworkIp();
+      host = networkIp ? `${networkIp}:${port}` : rawHost;
+    }
+    const protocol = isLocalhost ? "http" : forwardedProto || "https";
+    sessionJoinUrl = `${protocol}://${host}${withBasePath(`/room/${id}`)}`;
+    shortUrl = room.short_code ? `${protocol}://${host}${withBasePath(`/s/${room.short_code}`)}` : null;
   }
-  const protocol = isLocalhost ? "http" : forwardedProto || "https";
-  const sessionJoinUrl = `${protocol}://${host}${withBasePath(`/room/${id}`)}`;
-  const shortUrl = room.short_code ? `${protocol}://${host}${withBasePath(`/s/${room.short_code}`)}` : null;
   // eslint-disable-next-line react-hooks/purity
   const renderNow = Date.now();
   const dashboardClassId = room.agit_class_id ?? room.class_id;
@@ -105,7 +112,19 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
-          {room.is_active && <QRCodeSection roomUrl={sessionJoinUrl} shortUrl={shortUrl} />}
+          {room.is_active && (
+            integratedLab ? (
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4">
+                <p className="font-bold text-indigo-900">학생 대시보드에서 바로 참여해요</p>
+                <p className="mt-1 text-sm leading-relaxed text-indigo-700">
+                  학생이 끄적끄적 아지트의 <strong>글쓰기 연구소</strong> 메뉴를 열면 이 활동이 자동으로 표시됩니다.
+                  번호·이름 입력이나 입장용 QR 코드는 필요하지 않습니다.
+                </p>
+              </div>
+            ) : (
+              <QRCodeSection roomUrl={sessionJoinUrl} shortUrl={shortUrl} />
+            )
+          )}
         </div>
 
         {/* 실시간 학생 현황 */}

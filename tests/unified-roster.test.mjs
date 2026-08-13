@@ -10,6 +10,7 @@ const [
   studentSession,
   roomEntryPage,
   roomEntryClient,
+  roomDetailPage,
   dashboard,
   classPage,
   rosterManager,
@@ -22,6 +23,7 @@ const [
   readFile("src/lib/lab-student-session.ts", "utf8"),
   readFile("src/app/room/[id]/page.tsx", "utf8"),
   readFile("src/app/room/[id]/room-entry-client.tsx", "utf8"),
+  readFile("src/app/dashboard/room/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/dashboard-tabs.tsx", "utf8"),
   readFile("src/app/dashboard/class/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/class/[id]/roster-manager.tsx", "utf8"),
@@ -70,6 +72,13 @@ test("통합 학생은 실제 로그인 연결로 자동 입장하고 번호·�
   assert.match(roomEntryPage, /ensureIntegratedStudentRoomSession\(roomId\)/);
   assert.match(roomEntryClient, /router\.replace\(/);
   assert.match(studentActions, /if \(isIntegratedLab\(\)\) \{[\s\S]*ensureIntegratedStudentRoomSession\(roomId\)/);
+});
+
+test("통합 활동 입장은 학생 대시보드로 안내하고 입장용 QR·단축주소를 만들지 않는다", () => {
+  assert.match(roomActions, /if \(isIntegratedLab\(\)\) \{[\s\S]*short_code: null/);
+  assert.match(roomDetailPage, /integratedLab \? \([\s\S]*학생 대시보드에서 바로 참여해요/);
+  assert.match(roomDetailPage, /번호·이름 입력이나 입장용 QR 코드는 필요하지 않습니다/);
+  assert.match(livePanel, /학생이 활동에 입장하면 여기에 표시돼요/);
 });
 
 test("통합 학생의 읽기·저장·반응은 본인 세션 소유권을 공통 검사한다", () => {
