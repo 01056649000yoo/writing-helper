@@ -7,12 +7,16 @@ const [
   liveStudentPanel,
   teacherResultPage,
   studentResultPage,
+  studentRoomLayout,
+  studentLabNavigation,
   globalStyles,
 ] = await Promise.all([
   readFile("src/app/dashboard/room/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/room/[id]/live-student-panel.tsx", "utf8"),
   readFile("src/app/dashboard/room/[id]/result/[sessionId]/page.tsx", "utf8"),
   readFile("src/app/room/[id]/result/page.tsx", "utf8"),
+  readFile("src/app/room/[id]/layout.tsx", "utf8"),
+  readFile("src/components/student-lab-navigation.tsx", "utf8"),
   readFile("src/app/globals.css", "utf8"),
 ]);
 
@@ -33,11 +37,15 @@ test("학생과 교사의 개요 완성 화면은 입력 화면과 같은 1200px
   assert.match(globalStyles, /\.lab-page__content--writing \{\s*max-width: 1200px;/);
 });
 
-test("통합 연구소의 다섯 학생 활동 완료 화면에서 아지트 글쓰기 대시보드로 돌아갈 수 있다", () => {
-  assert.match(studentResultPage, /process\.env\.NEXT_PUBLIC_AGIT_APP_URL/);
-  assert.match(studentResultPage, /process\.env\.NEXT_PUBLIC_LAB_SSO_ENABLED === "true"/);
-  assert.match(studentResultPage, /if \(!INTEGRATED_LAB\) return null/);
-  assert.match(studentResultPage, /<a\s+href=\{AGIT_HOME_URL\}/);
-  assert.match(studentResultPage, /글쓰기 대시보드로 돌아가기/);
-  assert.equal(studentResultPage.match(/<AgitDashboardReturnLink \/>/g)?.length, 5);
+test("통합 연구소의 다섯 학생 활동 전체 화면에서 홈과 연구소 목록으로 이동할 수 있다", () => {
+  assert.match(studentRoomLayout, /<StudentLabNavigation \/>/);
+  assert.match(studentLabNavigation, /process\.env\.NEXT_PUBLIC_AGIT_APP_URL/);
+  assert.match(studentLabNavigation, /process\.env\.NEXT_PUBLIC_LAB_SSO_ENABLED === "true"/);
+  assert.match(studentLabNavigation, /if \(!INTEGRATED_LAB\) return null/);
+  assert.match(studentLabNavigation, /href=\{AGIT_HOME_URL\}/);
+  assert.match(studentLabNavigation, /studentPage=lab_activities/);
+  assert.match(studentLabNavigation, /홈으로 이동하기/);
+  assert.match(studentLabNavigation, /글쓰기 연구소 페이지/);
+  assert.match(studentLabNavigation, /sticky top-0/);
+  assert.doesNotMatch(studentResultPage, /AgitDashboardReturnLink/);
 });
