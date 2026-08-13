@@ -603,7 +603,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
-      <div className="max-w-lg mx-auto pt-8 pb-16 space-y-4">
+      <div className="w-full max-w-[1200px] mx-auto pt-8 pb-16 space-y-4">
         <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
           <div className="text-5xl mb-2">🎉</div>
           <h1 className="text-2xl font-bold text-gray-800">개요 완성!</h1>

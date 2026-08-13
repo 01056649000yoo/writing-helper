@@ -17,6 +17,7 @@ import {
   normalizeQuestionVotingSubmission,
 } from "@/lib/question-voting";
 import { normalizeHanjaWritingConfig } from "@/lib/hanja-writing";
+import { isIntegratedLab } from "@/lib/lab-roster";
 
 export default async function TeacherResultPage({
   params,
@@ -46,7 +47,13 @@ export default async function TeacherResultPage({
 
   if (room?.teacher_id !== user?.id) notFound();
 
-  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/share/${sessionId}`;
+  const integratedLab = isIntegratedLab();
+  const isOutlineBuilder = !room?.activity_type || room.activity_type === "outline_builder";
+  const showLegacyResultQr = !integratedLab
+    && isOutlineBuilder
+    && Array.isArray(session.answers)
+    && session.answers.length > 0;
+  const shareUrl = showLegacyResultQr ? `${process.env.NEXT_PUBLIC_APP_URL}/share/${sessionId}` : "";
   const questionSubmission = normalizeQuestionGeneratorSubmission(session.submission);
   const questionVotingSubmission = normalizeQuestionVotingSubmission(session.submission);
   const questionVotingConfig = normalizeQuestionVotingConfig(room?.activity_config);
@@ -94,7 +101,7 @@ export default async function TeacherResultPage({
 
   return (
     <main className="lab-page">
-      <div className="lab-page__content lab-page__content--narrow">
+      <div className={`lab-page__content ${isOutlineBuilder ? "lab-page__content--writing" : "lab-page__content--narrow"}`}>
         <Link href={`/dashboard/room/${id}`} className="lab-breadcrumb">← 활동으로</Link>
         <div className="lab-panel lab-panel--raised p-6 sm:p-8 space-y-6">
           <div className="flex items-start justify-between gap-4">
@@ -110,13 +117,13 @@ export default async function TeacherResultPage({
               </div>
             </div>
             {/* 학생 개인 QR */}
-            {!isQuestionGenerator && !isQuestionVoting && !isHanjaWriting && !isOneLineShare && Array.isArray(session.answers) && session.answers.length > 0 && (
+            {showLegacyResultQr ? (
               <StudentResultQr
                 shareUrl={shareUrl}
                 studentName={session.student_name}
                 studentNumber={session.student_number}
               />
-            )}
+            ) : null}
           </div>
 
           {isQuestionGenerator && questionSubmission && (

@@ -132,12 +132,13 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
           roomId={id}
           students={students}
           isActive={room.is_active}
-        activityType={room.activity_type}
-        questionResults={questionResults}
-        questionVotingResults={questionVotingResults}
-        oneLineShareResults={oneLineShareResults}
-        hanjaWritingResults={hanjaWritingResults}
-      />
+          activityType={room.activity_type}
+          questionResults={questionResults}
+          questionVotingResults={questionVotingResults}
+          oneLineShareResults={oneLineShareResults}
+          hanjaWritingResults={hanjaWritingResults}
+          showResultQr={!integratedLab}
+        />
       </div>
     </main>
   );

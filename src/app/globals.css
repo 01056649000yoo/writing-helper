@@ -786,6 +786,10 @@ button:not(:disabled),
   max-width: 960px;
 }
 
+.lab-page__content--writing {
+  max-width: 1200px;
+}
+
 .lab-page-heading {
   display: flex;
   align-items: flex-end;

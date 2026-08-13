@@ -823,6 +823,7 @@ export default function LiveStudentPanel({
   questionVotingResults: initialQuestionVotingResults,
   oneLineShareResults: initialOneLineShareResults,
   hanjaWritingResults: initialHanjaWritingResults,
+  showResultQr,
 }: {
   roomId: string;
   students: Student[];
@@ -832,6 +833,7 @@ export default function LiveStudentPanel({
   questionVotingResults: QuestionVotingRanking;
   oneLineShareResults: OneLineShareResults;
   hanjaWritingResults: HanjaWritingResults;
+  showResultQr: boolean;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
@@ -894,14 +896,14 @@ export default function LiveStudentPanel({
   ));
   return (
     <>
-      {qrTarget && (
+      {showResultQr && qrTarget ? (
         <StudentQrModal
           sessionId={qrTarget.id}
           studentName={qrTarget.student_name}
           studentNumber={qrTarget.student_number}
           onClose={() => setQrTarget(null)}
         />
-      )}
+      ) : null}
       {isQuestionResultsOpen && (
         <QuestionResultsModal
           results={questionResults}
@@ -1053,7 +1055,9 @@ export default function LiveStudentPanel({
                       ? "보기 → 학생 문장 상세"
                       : activityType === "hanja_writing"
                         ? "보기 → 학생 문장 상세"
-                    : "QR 버튼 → 학생 개인 결과 QR"}
+                    : showResultQr
+                      ? "QR 버튼 → 학생 개인 결과 QR"
+                      : "보기 → 학생 개요 상세"}
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1063,7 +1067,7 @@ export default function LiveStudentPanel({
                   <span className="text-sm text-green-300 font-mono w-5 shrink-0">{s.student_number}</span>
                   <span className="text-sm font-medium text-green-800 truncate flex-1">{s.student_name}</span>
                   {/* QR 버튼 */}
-                  {activityType === "outline_builder" && (
+                  {activityType === "outline_builder" && showResultQr ? (
                     <button
                       type="button"
                       onClick={() => setQrTarget(s)}
@@ -1072,7 +1076,7 @@ export default function LiveStudentPanel({
                     >
                       QR
                     </button>
-                  )}
+                  ) : null}
                   {/* 결과 보기 링크 */}
                   <Link
                     href={`/dashboard/room/${roomId}/result/${s.id}`}
