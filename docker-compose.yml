@@ -9,8 +9,11 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_VERSION: ${BUILD_VERSION:-local}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL is required}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?NEXT_PUBLIC_SUPABASE_ANON_KEY is required}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?NEXT_PUBLIC_APP_URL is required}
     env_file:
-      - .env.local
+      - ${RUNTIME_ENV_FILE:-.env.local}
     environment:
       NODE_ENV: production
       PORT: 3000
