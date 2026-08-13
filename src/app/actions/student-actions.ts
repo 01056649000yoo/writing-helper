@@ -499,6 +499,97 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
   };
 }
 
+/**
+ * 개요짜기에서 학생이 친구들과 만든 질문을 직접 추가할 때만 호출한다.
+ *
+ * 질문 만들기 원본이나 학생별 투표 결과는 읽지 않고, 교사가 문장을 다듬고
+ * 포함 여부를 정해 좋은 질문 고르기 방에 저장한 sourceQuestions만 반환한다.
+ */
+export async function getOutlineSharedQuestionCandidates(sessionId: string, roomId: string) {
+  if (!sessionId || !roomId || sessionId.length > 100 || roomId.length > 100) {
+    return { rooms: [], error: "잘못된 요청입니다." };
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) {
+    return { rooms: [], error: "내 활동에서만 질문을 불러올 수 있습니다." };
+  }
+
+  const [{ data: session }, { data: outlineRoom, error: roomError }] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id")
+      .eq("id", sessionId)
+      .eq("room_id", roomId)
+      .maybeSingle(),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("id, teacher_id, class_id, agit_class_id, activity_type")
+      .eq("id", roomId)
+      .maybeSingle(),
+  ]);
+
+  if (
+    !session
+    || roomError
+    || !outlineRoom
+    || (outlineRoom.activity_type && outlineRoom.activity_type !== "outline_builder")
+  ) {
+    return { rooms: [], error: "개요짜기 활동을 확인하지 못했습니다." };
+  }
+
+  const classColumn = outlineRoom.agit_class_id ? "agit_class_id" : "class_id";
+  const classId = outlineRoom.agit_class_id ?? outlineRoom.class_id;
+  if (!classId) {
+    return { rooms: [], error: "연결된 학급을 확인하지 못했습니다." };
+  }
+
+  const { data: votingRooms, error } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("id, title, topic, activity_config, is_active, created_at")
+    .eq("teacher_id", outlineRoom.teacher_id)
+    .eq(classColumn, classId)
+    .eq("activity_type", "question_voting")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    return { rooms: [], error: "친구들과 만든 질문을 불러오지 못했습니다." };
+  }
+
+  let remainingQuestionCount = 100;
+  const rooms = (votingRooms ?? []).flatMap((room) => {
+    if (remainingQuestionCount <= 0) return [];
+
+    const config = normalizeQuestionVotingConfig(room.activity_config);
+    if (!config) return [];
+
+    const questions = config.sourceQuestions
+      .slice(0, remainingQuestionCount)
+      .map((question, index) => ({
+        // 원본 ID에는 학생 세션 ID가 들어갈 수 있어 학생 화면에는 노출하지 않는다.
+        id: `question-${index + 1}`,
+        text: question.text,
+      }));
+    remainingQuestionCount -= questions.length;
+    if (questions.length === 0) return [];
+
+    return [{
+      roomId: room.id,
+      title: room.title?.trim() || config.sourceRoomTitle || room.topic?.trim() || "좋은 질문 고르기",
+      topic: room.topic?.trim() || "",
+      createdAt: room.created_at,
+      isActive: room.is_active,
+      questions,
+    }];
+  });
+
+  return { rooms };
+}
+
 export async function getStudentRoomEntry(roomId: string) {
   if (!roomId) return null;
   const admin = createSupabaseAdminClient();

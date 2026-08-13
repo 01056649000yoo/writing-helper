@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   saveAnswers,
   requestOutline,
+  getOutlineSharedQuestionCandidates,
   getStudentRoomQuestions,
   submitHanjaWriting,
   submitOneLineShare,
@@ -51,6 +52,23 @@ type Step =
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
 type QuestionBuildMode = "direct" | "card_remix";
 type ResearchRoleId = string;
+type OutlineSectionKey = "처음" | "가운데" | "끝";
+
+type OutlineSharedQuestion = {
+  id: string;
+  text: string;
+};
+
+type OutlineSharedQuestionRoom = {
+  roomId: string;
+  title: string;
+  topic: string;
+  createdAt: string;
+  isActive: boolean;
+  questions: OutlineSharedQuestion[];
+};
+
+const SHARED_QUESTION_ITEM_PREFIX = "shared-question:";
 
 type ResearchRole = {
   id: ResearchRoleId;
@@ -164,6 +182,11 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [outlineTemplate, setOutlineTemplate] = useState<OutlineTemplate | null>(null);
   const [templateAnswers, setTemplateAnswers] = useState<OutlineTemplateAnswer[]>([]);
   const [outlineSubmitting, setOutlineSubmitting] = useState(false);
+  const [sharedQuestionPickerSection, setSharedQuestionPickerSection] = useState<OutlineSectionKey | null>(null);
+  const [sharedQuestionRooms, setSharedQuestionRooms] = useState<OutlineSharedQuestionRoom[]>([]);
+  const [sharedQuestionLoading, setSharedQuestionLoading] = useState(false);
+  const [sharedQuestionLoaded, setSharedQuestionLoaded] = useState(false);
+  const [sharedQuestionError, setSharedQuestionError] = useState("");
   const [topic, setTopic] = useState("");
   const [topicDescription, setTopicDescription] = useState("");
   const [error, setError] = useState("");
@@ -379,6 +402,43 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   function addCustomTemplateItem(section: "처음" | "가운데" | "끝") {
     const itemId = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setTemplateAnswers((prev) => [...prev, { section, itemId, label: "", answer: "" }]);
+  }
+
+  function buildSharedQuestionItemId(
+    section: OutlineSectionKey,
+    sourceRoomId: string,
+    questionId: string,
+  ) {
+    return `${SHARED_QUESTION_ITEM_PREFIX}${sourceRoomId}:${questionId}:${section}`;
+  }
+
+  async function openSharedQuestionPicker(section: OutlineSectionKey) {
+    setSharedQuestionPickerSection(section);
+    setSharedQuestionError("");
+    if (sharedQuestionLoading) return;
+
+    setSharedQuestionLoaded(false);
+    setSharedQuestionLoading(true);
+    const result = await getOutlineSharedQuestionCandidates(sessionId, roomId);
+    if (result.error) {
+      setSharedQuestionError(result.error);
+    } else {
+      setSharedQuestionRooms(result.rooms as OutlineSharedQuestionRoom[]);
+      setSharedQuestionLoaded(true);
+    }
+    setSharedQuestionLoading(false);
+  }
+
+  function addSharedQuestionTemplateItem(
+    section: OutlineSectionKey,
+    sourceRoomId: string,
+    question: OutlineSharedQuestion,
+  ) {
+    const itemId = buildSharedQuestionItemId(section, sourceRoomId, question.id);
+    setTemplateAnswers((prev) => prev.some((answer) => answer.itemId === itemId)
+      ? prev
+      : [...prev, { section, itemId, label: question.text, answer: "" }]);
+    setSharedQuestionPickerSection(null);
   }
 
   function removeTemplateItem(itemId: string) {
@@ -1550,7 +1610,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                   {customAnswers.map((custom) => (
                     <div key={custom.itemId} className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-3 space-y-2 shadow-sm">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold shrink-0">내가 추가</span>
+                        <span className="rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold shrink-0">
+                          {custom.itemId.startsWith(SHARED_QUESTION_ITEM_PREFIX) ? "친구들과 만든 질문" : "내가 추가"}
+                        </span>
                         <button
                           type="button"
                           onClick={() => removeTemplateItem(custom.itemId)}
@@ -1559,18 +1621,26 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                           × 빼기
                         </button>
                       </div>
-                      <input
-                        type="text"
-                        value={custom.label}
-                        onChange={(e) => handleTemplateLabelChange(custom.itemId, e.target.value)}
-                        placeholder="항목 이름 (예: 친구 이야기)"
-                        className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
-                      />
+                      {custom.itemId.startsWith(SHARED_QUESTION_ITEM_PREFIX) ? (
+                        <p className="rounded-xl border-2 border-amber-100 bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-gray-800">
+                          {custom.label}
+                        </p>
+                      ) : (
+                        <input
+                          type="text"
+                          value={custom.label}
+                          onChange={(e) => handleTemplateLabelChange(custom.itemId, e.target.value)}
+                          placeholder="항목 이름 (예: 친구 이야기)"
+                          className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
+                        />
+                      )}
                       <StudentSpellingTextarea
                         value={custom.answer}
                         onValueChange={(nextValue) => handleTemplateAnswerChange(custom.itemId, nextValue)}
                         rows={2}
-                        placeholder="내가 쓸 내용을 적어봐요"
+                        placeholder={custom.itemId.startsWith(SHARED_QUESTION_ITEM_PREFIX)
+                          ? "이 질문에 답하며 글에 넣을 생각을 적어봐요"
+                          : "내가 쓸 내용을 적어봐요"}
                         className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none transition-colors"
                       />
                     </div>
@@ -1578,7 +1648,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
                   <button
                     type="button"
-                    onClick={() => addCustomTemplateItem(key)}
+                    onClick={() => openSharedQuestionPicker(key)}
                     className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/30 px-4 py-3 text-sm font-semibold text-amber-700 hover:border-amber-400 hover:bg-amber-50 transition-colors"
                   >
                     + 직접 추가하기
@@ -1599,6 +1669,130 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             {error && <p className="text-red-500 text-sm text-center mt-3">{error}</p>}
           </div>
         </div>
+
+        {sharedQuestionPickerSection && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 p-0 sm:items-center sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shared-question-picker-title"
+          >
+            <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+              <div className="flex items-start justify-between gap-4 border-b border-orange-100 px-5 py-5 sm:px-6">
+                <div>
+                  <p className="text-xs font-bold text-orange-500">{sharedQuestionPickerSection}에 질문 추가</p>
+                  <h2 id="shared-question-picker-title" className="mt-1 text-xl font-bold text-gray-900">
+                    친구들과 만든 질문에서 골라보세요
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                    선생님이 중복 질문과 맞춤법을 정리한 뒤 ‘좋은 질문 고르기’에 올린 질문만 보여요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSharedQuestionPickerSection(null)}
+                  aria-label="질문 선택 창 닫기"
+                  className="shrink-0 rounded-full bg-gray-100 px-3 py-2 text-sm font-bold text-gray-500 hover:bg-gray-200"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div className="overflow-y-auto px-5 py-5 sm:px-6">
+                {sharedQuestionLoading && (
+                  <div className="rounded-2xl bg-orange-50 px-5 py-8 text-center text-sm font-semibold text-orange-700">
+                    우리 반 질문을 불러오고 있어요…
+                  </div>
+                )}
+
+                {!sharedQuestionLoading && sharedQuestionError && (
+                  <div className="rounded-2xl bg-rose-50 px-5 py-6 text-center">
+                    <p className="text-sm font-semibold text-rose-600">{sharedQuestionError}</p>
+                    <button
+                      type="button"
+                      onClick={() => openSharedQuestionPicker(sharedQuestionPickerSection)}
+                      className="mt-4 rounded-xl bg-rose-500 px-4 py-2 text-sm font-bold text-white hover:bg-rose-600"
+                    >
+                      다시 불러오기
+                    </button>
+                  </div>
+                )}
+
+                {!sharedQuestionLoading && !sharedQuestionError && sharedQuestionLoaded && sharedQuestionRooms.length === 0 && (
+                  <div className="rounded-2xl bg-gray-50 px-5 py-8 text-center">
+                    <p className="text-sm font-bold text-gray-700">아직 가져올 질문이 없어요.</p>
+                    <p className="mt-2 text-sm text-gray-500">선생님이 좋은 질문 고르기 활동을 만든 뒤 다시 확인해 주세요.</p>
+                  </div>
+                )}
+
+                {!sharedQuestionLoading && !sharedQuestionError && sharedQuestionRooms.length > 0 && (
+                  <div className="space-y-5">
+                    {sharedQuestionRooms.map((questionRoom) => (
+                      <section key={questionRoom.roomId} className="rounded-2xl border border-orange-100 bg-orange-50/40 p-4">
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-bold text-gray-800">{questionRoom.title}</h3>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            questionRoom.isActive
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-gray-200 text-gray-600"
+                          }`}>
+                            {questionRoom.isActive ? "진행 중" : "완료"}
+                          </span>
+                        </div>
+                        {questionRoom.topic && questionRoom.topic !== questionRoom.title && (
+                          <p className="mb-3 text-xs text-gray-500">주제: {questionRoom.topic}</p>
+                        )}
+                        <div className="space-y-2">
+                          {questionRoom.questions.map((question) => {
+                            const candidateItemId = buildSharedQuestionItemId(
+                              sharedQuestionPickerSection,
+                              questionRoom.roomId,
+                              question.id,
+                            );
+                            const selected = templateAnswers.some((answer) => answer.itemId === candidateItemId);
+                            return (
+                              <button
+                                key={question.id}
+                                type="button"
+                                disabled={selected}
+                                onClick={() => addSharedQuestionTemplateItem(
+                                  sharedQuestionPickerSection,
+                                  questionRoom.roomId,
+                                  question,
+                                )}
+                                className="flex w-full items-start gap-3 rounded-2xl border-2 border-white bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-orange-300 disabled:cursor-default disabled:border-emerald-200 disabled:bg-emerald-50"
+                              >
+                                <span className={`mt-0.5 shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                                  selected ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"
+                                }`}>
+                                  {selected ? "추가됨" : "+ 선택"}
+                                </span>
+                                <span className="text-sm font-medium leading-relaxed text-gray-800">{question.text}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-gray-100 px-5 py-4 sm:px-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    addCustomTemplateItem(sharedQuestionPickerSection);
+                    setSharedQuestionPickerSection(null);
+                  }}
+                  className="w-full rounded-2xl border-2 border-dashed border-gray-300 px-4 py-3 text-sm font-semibold text-gray-600 hover:border-gray-400 hover:bg-gray-50"
+                >
+                  친구 질문 없이 내 항목 직접 쓰기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
