@@ -271,7 +271,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                 <p className="text-xs text-indigo-700 font-bold leading-relaxed">
                   💡 <strong>작성 꿀팁</strong>: AI가 추천한 역할과 질문들을 확인해 보세요. 
                   이모지와 텍스트를 마우스로 클릭하면 즉시 수정할 수 있습니다. 
-                  수정이 완료된 역할 중 등록할 카드만 왼쪽 체크박스를 켜고 하단 '일괄 등록'을 누르세요.
+                  수정이 완료된 역할 중 등록할 카드만 왼쪽 체크박스를 켜고 하단 일괄 등록을 누르세요.
                 </p>
               </div>
 

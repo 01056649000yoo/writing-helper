@@ -17,7 +17,7 @@ export function HanjaWordbookClient({
   const [error, setError] = useState(initialError);
   const [query, setQuery] = useState("");
   const [gradeFilter, setGradeFilter] = useState<GradeFilter>("all");
-  const [selectedIds, setSelectedIds] = useState<string[]>(initialCards.map((card) => card.id));
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [pageSize, setPageSize] = useState<PageSize>(12);
   const [currentPage, setCurrentPage] = useState(1);
@@ -76,6 +76,14 @@ export function HanjaWordbookClient({
     setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleCards.map((card) => card.id)])));
   }
 
+  function selectAllCards() {
+    setSelectedIds(cards.map((card) => card.id));
+  }
+
+  function clearAllSelections() {
+    setSelectedIds([]);
+  }
+
   function clearFiltered() {
     const filteredIds = new Set(visibleCards.map((card) => card.id));
     setSelectedIds((prev) => prev.filter((id) => !filteredIds.has(id)));
@@ -106,7 +114,26 @@ export function HanjaWordbookClient({
       return;
     }
     setError("");
-    window.print();
+    const payload = selectedCards.map((card) => ({
+      id: card.id,
+      word: card.word,
+      hanja: card.hanja.length > 0 ? card.hanja.map((entry) => entry.char).join(" ") : "한자 정보 없음",
+      definition: card.definition || "뜻 정보 없음",
+      example: card.example || "예시 문장 없음",
+    }));
+
+    const jsonBlob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    const jsonUrl = URL.createObjectURL(jsonBlob);
+    const htmlBlob = new Blob([buildPrintHtmlDocument(jsonUrl, payload.length)], { type: "text/html" });
+    const htmlUrl = URL.createObjectURL(htmlBlob);
+
+    const printWindow = window.open(htmlUrl, "_blank");
+    if (!printWindow) {
+      setError("인쇄 창을 열지 못했습니다. 팝업 차단을 확인해 주세요.");
+      URL.revokeObjectURL(jsonUrl);
+      URL.revokeObjectURL(htmlUrl);
+      return;
+    }
   }
 
   return (
@@ -162,6 +189,20 @@ export function HanjaWordbookClient({
         <div className="flex flex-wrap items-end gap-2">
           <button
             type="button"
+            onClick={selectAllCards}
+            className="rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
+          >
+            전체 카드 선택
+          </button>
+          <button
+            type="button"
+            onClick={clearAllSelections}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            전체 선택 해제
+          </button>
+          <button
+            type="button"
             onClick={selectFiltered}
             className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100"
           >
@@ -200,7 +241,7 @@ export function HanjaWordbookClient({
         <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           선택 {selectedCards.length}장
         </div>
-        <p className="text-sm text-gray-500 md:text-right">목록은 최근 저장 순으로 정렬되며, 자세히 보기는 필요한 카드만 펼칠 수 있어요.</p>
+        <p className="text-sm text-gray-500 md:text-right">기본은 미선택 상태이며, 필요한 카드만 골라 빠르게 인쇄할 수 있어요.</p>
       </div>
 
       {filteredCards.length === 0 ? (
@@ -362,65 +403,215 @@ export function HanjaWordbookClient({
               </button>
             </div>
           </div>
-
-          <div className="hidden print:block">
-            <div className="mb-6 border-b border-gray-300 pb-4">
-              <h2 className="text-2xl font-bold text-gray-900">한자 단어집</h2>
-              <p className="mt-2 text-sm text-gray-600">
-                선택한 카드 {selectedCards.length}장
-              </p>
-            </div>
-
-            <div className="grid gap-6">
-              {selectedCards.map((card) => (
-                <div key={`print-${card.id}`} className="break-inside-avoid rounded-3xl border border-gray-300 p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-3xl font-bold text-gray-900">{card.word}</h3>
-                    <span className="text-sm font-semibold text-gray-500">초등 {card.grade}학년</span>
-                  </div>
-                  {card.definition && (
-                    <p className="mt-3 text-sm leading-relaxed text-gray-700">{card.definition}</p>
-                  )}
-
-                  {card.hanja.length > 0 && (
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      {card.hanja.map((entry, index) => (
-                        <div key={`${card.id}-print-hanja-${index}`} className="rounded-2xl border border-gray-200 px-3 py-2">
-                          <p className="text-2xl font-bold text-gray-900">{entry.char}</p>
-                          <p className="mt-1 text-sm text-gray-700">{entry.meaning} {entry.reading}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {card.relatedWords.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm font-bold text-gray-800">관련 단어</p>
-                      <div className="mt-2 grid gap-2">
-                        {card.relatedWords.map((entry, index) => (
-                          <div key={`${card.id}-print-related-${index}`} className="rounded-2xl border border-gray-200 px-3 py-2">
-                            <p className="text-sm font-semibold text-gray-800">
-                              {entry.word} {entry.hanja ? `(${entry.hanja})` : ""}
-                            </p>
-                            <p className="mt-1 text-xs leading-relaxed text-gray-600">{entry.meaning}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {card.example && (
-                    <div className="mt-4 rounded-2xl bg-gray-50 px-3 py-3">
-                      <p className="text-xs font-bold uppercase tracking-wide text-gray-500">예시 문장</p>
-                      <p className="mt-1 text-sm leading-relaxed text-gray-700">{card.example}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </div>
   );
+}
+
+function buildPrintHtmlDocument(jsonUrl: string, totalCount: number) {
+  return `
+    <!doctype html>
+    <html lang="ko">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>한자 단어집 인쇄</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            margin: 0;
+            color: #111827;
+            font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+          }
+
+          .loading {
+            align-items: center;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+          }
+
+          .loading-box {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            max-width: 320px;
+            padding: 24px 28px;
+            text-align: center;
+          }
+
+          .loading-box h1 {
+            font-size: 18px;
+            margin: 0;
+          }
+
+          .loading-box p {
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 10px 0 0;
+          }
+
+          .sheet {
+            display: none;
+          }
+
+          .page {
+            break-after: page;
+            min-height: calc(297mm - 20mm);
+          }
+
+          .page:last-child {
+            break-after: auto;
+          }
+
+          .header {
+            border-bottom: 1px solid #d1d5db;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+          }
+
+          .header h1 {
+            font-size: 18px;
+            margin: 0;
+          }
+
+          .header p {
+            color: #6b7280;
+            font-size: 11px;
+            margin: 4px 0 0;
+          }
+
+          table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+          }
+
+          th, td {
+            border: 1px solid #d1d5db;
+            font-size: 10px;
+            line-height: 1.35;
+            padding: 6px 7px;
+            text-align: left;
+            vertical-align: top;
+          }
+
+          thead th {
+            background: #f9fafb;
+            font-weight: 700;
+          }
+
+          tbody tr {
+            height: 12.2mm;
+          }
+
+          .num {
+            text-align: center;
+            width: 6%;
+          }
+
+          .word {
+            font-size: 11px;
+            font-weight: 700;
+            width: 10%;
+          }
+        </style>
+      </head>
+      <body>
+        <main class="loading" id="loading">
+          <div class="loading-box">
+            <h1>인쇄 준비 중</h1>
+            <p>선택한 카드 ${totalCount}장을 정리하고 있습니다.</p>
+          </div>
+        </main>
+        <main class="sheet" id="sheet"></main>
+        <script>
+          const jsonUrl = ${JSON.stringify(jsonUrl)};
+          const CARDS_PER_PAGE = 20;
+
+          function escapeHtml(value) {
+            return String(value)
+              .replaceAll("&", "&amp;")
+              .replaceAll("<", "&lt;")
+              .replaceAll(">", "&gt;")
+              .replaceAll('"', "&quot;")
+              .replaceAll("'", "&#39;");
+          }
+
+          function chunk(items, size) {
+            const result = [];
+            for (let index = 0; index < items.length; index += size) {
+              result.push(items.slice(index, index + size));
+            }
+            return result;
+          }
+
+          fetch(jsonUrl)
+            .then((response) => response.json())
+            .then((cards) => {
+              const pages = chunk(cards, CARDS_PER_PAGE).map((pageCards, pageIndex) => {
+                const rows = pageCards.map((card, itemIndex) => \`
+                  <tr>
+                    <td class="num">\${pageIndex * CARDS_PER_PAGE + itemIndex + 1}</td>
+                    <td class="word">\${escapeHtml(card.word)}</td>
+                    <td>\${escapeHtml(card.hanja)}</td>
+                    <td>\${escapeHtml(card.definition)}</td>
+                    <td>\${escapeHtml(card.example)}</td>
+                  </tr>
+                \`).join("");
+
+                return \`
+                  <section class="page">
+                    <header class="header">
+                      <h1>한자 단어집</h1>
+                      <p>선택한 카드 \${cards.length}장 · 페이지당 20개 정리</p>
+                    </header>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th class="num">번호</th>
+                          <th class="word">단어</th>
+                          <th style="width: 10%;">한자</th>
+                          <th style="width: 30%;">뜻</th>
+                          <th>예시 문장</th>
+                        </tr>
+                      </thead>
+                      <tbody>\${rows}</tbody>
+                    </table>
+                  </section>
+                \`;
+              }).join("");
+
+              document.getElementById("sheet").innerHTML = pages;
+              document.getElementById("loading").style.display = "none";
+              document.getElementById("sheet").style.display = "block";
+
+              setTimeout(() => {
+                window.print();
+              }, 120);
+            })
+            .catch(() => {
+              document.getElementById("loading").innerHTML = '<div class="loading-box"><h1>인쇄 오류</h1><p>인쇄 데이터를 불러오지 못했습니다.</p></div>';
+            })
+            .finally(() => {
+              setTimeout(() => URL.revokeObjectURL(jsonUrl), 1000);
+            });
+
+          window.addEventListener("afterprint", () => {
+            window.close();
+          });
+        </script>
+      </body>
+    </html>
+  `;
 }

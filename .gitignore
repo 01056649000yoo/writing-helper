@@ -25,6 +25,8 @@
 *.pem
 .claude/
 supabase/.temp/
+supabase/.branches/
+docker-compose.yml.pre-*
 
 # debug
 npm-debug.log*

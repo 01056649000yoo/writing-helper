@@ -16,7 +16,6 @@ const WRITING_LABEL: Record<ActivityType, string> = {
   question_voting: "좋은 질문 고르기",
   one_line_share: "한줄모아",
   hanja_writing: "한자 활용 문장 만들기",
-  word_game: "필수 단어 맞추기 게임",
 };
 
 const WRITING_EMOJI: Record<ActivityType, string> = {
@@ -25,24 +24,12 @@ const WRITING_EMOJI: Record<ActivityType, string> = {
   question_voting: "🗳️",
   one_line_share: "💬",
   hanja_writing: "📜",
-  word_game: "🎮",
-};
-
-const SUBJECT_LABEL: Record<"science" | "morals", string> = {
-  science: "과학 탐구 글쓰기",
-  morals: "도덕 가치 글쓰기",
-};
-const SUBJECT_EMOJI: Record<"science" | "morals", string> = {
-  science: "🔬",
-  morals: "🪞",
 };
 
 function labelFor(slug: DraftActivitySlug): string {
-  if (slug === "science" || slug === "morals") return SUBJECT_LABEL[slug];
   return WRITING_LABEL[slug];
 }
 function emojiFor(slug: DraftActivitySlug): string {
-  if (slug === "science" || slug === "morals") return SUBJECT_EMOJI[slug];
   return WRITING_EMOJI[slug];
 }
 
@@ -55,8 +42,6 @@ function getDraftTitle(draft: ActivityDraftSummary) {
 }
 
 function hrefFor(draft: ActivityDraftSummary): string {
-  if (draft.kind === "science") return `/dashboard/science/new?class_id=${draft.classId}`;
-  if (draft.kind === "morals") return `/dashboard/morals/new?class_id=${draft.classId}`;
   return `/dashboard/room/new?class_id=${draft.classId}&activity_type=${draft.activitySlug}`;
 }
 

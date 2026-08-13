@@ -1,22 +1,19 @@
 import type { ActivityType } from "@/features/activities/types";
 
 export const DRAFT_STORAGE_PREFIX = "writing-helper:activity-draft:v1";
-export const SCIENCE_DRAFT_SLUG = "science";
-export const MORALS_DRAFT_SLUG = "morals";
 
 type StoredDraft<T> = {
   data: T;
   savedAt: number;
 };
 
-export type DraftActivitySlug = ActivityType | typeof SCIENCE_DRAFT_SLUG | typeof MORALS_DRAFT_SLUG;
-export type DraftKind = "writing" | "science" | "morals";
+export type DraftActivitySlug = ActivityType;
+export type DraftKind = "writing";
 
 export type ActivityDraftSummary = {
   storageKey: string;
   classId: string;
   kind: DraftKind;
-  /** writing 활동 타입이거나 'science' */
   activitySlug: DraftActivitySlug;
   topic: string;
   topicDescription: string;
@@ -34,8 +31,6 @@ const WRITING_ACTIVITY_SLUGS: ReadonlySet<string> = new Set<ActivityType>([
 ]);
 
 function classifySlug(slug: string): { kind: DraftKind; activitySlug: DraftActivitySlug } | null {
-  if (slug === SCIENCE_DRAFT_SLUG) return { kind: "science", activitySlug: SCIENCE_DRAFT_SLUG };
-  if (slug === MORALS_DRAFT_SLUG) return { kind: "morals", activitySlug: MORALS_DRAFT_SLUG };
   if (WRITING_ACTIVITY_SLUGS.has(slug)) return { kind: "writing", activitySlug: slug as ActivityType };
   return null;
 }

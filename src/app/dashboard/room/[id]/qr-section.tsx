@@ -45,6 +45,7 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
               className="bg-white p-4 rounded-2xl shadow-inner border border-indigo-100 hover:border-indigo-400 hover:shadow-md transition-all group relative"
               title="클릭하면 크게 볼 수 있어요"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrSmall} alt="QR 코드" className="w-48 h-48" />
               <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-indigo-500/0 group-hover:bg-indigo-500/10 transition-colors">
                 <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-indigo-700 bg-white/90 px-2 py-1 rounded-lg shadow">
@@ -101,6 +102,7 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
             
             {qrLarge && (
               <div className="bg-white p-10 rounded-[40px] border-8 border-indigo-50 shadow-2xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={qrLarge} alt="QR 코드 확대" className="w-full max-w-2xl h-auto drop-shadow-md" />
               </div>
             )}

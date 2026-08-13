@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
@@ -12,10 +12,10 @@ import {
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
   getRoomSessions,
-  getWordGameRoomResults,
   updateQuestionGeneratorSelection,
   type SpellingCorrectionCandidate,
 } from "@/app/actions/room-actions";
+import type { ActivityType } from "@/features/activities/types";
 import {
   QuestionVotingCompactList,
   QuestionVotingTopThree,
@@ -29,7 +29,6 @@ type Session = {
   level: string | null;
   status: string;
 };
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing" | "word_game";
 type QuestionResult = {
   sessionId: string;
   studentNumber: number;
@@ -62,52 +61,17 @@ type OneLineShareResults = Array<{
   updatedAt: string;
 }>;
 type HanjaWritingResults = Array<{
+  entryId: string;
   sessionId: string;
+  sentenceIndex: number;
   studentNumber: number;
   studentName: string;
   content: string;
   likeCount: number;
+  givenLikeCount: number;
+  maxReactionsPerStudent: number;
   createdAt: string;
 }>;
-type WordGameResults = {
-  rankings: Array<{
-    studentNumber: number;
-    studentName: string;
-    score: number;
-    correctCount: number;
-    wrongCount: number;
-    usedHints: number;
-    currentIndex: number;
-    totalQuestions: number;
-    teamId: string | null;
-    status: "in_progress" | "done";
-  }>;
-  teams: Array<{
-    teamId: string;
-    teamName: string;
-    color: string;
-    memberCount: number;
-    activeCount: number;
-    completedCount: number;
-    averageScore: number;
-    averageGrowthBonus: number;
-    averageCorrectRate: number;
-    tugOffset: number;
-  }>;
-  progress: {
-    totalStudents: number;
-    connectedStudents: number;
-    activeStudents: number;
-    completedStudents: number;
-    averageCorrectRate: number;
-  };
-  hardWords: Array<{
-    word: string;
-    wrongCount: number;
-    correctCount: number;
-  }>;
-};
-
 function levelLabel(level: string) {
   if (!level || level === "null") return "";
   return { low: "도움 필요", mid: "보통", high: "잘 써요" }[level] ?? level;
@@ -170,6 +134,7 @@ function StudentQrModal({
           </h3>
         </div>
         {qrUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={qrUrl} alt="QR" className="w-48 h-48 rounded-xl" />
         ) : (
           <div className="w-48 h-48 bg-gray-100 rounded-xl animate-pulse" />
@@ -742,6 +707,8 @@ function HanjaWritingResultsModal({
   entries: HanjaWritingResults;
   onClose: () => void;
 }) {
+  const topEntries = entries.slice(0, 5);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -775,21 +742,69 @@ function HanjaWritingResultsModal({
               <p className="mt-2 text-sm text-amber-700">학생들이 문장을 제출하면 여기에 모입니다.</p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {entries.map((entry) => (
-                <div key={entry.sessionId} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
-                      좋아요 {entry.likeCount}
-                    </span>
+            <div className="space-y-5">
+              <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-500">Best 5</p>
+                    <h4 className="mt-1 text-xl font-bold text-gray-800">좋아요 상위 문장 먼저 보기</h4>
+                    <p className="mt-1 text-sm text-gray-500">가장 많은 공감을 받은 학생 문장을 위에서 바로 확인할 수 있어요.</p>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
-                  <p className="mt-3 text-[11px] text-gray-400">
-                    {new Date(entry.createdAt).toLocaleString("ko-KR")}
-                  </p>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                    상위 {topEntries.length}문장
+                  </span>
                 </div>
-              ))}
+                <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                  {topEntries.map((entry, index) => (
+                    <div key={`top-${entry.entryId}`} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-amber-700">#{index + 1} · {entry.studentNumber}번 {entry.studentName}</p>
+                          <p className="mt-1 text-[11px] font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                          <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                          ❤️ {entry.likeCount}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-800">전체 문장 목록</h4>
+                    <p className="mt-1 text-sm text-gray-500">좋아요 순으로 정렬된 학급 전체 결과입니다.</p>
+                  </div>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                    전체 {entries.length}명
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {entries.map((entry) => (
+                    <div key={entry.entryId} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
+                            받은 ❤️ {entry.likeCount}
+                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-600">
+                            누른 ❤️ {entry.givenLikeCount}/{entry.maxReactionsPerStudent}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-1 text-[11px] font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                      <p className="mt-3 text-[11px] text-gray-400">
+                        {new Date(entry.createdAt).toLocaleString("ko-KR")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
         </div>
@@ -807,7 +822,6 @@ export default function LiveStudentPanel({
   questionVotingResults: initialQuestionVotingResults,
   oneLineShareResults: initialOneLineShareResults,
   hanjaWritingResults: initialHanjaWritingResults,
-  wordGameResults: initialWordGameResults,
 }: {
   roomId: string;
   students: Student[];
@@ -817,7 +831,6 @@ export default function LiveStudentPanel({
   questionVotingResults: QuestionVotingRanking;
   oneLineShareResults: OneLineShareResults;
   hanjaWritingResults: HanjaWritingResults;
-  wordGameResults: WordGameResults | null;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
@@ -829,7 +842,6 @@ export default function LiveStudentPanel({
   const [questionVotingResults, setQuestionVotingResults] = useState<QuestionVotingRanking>(initialQuestionVotingResults);
   const [oneLineShareResults, setOneLineShareResults] = useState<OneLineShareResults>(initialOneLineShareResults);
   const [hanjaWritingResults, setHanjaWritingResults] = useState<HanjaWritingResults>(initialHanjaWritingResults);
-  const [wordGameResults, setWordGameResults] = useState<WordGameResults | null>(initialWordGameResults);
 
   useEffect(() => {
     let cancelled = false;
@@ -855,10 +867,6 @@ export default function LiveStudentPanel({
         const hanjaData = await getHanjaWritingRoomResults(roomId);
         if (cancelled) return;
         setHanjaWritingResults(hanjaData ?? []);
-      } else if (activityType === "word_game") {
-        const wordGameData = await getWordGameRoomResults(roomId);
-        if (cancelled) return;
-        setWordGameResults(wordGameData);
       }
     };
 
@@ -875,23 +883,6 @@ export default function LiveStudentPanel({
   const activeSessions = sessions.filter(s => s.status === "in_progress");
   const connectedNums = new Set(sessions.map(s => s.student_number));
   const notConnected = students.filter(s => !connectedNums.has(s.student_number));
-  const wordGameRankingByStudent = useMemo(
-    () => new Map((wordGameResults?.rankings ?? []).map((entry) => [entry.studentNumber, entry] as const)),
-    [wordGameResults],
-  );
-  const sortedTeams = useMemo(
-    () => [...(wordGameResults?.teams ?? [])].sort((a, b) => b.averageScore - a.averageScore || b.averageCorrectRate - a.averageCorrectRate),
-    [wordGameResults],
-  );
-  const topWordGamePlayers = useMemo(
-    () => (wordGameResults?.rankings ?? []).slice(0, 5),
-    [wordGameResults],
-  );
-  const chasingPlayers = useMemo(
-    () => (wordGameResults?.rankings ?? []).filter((entry) => entry.status === "in_progress").slice(0, 4),
-    [wordGameResults],
-  );
-
   return (
     <>
       {qrTarget && (
@@ -1008,219 +999,11 @@ export default function LiveStudentPanel({
           </div>
         </div>
 
-        {/* 접속 중 */}
-        {activityType === "word_game" && wordGameResults && (
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-indigo-100 bg-[radial-gradient(circle_at_top,#eef2ff,transparent_55%),linear-gradient(135deg,#f8fbff,#eef2ff)] p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Live Match</p>
-                  <h3 className="mt-1 text-lg font-bold text-slate-900">팀 경쟁 진행 보드</h3>
-                  <p className="mt-1 text-sm text-slate-500">선두 팀과 추격 팀의 흐름을 한눈에 보여줍니다.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <MiniMetric label="참여" value={`${wordGameResults!.progress.connectedStudents}/${wordGameResults!.progress.totalStudents}`} tone="sky" />
-                  <MiniMetric label="완료" value={String(wordGameResults!.progress.completedStudents)} tone="emerald" />
-                  <MiniMetric label="진행중" value={String(wordGameResults!.progress.activeStudents)} tone="amber" />
-                  <MiniMetric label="정답률" value={`${wordGameResults!.progress.averageCorrectRate}%`} tone="violet" />
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-3xl bg-white/90 p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-bold text-slate-800">팀 레이스</p>
-                    {sortedTeams[0] && (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        선두 {sortedTeams[0].teamName}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {sortedTeams.map((team, index) => (
-                      <div key={team.teamId} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
-                              style={{ backgroundColor: team.color }}
-                            >
-                              {index + 1}
-                            </span>
-                            <div>
-                              <p className="font-semibold text-slate-900">{team.teamName}</p>
-                              <p className="text-xs text-slate-500">평균 점수 {team.averageScore} · 성장 {team.averageGrowthBonus}</p>
-                            </div>
-                          </div>
-                          <div className="text-right text-xs text-slate-500">
-                            <p>완료 {team.completedCount}/{team.memberCount}</p>
-                            <p>정답률 {team.averageCorrectRate}%</p>
-                          </div>
-                        </div>
-                        <div className="mt-3 h-4 overflow-hidden rounded-full bg-white">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${Math.max(team.tugOffset, 8)}%`,
-                              background: `linear-gradient(90deg, ${team.color}, ${team.color}cc)`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-3xl bg-white/90 p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-bold text-slate-800">개인 랭킹 Top 5</p>
-                      <span className="text-xs text-slate-400">실시간 반영</span>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      {topWordGamePlayers.length === 0 ? (
-                        <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">아직 집계된 점수가 없어요.</p>
-                      ) : (
-                        topWordGamePlayers.map((player, index) => (
-                          <div key={`${player.studentNumber}-${player.teamId ?? "solo"}`} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-3 py-3">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">
-                              {index + 1}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="truncate text-sm font-semibold text-slate-900">{player.studentNumber}번 {player.studentName}</p>
-                                {player.teamId && (
-                                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                                    {player.teamId.replace("team-", "T")}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-500"
-                                  style={{ width: `${Math.max(Math.round((player.currentIndex / Math.max(player.totalQuestions, 1)) * 100), player.status === "done" ? 100 : 6)}%` }}
-                                />
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-bold text-slate-900">{player.score}</p>
-                              <p className="text-[11px] text-slate-500">{player.correctCount}정답</p>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-white/90 p-4 shadow-sm">
-                    <p className="text-sm font-bold text-slate-800">지금 추격 중인 학생</p>
-                    <div className="mt-4 space-y-2">
-                      {chasingPlayers.length === 0 ? (
-                        <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">현재 진행 중인 학생이 없어요.</p>
-                      ) : (
-                        chasingPlayers.map((player) => {
-                          const percent = Math.round((player.currentIndex / Math.max(player.totalQuestions, 1)) * 100);
-                          return (
-                            <div key={`chase-${player.studentNumber}`} className="rounded-2xl bg-amber-50/70 px-4 py-3">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-semibold text-slate-900">{player.studentNumber}번 {player.studentName}</p>
-                                <span className="text-xs font-semibold text-amber-700">{player.currentIndex}/{player.totalQuestions} 문제</span>
-                              </div>
-                              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
-                                <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-400" style={{ width: `${Math.max(percent, 8)}%` }} />
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {wordGameResults!.hardWords.length > 0 && (
-                <div className="mt-4 rounded-3xl bg-white/90 p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-bold text-slate-800">자주 틀리는 단어</p>
-                    <span className="text-xs text-slate-400">즉시 복습 포인트</span>
-                  </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    {wordGameResults!.hardWords.map((word) => (
-                      <div key={word.word} className="rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-4">
-                        <p className="text-base font-bold text-rose-900">{word.word}</p>
-                        <div className="mt-3 flex gap-2 text-xs">
-                          <span className="rounded-full bg-white px-3 py-1 font-semibold text-rose-700">오답 {word.wrongCount}</span>
-                          <span className="rounded-full bg-white px-3 py-1 font-semibold text-emerald-700">정답 {word.correctCount}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {false && activityType === "word_game" && wordGameResults && (
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-indigo-100 bg-indigo-50/70 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Live Match</p>
-                  <h3 className="mt-1 text-lg font-bold text-slate-900">팀 경쟁 현황</h3>
-                </div>
-                <div className="text-right text-sm text-slate-600">
-                  <p>참여 {wordGameResults!.progress.connectedStudents}/{wordGameResults!.progress.totalStudents}</p>
-                  <p>완료 {wordGameResults!.progress.completedStudents}</p>
-                </div>
-              </div>
-              <div className="mt-4 rounded-full bg-white p-2 shadow-inner">
-                <div className="relative h-6 overflow-hidden rounded-full bg-slate-100">
-                  <div className="absolute inset-y-0 left-1/2 w-px bg-slate-300" />
-                  {wordGameResults!.teams.slice(0, 2).map((team, index) => (
-                    <div
-                      key={team.teamId}
-                      className={`absolute inset-y-0 ${index === 0 ? "left-0 rounded-r-full" : "right-0 rounded-l-full"} transition-all`}
-                      style={{ width: `${Math.max(team.tugOffset, 6)}%`, backgroundColor: team.color }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {wordGameResults!.teams.map((team) => (
-                  <div key={team.teamId} className="rounded-2xl bg-white px-4 py-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: team.color }} />
-                        <p className="font-bold text-slate-900">{team.teamName}</p>
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        평균 {team.averageScore}
-                      </span>
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="rounded-xl bg-slate-50 px-2 py-2 text-slate-600">완료 {team.completedCount}/{team.memberCount}</div>
-                      <div className="rounded-xl bg-slate-50 px-2 py-2 text-slate-600">성장 {team.averageGrowthBonus}</div>
-                      <div className="rounded-xl bg-slate-50 px-2 py-2 text-slate-600">정답률 {team.averageCorrectRate}%</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {activeSessions.length > 0 && (
           <div>
             <p className="text-sm font-semibold text-blue-600 mb-2">✏️ 지금 활동 중</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {activeSessions.map((s) => {
-                const ranking = wordGameRankingByStudent.get(s.student_number);
-                const progressPercent = ranking
-                  ? Math.round((ranking.currentIndex / Math.max(ranking.totalQuestions, 1)) * 100)
-                  : 0;
-
-                return (
+              {activeSessions.map((s) => (
                   <div key={s.id} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-blue-300 font-mono w-5 shrink-0">{s.student_number}</span>
@@ -1231,20 +1014,8 @@ export default function LiveStudentPanel({
                         </span>
                       )}
                     </div>
-                    {activityType === "word_game" && ranking && (
-                      <div className="mt-2">
-                        <div className="flex items-center justify-between text-[11px] text-blue-700">
-                          <span>{ranking.currentIndex}/{ranking.totalQuestions} 문제</span>
-                          <span>{ranking.score}점</span>
-                        </div>
-                        <div className="mt-1 h-2 overflow-hidden rounded-full bg-white">
-                          <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-500" style={{ width: `${Math.max(progressPercent, 8)}%` }} />
-                        </div>
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+              ))}
             </div>
           </div>
         )}
@@ -1333,29 +1104,5 @@ export default function LiveStudentPanel({
         )}
       </div>
     </>
-  );
-}
-
-function MiniMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "sky" | "emerald" | "amber" | "violet";
-}) {
-  const styles = {
-    sky: "bg-sky-50 text-sky-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    violet: "bg-violet-50 text-violet-700",
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl px-3 py-2 ${styles}`}>
-      <p className="text-[11px] font-semibold">{label}</p>
-      <p className="mt-1 text-sm font-bold">{value}</p>
-    </div>
   );
 }

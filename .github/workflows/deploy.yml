@@ -14,37 +14,29 @@ jobs:
   deploy:
     runs-on: self-hosted
     timeout-minutes: 30
+    env:
+      RUNTIME_ENV_FILE: /Users/seunghyeonmaegmini/writing-helper/.env.local
     steps:
       - name: Checkout latest code
         uses: actions/checkout@v4
 
-      - name: Copy .env.local from host
-        run: cp /Users/seunghyeonmaegmini/writing-helper/.env.local .
-
       - name: Set BUILD_VERSION
         run: echo "BUILD_VERSION=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
-      - name: Stop legacy launchctl / pm2 processes (no-op if absent)
-        run: |
-          launchctl bootout "gui/$(id -u)/com.jarvis.helper" >/dev/null 2>&1 || true
-          launchctl disable "gui/$(id -u)/com.jarvis.helper" >/dev/null 2>&1 || true
-          if [ -x "node_modules/.bin/pm2" ]; then
-            ./node_modules/.bin/pm2 delete writing-helper >/dev/null 2>&1 || true
-            ./node_modules/.bin/pm2 save --force >/dev/null 2>&1 || true
-            ./node_modules/.bin/pm2 kill >/dev/null 2>&1 || true
-          fi
-          pkill -f "npm run start" >/dev/null 2>&1 || true
-          pkill -f "next-server" >/dev/null 2>&1 || true
-          true
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify source
+        run: npm run lint
 
       - name: Build docker image
-        run: docker compose build --no-cache
+        run: docker compose --env-file "$RUNTIME_ENV_FILE" build --no-cache
 
       - name: Restart docker stack
-        run: docker compose up -d --remove-orphans
+        run: docker compose --env-file "$RUNTIME_ENV_FILE" up -d --remove-orphans
 
-      - name: Verify container
+      - name: Verify deployment
         run: |
-          sleep 5
           docker ps --filter "name=writing-helper-app" --format "{{.Status}}"
           docker exec writing-helper-app sh -c 'env | grep NEXT_PUBLIC_BUILD_VERSION'
+          curl --fail --silent --show-error --retry 12 --retry-delay 2 http://127.0.0.1:3000/login >/dev/null

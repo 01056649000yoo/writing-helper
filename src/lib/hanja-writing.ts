@@ -2,6 +2,7 @@ import type { HanjaWritingBoardEntry, HanjaWritingConfig, HanjaWritingSubmission
 
 type RawHanjaReaction = {
   target_session_id: string;
+  target_sentence_index?: number | null;
   session_id: string;
 };
 
@@ -9,7 +10,7 @@ type RawHanjaSubmissionSession = {
   id: string;
   student_number: number;
   student_name: string;
-  submission: { content?: unknown } | null;
+  submission: { content?: unknown; contents?: unknown } | null;
   updated_at: string;
 };
 
@@ -20,13 +21,28 @@ export function normalizeHanjaWritingConfig(value: unknown): HanjaWritingConfig 
   const word = typeof rawCard.word === "string" ? rawCard.word.trim() : "";
   if (!word) return null;
 
+  const rawMax = typeof value.maxReactionsPerStudent === "number"
+    ? value.maxReactionsPerStudent
+    : Number(value.maxReactionsPerStudent);
+  const maxReactionsPerStudent = Number.isFinite(rawMax)
+    ? Math.min(Math.max(Math.trunc(rawMax), 1), 10)
+    : 3;
+  const rawSentenceCount = typeof value.sentenceCount === "number"
+    ? value.sentenceCount
+    : Number(value.sentenceCount);
+  const sentenceCount = Number.isFinite(rawSentenceCount)
+    ? Math.min(Math.max(Math.trunc(rawSentenceCount), 1), 5)
+    : 1;
+
   return {
     promptTitle: typeof value.promptTitle === "string" && value.promptTitle.trim()
       ? value.promptTitle.trim()
-      : "한자 카드를 보고 한 문장을 만들어 보세요",
+      : "한자 카드를 보고 문장을 만들어 보세요",
     promptDescription: typeof value.promptDescription === "string" && value.promptDescription.trim()
       ? value.promptDescription.trim()
-      : "단어 속 한자의 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 한 문장을 써보세요.",
+      : "단어 속 한자의 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 문장을 써보세요.",
+    sentenceCount,
+    maxReactionsPerStudent,
     card: {
       word,
       grade: clampGrade(rawCard.grade),
@@ -60,9 +76,9 @@ export function normalizeHanjaWritingConfig(value: unknown): HanjaWritingConfig 
 
 export function normalizeHanjaWritingSubmission(value: unknown): HanjaWritingSubmission | null {
   if (!isRecord(value)) return null;
-  const content = typeof value.content === "string" ? value.content.trim() : "";
-  if (!content) return null;
-  return { content };
+  const contents = extractHanjaWritingContents(value);
+  if (contents.length === 0) return null;
+  return { contents };
 }
 
 export function sentenceContainsWord(sentence: string, word: string): boolean {
@@ -98,30 +114,39 @@ export function buildHanjaWritingBoard(
   const likedTargetIds = new Set<string>();
 
   reactions.forEach((reaction) => {
-    likeCountByTarget.set(
+    const targetId = createHanjaSentenceEntryId(
       reaction.target_session_id,
-      (likeCountByTarget.get(reaction.target_session_id) ?? 0) + 1,
+      typeof reaction.target_sentence_index === "number" ? reaction.target_sentence_index : 0,
+    );
+    likeCountByTarget.set(
+      targetId,
+      (likeCountByTarget.get(targetId) ?? 0) + 1,
     );
 
     if (currentSessionId && reaction.session_id === currentSessionId) {
-      likedTargetIds.add(reaction.target_session_id);
+      likedTargetIds.add(targetId);
     }
   });
 
   return sessions.flatMap((session) => {
-    const content = typeof session.submission?.content === "string" ? session.submission.content.trim() : "";
-    if (!content) return [];
+    const contents = extractHanjaWritingContents(session.submission);
+    if (contents.length === 0) return [];
 
-    return [{
-      sessionId: session.id,
-      studentNumber: session.student_number,
-      studentName: session.student_name,
-      content,
-      likeCount: likeCountByTarget.get(session.id) ?? 0,
-      likedByCurrentSession: likedTargetIds.has(session.id),
-      isMine: currentSessionId === session.id,
-      createdAt: session.updated_at,
-    }];
+    return contents.map((content, sentenceIndex) => {
+      const entryId = createHanjaSentenceEntryId(session.id, sentenceIndex);
+      return {
+        entryId,
+        sessionId: session.id,
+        sentenceIndex,
+        studentNumber: session.student_number,
+        studentName: session.student_name,
+        content,
+        likeCount: likeCountByTarget.get(entryId) ?? 0,
+        likedByCurrentSession: likedTargetIds.has(entryId),
+        isMine: currentSessionId === session.id,
+        createdAt: session.updated_at,
+      };
+    });
   }).sort((left, right) => {
     if (right.likeCount !== left.likeCount) {
       return right.likeCount - left.likeCount;
@@ -131,12 +156,36 @@ export function buildHanjaWritingBoard(
       return left.isMine ? -1 : 1;
     }
 
-    return left.studentNumber - right.studentNumber;
+    if (left.studentNumber !== right.studentNumber) {
+      return left.studentNumber - right.studentNumber;
+    }
+
+    return left.sentenceIndex - right.sentenceIndex;
   });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function extractHanjaWritingContents(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+
+  const contents = Array.isArray(value.contents)
+    ? value.contents
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    : [];
+
+  if (contents.length > 0) return contents;
+
+  const content = typeof value.content === "string" ? value.content.trim() : "";
+  return content ? [content] : [];
+}
+
+export function createHanjaSentenceEntryId(sessionId: string, sentenceIndex: number) {
+  return `${sessionId}:${sentenceIndex}`;
 }
 
 const KOREAN_PARTICLE_SUFFIXES = [

@@ -11,7 +11,6 @@ import {
   getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
-  getWordGameRoomResults,
   closeRoom,
 } from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
@@ -38,10 +37,6 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   const hanjaWritingResults = room.activity_type === "hanja_writing"
     ? await getHanjaWritingRoomResults(id)
     : [];
-  const wordGameResults = room.activity_type === "word_game"
-    ? await getWordGameRoomResults(id)
-    : null;
-
   const headersList = await headers();
   const rawHost = headersList.get("host") ?? "localhost:3002";
   const forwardedProto = headersList.get("x-forwarded-proto");
@@ -121,7 +116,6 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
         questionVotingResults={questionVotingResults}
         oneLineShareResults={oneLineShareResults}
         hanjaWritingResults={hanjaWritingResults}
-        wordGameResults={wordGameResults}
       />
       </div>
     </div>

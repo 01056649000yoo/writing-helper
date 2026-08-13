@@ -103,15 +103,14 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-8 text-white shadow-md">
             <h2 className="text-2xl font-bold">✏️ 아지트 글쓰기 활동 꾸러미 완전 정복</h2>
             <p className="text-base text-indigo-100 mt-2 leading-relaxed max-w-3xl">
-              아지트 글쓰기 연구소의 대표 기능인 <strong>'글쓰기 활동 꾸러미'</strong>의 설정 및 4가지 핵심 활동 사용 가이드입니다.
-              한자 활용 문장 만들기는 이 꾸러미와 별도로 운영되는 문해력 활동입니다.
+              아지트 글쓰기 연구소의 대표 기능인 <strong>글쓰기 활동 꾸러미</strong>의 설정 및 5가지 핵심 활동 사용 가이드입니다.
             </p>
             <div className="mt-4 flex gap-3">
               <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
                 준비 단계: API 및 질문 카드 설정
               </span>
               <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
-                활동 구성: 4종 글쓰기 연계 활동
+                활동 구성: 5종 글쓰기 연계 활동
               </span>
             </div>
           </div>
@@ -169,7 +168,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded text-xs mt-0.5 shrink-0">Step 3</span>
-                  <span>질문 카드 묶음에 들어갈 개별 세부 문항(프롬프트)들을 한 줄씩 추가하여 구성해 둡니다. 이는 이후 <strong>'질문 만들기'</strong> 활동의 템플릿 카드가 됩니다.</span>
+                  <span>질문 카드 묶음에 들어갈 개별 세부 문항(프롬프트)들을 한 줄씩 추가하여 구성해 둡니다. 이는 이후 <strong>질문 만들기</strong> 활동의 템플릿 카드가 됩니다.</span>
                 </li>
               </ul>
               <div className="mt-5 p-3.5 bg-green-50 border border-green-100 rounded-xl flex gap-2">
@@ -237,7 +236,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
                   <h4 className="text-lg font-bold text-gray-800">좋은 질문 고르기 (Question Voting)</h4>
                 </div>
                 <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                  '질문 만들기' 활동에서 동료 학생들이 제출한 익명화된 전체 질문 풀(Pool)에서, 교사가 설정한 평가 기준에 부합하는 질문을 골라냄으로써 **평가 및 분석적 사고**를 경험합니다.
+                  질문 만들기 활동에서 동료 학생들이 제출한 익명화된 전체 질문 중, 교사가 설정한 평가 기준에 부합하는 질문을 고르며 평가 및 분석적 사고를 경험합니다.
                 </p>
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
                   <div className="flex justify-between">

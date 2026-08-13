@@ -19,6 +19,10 @@ export const questionVotingDefinition: ActivityDefinition<
   version: 1,
   usesAi: false,
   supportsRoomResult: true,
+  integration: {
+    schemaVersion: 1,
+    resultKind: "selected_questions",
+  },
   createDefaultConfig: () => ({
     sourceRoomId: null,
     sourceRoomTitle: null,

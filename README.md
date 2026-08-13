@@ -7,13 +7,27 @@ npm run dev
 
 로컬 개발은 `http://localhost:3000`에서 확인합니다.
 
+## 아지트 통합 대상
+
+연구소에서 계속 운영하고 아지트 글쓰기 결과로 연결할 활동은 아래 다섯 가지입니다.
+
+- 글 개요 짜기 (`outline_builder`)
+- 질문 만들기 (`question_generator`)
+- 좋은 질문 고르기 (`question_voting`)
+- 한줄모아 (`one_line_share`)
+- 한자 활용 문장 만들기 (`hanja_writing`)
+
+각 활동 매니페스트의 `integration` 항목이 표준 결과 종류와 스키마 버전을 선언합니다. 새 활동을 통합 대상으로 추가할 때도 이 계약을 먼저 등록하고, 아지트는 활동별 화면이나 RPC가 아니라 공통 결과 조회 경로를 사용합니다.
+
+과학·도덕·낱말 게임의 실행 화면과 서버 코드는 제거했지만 기존 DB 테이블과 과거 데이터는 롤백과 이력 확인을 위해 삭제하지 않습니다.
+
 ## Production: Docker
 
 이 앱은 운영 시 Docker Compose 기준으로 실행합니다.
 
 ```bash
-BUILD_VERSION=$(git rev-parse --short HEAD) docker compose build
-docker compose up -d
+BUILD_VERSION=$(git rev-parse --short HEAD) docker compose --env-file .env.local build
+docker compose --env-file .env.local up -d
 ```
 
 중지:
@@ -28,56 +42,32 @@ docker compose down
 - PM2, LaunchAgent, 수동 `npm run start`로 이 앱을 다시 띄우지 않음
 - 공개 도메인은 Docker 프록시가 `writing-helper-app`만 보게 구성
 
-## GitHub Auto Deploy
+## GitHub Actions 자동 배포
 
 자동 배포 흐름:
 
 1. GitHub `main` 푸시
-2. 맥미니 호스트의 webhook 수신기 실행
-3. `git pull --ff-only origin main`
-4. `docker compose build`
-5. `docker compose up -d --remove-orphans`
-6. 이전 컨테이너 교체
-
-### Host Webhook Receiver
-
-앱 내부 `/api/github-deploy`는 더 이상 실제 배포를 담당하지 않습니다.  
-배포는 호스트에서 별도 수신기가 받습니다.
-
-관련 파일:
-
-- [scripts/deploy-webhook-server.mjs](/Users/seunghyeonmaegmini/writing-helper/scripts/deploy-webhook-server.mjs:1)
-- [scripts/run-deploy-webhook.sh](/Users/seunghyeonmaegmini/writing-helper/scripts/run-deploy-webhook.sh:1)
-- [scripts/deploy-from-github.sh](/Users/seunghyeonmaegmini/writing-helper/scripts/deploy-from-github.sh:1)
-- [deploy/com.writing-helper.deploy-webhook.plist.example](/Users/seunghyeonmaegmini/writing-helper/deploy/com.writing-helper.deploy-webhook.plist.example:1)
-- [deploy/caddy-webhook-snippet.example](/Users/seunghyeonmaegmini/writing-helper/deploy/caddy-webhook-snippet.example:1)
-
-기본 수신 주소:
-
-- 로컬: `http://127.0.0.1:4010/health`
-- webhook endpoint: `http://127.0.0.1:4010/github-deploy`
-
-공개 도메인에서 받으려면 프록시에 아래 경로를 연결합니다.
-
-- `https://helper.xn--vz0ba242ncqcba79xhwx.site/__deploy/github/github-deploy`
+2. 맥미니의 GitHub Actions 자체 호스팅 러너가 체크아웃
+3. `npm ci`와 `npm run lint` 검사
+4. Docker 이미지 빌드
+5. Compose 스택 교체
+6. 컨테이너 버전과 로그인 URL 확인
 
 ### Required Environment Variables
 
-`.env.local`에 있어야 하는 값:
+러너 호스트의 `/Users/seunghyeonmaegmini/writing-helper/.env.local`에 있어야 하는 값:
 
 ```bash
-GITHUB_WEBHOOK_SECRET=...
-GITHUB_WEBHOOK_REPO=01056649000yoo/writing-helper
-GITHUB_WEBHOOK_REF=refs/heads/main
-DEPLOY_WEBHOOK_HOST=127.0.0.1
-DEPLOY_WEBHOOK_PORT=4010
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_APP_URL=...
+SUPABASE_INTERNAL_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+SERVICE_ADMIN_EMAIL=...
 ```
-
-## Deploy Logs
-
-- 앱 배포 로그: [logs/deploy-webhook.log](/Users/seunghyeonmaegmini/writing-helper/logs/deploy-webhook.log:1)
 
 ## Notes
 
 - 로그인 하단의 `deploy <commit>` 표기로 실제 배포 커밋을 확인할 수 있습니다.
 - Docker 빌드에서는 `NEXT_PUBLIC_BUILD_VERSION`이 직접 주입되고, 로컬 빌드에서는 Git 해시를 자동으로 읽습니다.
+- `.env.local` 전체는 Docker 빌드 문맥에서 제외됩니다. 브라우저에 필요한 `NEXT_PUBLIC_*` 값만 빌드 인자로 전달하고 서비스 역할 키는 컨테이너 실행 시에만 주입합니다.
