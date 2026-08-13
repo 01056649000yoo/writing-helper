@@ -255,7 +255,7 @@ function QuestionResultsModal({
   }
 
   async function runCorrection() {
-    if (!window.confirm("OpenAI에 모든 질문을 보내 맞춤법을 교정합니다. 진행할까요?")) return;
+    if (!window.confirm("AI로 모든 질문의 맞춤법을 확인합니다. 진행할까요?")) return;
     setCorrectionMode("loading");
     setCorrectionError(null);
     const result = await correctQuestionGeneratorSpelling(roomId);

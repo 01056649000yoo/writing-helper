@@ -6,14 +6,14 @@
     "dev": "next dev",
     "build": "NEXT_PUBLIC_BUILD_VERSION=${NEXT_PUBLIC_BUILD_VERSION:-$(git rev-parse --short HEAD 2>/dev/null || echo dev)} next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",
     "@types/qrcode": "^1.5.6",
     "next": "^16.3.0",
-    "openai": "^6.34.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

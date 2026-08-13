@@ -3,18 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "./auth-actions";
-import { saveApiKey } from "@/lib/vault";
-import { createOpenAIClient, generateAiRolesAndQuestions, type GeneratedRoleData } from "@/lib/gpt";
-import {
-  claimServiceAdmin,
-  getGlobalApiKeySecretOwner,
-  getServiceAdminState,
-  getSharedOpenAiKey,
-  getTeacherOpenAiAccess,
-  logApiUsage,
-  logServiceAudit,
-  requireServiceAdmin,
-} from "@/lib/service-admin";
+import { generateAiRolesAndQuestions, type GeneratedRoleData } from "@/lib/gpt";
 import {
   getTeacherQuestionCardSettingsTree,
   isMissingQuestionCardRolesTable,
@@ -62,121 +51,6 @@ function getDefaultRoleLabels() {
     "상담사",
     "상담사 모드",
   ].map(normalizeQuestionCardLabel));
-}
-
-export async function saveGptApiKey(formData: FormData): Promise<{ error?: string; success?: boolean }> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "로그인이 필요합니다." };
-  if (!user.email) return { error: "이메일 정보를 확인할 수 없습니다." };
-
-  const apiKey = String(formData.get("api_key") ?? "").trim();
-  if (!apiKey.startsWith("sk-")) return { error: "올바른 OpenAI API 키 형식이 아닙니다." };
-
-  try {
-    await requireServiceAdmin(user);
-    const secretId = await saveApiKey(getGlobalApiKeySecretOwner(), apiKey);
-    await claimServiceAdmin(user.email);
-
-    const admin = createSupabaseAdminClient();
-    const { error: settingsError } = await admin
-      .schema("writing_helper")
-      .from("service_settings")
-      .upsert({
-        id: "singleton",
-        admin_email: user.email.trim().toLowerCase(),
-        global_vault_secret_id: secretId,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "id" });
-
-    if (settingsError) {
-      console.error("[saveGptApiKey] service settings update error:", settingsError);
-      return { error: `공용 설정 업데이트 실패: ${settingsError.message}` };
-    }
-
-    const { error: updateError } = await admin
-      .schema("writing_helper")
-      .from("teacher_profiles")
-      .update({ vault_secret_id: secretId })
-      .eq("user_id", user.id);
-
-    if (updateError) {
-      console.error("[saveGptApiKey] profile update error:", updateError);
-      return { error: `프로필 업데이트 실패: ${updateError.message}` };
-    }
-
-    revalidatePath("/dashboard/api-key");
-    revalidatePath("/dashboard/admin");
-    revalidatePath("/dashboard/settings");
-    revalidatePath("/dashboard");
-    await logServiceAudit({
-      actorUserId: user.id,
-      actorEmail: user.email,
-      action: "global_api_key_saved",
-      metadata: { hasSharedKey: true },
-    });
-    return { success: true };
-  } catch (e) {
-    console.error("[saveGptApiKey] error:", e);
-    return { error: `API 키 저장에 실패했습니다: ${e instanceof Error ? e.message : String(e)}` };
-  }
-}
-
-export async function checkHasApiKey(): Promise<boolean> {
-  const user = await getCurrentUser();
-  if (!user) return false;
-  const result = await getSharedOpenAiKey();
-  return Boolean(result.apiKey);
-}
-
-export async function testApiKey(): Promise<{ ok: boolean; error?: string }> {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, error: "로그인이 필요합니다." };
-  try {
-    await requireServiceAdmin(user);
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "서비스 관리자만 공용 API 키를 테스트할 수 있습니다.",
-    };
-  }
-  const shared = await getSharedOpenAiKey();
-  if (shared.error || !shared.apiKey) return { ok: false, error: shared.error ?? "공용 API 키가 없습니다." };
-
-  try {
-    const client = createOpenAIClient(shared.apiKey);
-    await client.models.list();
-    await logServiceAudit({
-      actorUserId: user.id,
-      actorEmail: user.email ?? null,
-      action: "global_api_key_tested",
-      metadata: { ok: true },
-    });
-    return { ok: true };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "알 수 없는 오류";
-    await logServiceAudit({
-      actorUserId: user.id,
-      actorEmail: user.email ?? null,
-      action: "global_api_key_tested",
-      metadata: { ok: false, error: msg },
-    });
-    return { ok: false, error: msg };
-  }
-}
-
-export async function getApiKeyAccessInfo(): Promise<{
-  hasKey: boolean;
-  isAdmin: boolean;
-  adminEmail: string | null;
-}> {
-  const user = await getCurrentUser();
-  const state = await getServiceAdminState(user);
-  const shared = await getSharedOpenAiKey();
-  return {
-    hasKey: Boolean(shared.apiKey),
-    isAdmin: Boolean(user && state.isAdmin),
-    adminEmail: state.adminEmail,
-  };
 }
 
 export async function getQuestionCardSettings(): Promise<{ roles: QuestionCardRole[]; cardSets: QuestionCardSet[]; error?: string }> {
@@ -585,20 +459,14 @@ export async function generateAiRolesAndCardsAction(
 ): Promise<{ roles?: GeneratedRoleData[]; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
-  const keyAccess = await getTeacherOpenAiAccess(user.id);
-  if (keyAccess.error || !keyAccess.access) {
-    return { error: keyAccess.error ?? "OpenAI API 키를 불러올 수 없습니다." };
-  }
+
+  const normalizedTopic = topic.trim();
+  if (!normalizedTopic || normalizedTopic.length > 200) return { error: "수업 주제는 1~200자로 입력해주세요." };
+  if (!["저학년", "중학년", "고학년"].includes(gradeLevel)) return { error: "학년 수준을 확인해주세요." };
+  if (!Number.isInteger(roleCount) || roleCount < 1 || roleCount > 5) return { error: "역할 수는 1~5개로 선택해주세요." };
 
   try {
-    await logApiUsage({
-      teacherId: user.id,
-      feature: "admin_generate_ai_roles",
-      model: "gpt-4o",
-      usedSharedApi: keyAccess.access.usedSharedApi,
-      metadata: { topic, gradeLevel, roleCount },
-    });
-    const roles = await generateAiRolesAndQuestions(keyAccess.access.apiKey, topic, gradeLevel, roleCount);
+    const roles = await generateAiRolesAndQuestions(user.id, normalizedTopic, gradeLevel, roleCount);
     return { roles };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.";

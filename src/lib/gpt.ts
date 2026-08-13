@@ -1,8 +1,4 @@
-import OpenAI from "openai";
-
-export function createOpenAIClient(apiKey: string) {
-  return new OpenAI({ apiKey });
-}
+import { callAgitAi, parseAiJsonObject } from "@/lib/agit-ai";
 
 
 export interface GeneratedRoleData {
@@ -18,13 +14,11 @@ export interface GeneratedRoleData {
 }
 
 export async function generateAiRolesAndQuestions(
-  apiKey: string,
+  labActorId: string,
   topic: string,
   gradeLevel: string,
   roleCount: number
 ): Promise<GeneratedRoleData[]> {
-  const client = createOpenAIClient(apiKey);
-
   const gradeDesc = {
     "저학년": "초등학교 1~2학년 (매우 쉽고 직관적인 언어, 이모지 활용 권장)",
     "중학년": "초등학교 3~4학년 (쉬운 어휘, 친근하고 명확한 설명)",
@@ -85,17 +79,7 @@ export async function generateAiRolesAndQuestions(
 }
 `;
 
-  const response = await client.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    temperature: 0.7,
-  });
-
-  const content = response.choices[0].message.content;
-  if (!content) throw new Error("GPT 응답이 비어있습니다.");
-
-  const parsed = JSON.parse(content);
+  const parsed = parseAiJsonObject(await callAgitAi(labActorId, prompt));
   return (parsed.roles || []) as GeneratedRoleData[];
 }
 
@@ -103,12 +87,10 @@ export type SpellCorrectionInput = { id: string; text: string };
 export type SpellCorrectionResult = { id: string; corrected: string };
 
 export async function correctKoreanSpelling(
-  apiKey: string,
+  labActorId: string,
   inputs: SpellCorrectionInput[],
 ): Promise<SpellCorrectionResult[]> {
   if (inputs.length === 0) return [];
-  const client = createOpenAIClient(apiKey);
-
   const prompt = `초등학생이 만든 한국어 질문 문장들의 맞춤법·띄어쓰기·문장부호·조사 오류만 교정해 주세요.
 
 규칙:
@@ -125,16 +107,7 @@ export async function correctKoreanSpelling(
 입력:
 ${JSON.stringify(inputs)}`;
 
-  const response = await client.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    temperature: 0,
-  });
-
-  const content = response.choices[0].message.content;
-  if (!content) throw new Error("GPT 응답이 비어있습니다.");
-  const parsed = JSON.parse(content) as { results?: unknown };
+  const parsed = parseAiJsonObject(await callAgitAi(labActorId, prompt)) as { results?: unknown };
   if (!Array.isArray(parsed.results)) return [];
 
   return parsed.results
@@ -159,12 +132,10 @@ export type GeneratedHanjaCard = {
 };
 
 export async function generateHanjaWordCard(
-  apiKey: string,
+  labActorId: string,
   word: string,
   grade: number,
 ): Promise<GeneratedHanjaCard> {
-  const client = createOpenAIClient(apiKey);
-
   const prompt = `초등학교 ${grade}학년 학생을 위한 한자 학습 카드를 만들어 주세요.
 
 대상 단어: "${word}"
@@ -197,17 +168,7 @@ export async function generateHanjaWordCard(
   "category": "분류"
 }`;
 
-  const response = await client.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-    temperature: 0.3,
-  });
-
-  const content = response.choices[0].message.content;
-  if (!content) throw new Error("GPT 응답이 비어있습니다.");
-
-  const parsed = JSON.parse(content) as Partial<GeneratedHanjaCard>;
+  const parsed = parseAiJsonObject(await callAgitAi(labActorId, prompt)) as Partial<GeneratedHanjaCard>;
   return {
     word: typeof parsed.word === "string" && parsed.word.trim() ? parsed.word.trim() : word,
     isHanjaWord: parsed.isHanjaWord === true,

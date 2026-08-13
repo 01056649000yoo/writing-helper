@@ -107,7 +107,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
             </p>
             <div className="mt-4 flex gap-3">
               <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
-                준비 단계: API 및 질문 카드 설정
+                준비 단계: 질문 카드 설정
               </span>
               <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
                 활동 구성: 5종 글쓰기 연계 활동
@@ -116,44 +116,13 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
           </div>
 
           {/* 설정 가이드 섹션 */}
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* API 키 설정 */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-3xl">🔑</span>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800">1. GPT API 키 설정 방법</h3>
-                  <p className="text-sm text-gray-400">AI 자동 글 개요 및 초고 생성을 위한 필수 준비</p>
-                </div>
-              </div>
-              <ul className="space-y-3.5 text-sm text-gray-600 leading-relaxed">
-                <li className="flex items-start gap-2">
-                  <span className="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded text-xs mt-0.5 shrink-0">Step 1</span>
-                  <span>대시보드 우측 상단의 <strong className="text-indigo-600 font-semibold">🔑 API 키 설정</strong> 버튼을 누르거나 <code className="bg-gray-50 px-1.5 py-0.5 rounded text-xs border border-gray-200">/dashboard/api-key</code> 페이지로 이동합니다.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded text-xs mt-0.5 shrink-0">Step 2</span>
-                  <span>OpenAI 공식 홈페이지(platform.openai.com)에서 발급받은 <strong className="font-semibold text-gray-700">sk-...</strong> 형태의 API Key를 입력창에 넣고 등록합니다.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded text-xs mt-0.5 shrink-0">Step 3</span>
-                  <span>정상적으로 등록되면 대시보드 표시가 <span className="text-green-600 font-bold">✅ API 키 설정됨</span>으로 바뀌며, 글 개요 짜기 시 GPT 프롬프트가 가동됩니다.</span>
-                </li>
-              </ul>
-              <div className="mt-5 p-3.5 bg-amber-50 border border-amber-100 rounded-xl flex gap-2">
-                <span className="text-base shrink-0">💡</span>
-                <p className="text-xs text-amber-800 leading-normal">
-                  교사 개인이 소유한 API 키를 데이터베이스 전용 보관소(Vault)에 안전하게 암호화하여 저장하므로, 학생이나 외부로 유출될 염려가 전혀 없습니다.
-                </p>
-              </div>
-            </div>
-
+          <div className="grid gap-6">
             {/* 질문 카드 설정 */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-3xl">🃏</span>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">2. 질문 카드 설정 방법</h3>
+                  <h3 className="text-lg font-bold text-gray-800">1. 질문 카드 설정 방법</h3>
                   <p className="text-sm text-gray-400">학생들의 글감 구성을 돕는 카드 리스트 조립</p>
                 </div>
               </div>

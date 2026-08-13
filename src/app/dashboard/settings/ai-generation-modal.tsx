@@ -51,7 +51,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
 
     const result = await generateAiRolesAndCardsAction(topic, gradeLevel, roleCount);
     if (result.error || !result.roles) {
-      setError(result.error ?? "AI 생성 중 오류가 발생했습니다. OpenAI API 키를 확인해주세요.");
+      setError(result.error ?? "AI 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       setStep("input");
       return;
     }

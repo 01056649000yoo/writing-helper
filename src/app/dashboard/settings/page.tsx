@@ -9,7 +9,6 @@ import {
   getQuestionCardSettings,
   saveQuestionCardRole,
   saveQuestionCardSetting,
-  checkHasApiKey,
   resetDefaultQuestionCardSettings,
 } from "@/app/actions/settings-actions";
 import AiGenerationModal from "./ai-generation-modal";
@@ -53,7 +52,6 @@ export default function SettingsPage() {
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const [deletingRoleId, setDeletingRoleId] = useState<string | null>(null);
 
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -88,10 +86,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     let active = true;
-
-    checkHasApiKey().then((hasKey) => {
-      if (active) setHasApiKey(hasKey);
-    });
 
     getQuestionCardSettings().then((result) => {
       if (!active) return;
@@ -316,8 +310,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}
-                disabled={!hasApiKey}
-                title={!hasApiKey ? "AI 기능을 사용하려면 먼저 대시보드에서 OpenAI API 키를 등록해주세요." : "AI가 주제에 꼭 맞는 역할을 자동으로 만들어줍니다."}
+                title="AI가 주제에 꼭 맞는 역할을 자동으로 만들어줍니다."
                 className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-100 flex items-center gap-1.5 whitespace-nowrap transition-all"
               >
                 ✨ AI 역할 & 질문 생성
@@ -331,20 +324,6 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-
-          {!hasApiKey && (
-            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-xs text-amber-700 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span>💡</span>
-                <p>
-                  <strong>OpenAI API 키 등록 안내</strong>: AI로 역할과 질문을 자동 완성하는 스마트 비서 기능을 사용해 보세요! 대시보드에서 API 키를 등록하시면 활성화됩니다.
-                </p>
-              </div>
-              <Link href="/dashboard" className="shrink-0 font-bold hover:underline whitespace-nowrap text-amber-800">
-                등록하러 가기 →
-              </Link>
-            </div>
-          )}
 
           {cardSettingsError && (
             <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl">{cardSettingsError}</p>

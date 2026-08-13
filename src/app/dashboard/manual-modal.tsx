@@ -5,17 +5,6 @@ import { useState } from "react";
 const STEPS = [
   {
     number: 1,
-    emoji: "🔑",
-    title: "API 키 설정법",
-    color: "amber",
-    items: [
-      "대시보드 우측 상단 'API 키 설정 필요' 뱃지 또는 'API 키 설정' 메뉴를 누릅니다.",
-      "OpenAI Platform(platform.openai.com)에서 발급받은 API 키(sk-...로 시작)를 입력창에 등록합니다.",
-      "보관소(Vault)에 안전하게 암호화되어 저장되며, 등록 즉시 AI 기능(개요 짜기 등)이 활성화됩니다.",
-    ],
-  },
-  {
-    number: 2,
     emoji: "🃏",
     title: "질문 카드 설정법",
     color: "indigo",
@@ -26,7 +15,7 @@ const STEPS = [
     ],
   },
   {
-    number: 3,
+    number: 2,
     emoji: "🏫",
     title: "학급 및 학생 등록",
     color: "green",
@@ -37,7 +26,7 @@ const STEPS = [
     ],
   },
   {
-    number: 4,
+    number: 3,
     emoji: "✏️",
     title: "글쓰기 활동 꾸러미 시작",
     color: "purple",

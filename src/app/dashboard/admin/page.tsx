@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServiceAdminDashboardData } from "@/app/actions/admin-actions";
-import { AdminApiKeyCard } from "./api-key-card";
 import { AdminDashboardClient } from "./admin-dashboard-client";
 
 export default async function ServiceAdminDashboardPage() {
@@ -28,7 +27,7 @@ export default async function ServiceAdminDashboardPage() {
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-indigo-500">Service Admin</p>
           <h1 className="mt-2 text-3xl font-bold text-gray-900">서비스 관리자 대시보드</h1>
           <p className="mt-2 text-sm leading-relaxed text-gray-600">
-            가입 교사 현황, 공용 OpenAI API 키, 기본 서비스 사용 통계를 확인할 수 있습니다.
+            가입 교사 현황과 기본 서비스 사용 통계를 확인할 수 있습니다.
           </p>
         </div>
 
@@ -39,12 +38,6 @@ export default async function ServiceAdminDashboardPage() {
           <StatCard label="활성 방" value={`${data.stats.activeRoomCount}개`} tone="rose" />
           <StatCard label="학생 세션" value={`${data.stats.studentSessionCount}개`} tone="sky" />
           <StatCard label="완료 제출" value={`${data.stats.completedSessionCount}개`} tone="violet" />
-          <StatCard label="전체 API 호출" value={`${data.stats.totalApiCallCount}회`} tone="indigo" />
-          <StatCard label="공용 API 호출" value={`${data.stats.sharedApiCallCount}회`} tone="emerald" />
-        </div>
-
-        <div className="mt-6">
-          <AdminApiKeyCard hasKey={data.hasGlobalApiKey} adminEmail={data.adminEmail} />
         </div>
 
         <div className="mt-6">

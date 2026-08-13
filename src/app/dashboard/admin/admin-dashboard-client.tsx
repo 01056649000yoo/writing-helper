@@ -1,8 +1,4 @@
-"use client";
-
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { updateTeacherSharedApiAccess, type ServiceAuditLogSummary, type ServiceAdminUserSummary } from "@/app/actions/admin-actions";
+import type { ServiceAuditLogSummary, ServiceAdminUserSummary } from "@/app/actions/admin-actions";
 
 export function AdminDashboardClient({
   initialUsers,
@@ -11,47 +7,18 @@ export function AdminDashboardClient({
   initialUsers: ServiceAdminUserSummary[];
   auditLogs: ServiceAuditLogSummary[];
 }) {
-  const router = useRouter();
-  const [users, setUsers] = useState(initialUsers);
-  const [error, setError] = useState("");
-  const [pendingTeacherId, setPendingTeacherId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-
-  function handleToggle(user: ServiceAdminUserSummary) {
-    setError("");
-    setPendingTeacherId(user.id);
-    startTransition(async () => {
-      const result = await updateTeacherSharedApiAccess(user.id, !user.useSharedApiKey);
-      setPendingTeacherId(null);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setUsers((prev) => prev.map((item) => (
-        item.id === user.id ? { ...item, useSharedApiKey: !item.useSharedApiKey } : item
-      )));
-      router.refresh();
-    });
-  }
-
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-gray-900">가입 교사 목록</h2>
-            <p className="mt-1 text-sm text-gray-500">공용 API 사용 여부와 누적 API 호출 수를 함께 확인합니다.</p>
+            <p className="mt-1 text-sm text-gray-500">교사별 학급과 활동 방 수를 확인합니다.</p>
           </div>
           <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-            {users.length}명
+            {initialUsers.length}명
           </span>
         </div>
-
-        {error && (
-          <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
-          </div>
-        )}
 
         <div className="mt-5 overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -62,35 +29,16 @@ export function AdminDashboardClient({
                 <th className="px-3 py-3 font-semibold">가입일</th>
                 <th className="px-3 py-3 font-semibold">학급</th>
                 <th className="px-3 py-3 font-semibold">활동</th>
-                <th className="px-3 py-3 font-semibold">API 호출</th>
-                <th className="px-3 py-3 font-semibold">공용 호출</th>
-                <th className="px-3 py-3 font-semibold">공용 API</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {initialUsers.map((user) => (
                 <tr key={user.id} className="border-b border-gray-50 last:border-b-0">
                   <td className="px-3 py-3 font-medium text-gray-900">{user.name}</td>
                   <td className="px-3 py-3 text-gray-600">{user.email || "-"}</td>
                   <td className="px-3 py-3 text-gray-500">{new Date(user.createdAt).toLocaleDateString("ko-KR")}</td>
                   <td className="px-3 py-3 text-gray-700">{user.classCount}</td>
                   <td className="px-3 py-3 text-gray-700">{user.roomCount}</td>
-                  <td className="px-3 py-3 text-gray-700">{user.apiCallCount}</td>
-                  <td className="px-3 py-3 text-gray-700">{user.sharedApiCallCount}</td>
-                  <td className="px-3 py-3">
-                    <button
-                      type="button"
-                      onClick={() => handleToggle(user)}
-                      disabled={pendingTeacherId === user.id}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        user.useSharedApiKey
-                          ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      } disabled:opacity-50`}
-                    >
-                      {pendingTeacherId === user.id ? "변경 중..." : user.useSharedApiKey ? "적용 중" : "사용 안 함"}
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>

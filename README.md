@@ -71,3 +71,4 @@ SERVICE_ADMIN_EMAIL=...
 - 로그인 하단의 `deploy <commit>` 표기로 실제 배포 커밋을 확인할 수 있습니다.
 - Docker 빌드에서는 `NEXT_PUBLIC_BUILD_VERSION`이 직접 주입되고, 로컬 빌드에서는 Git 해시를 자동으로 읽습니다.
 - `.env.local` 전체는 Docker 빌드 문맥에서 제외됩니다. 브라우저에 필요한 `NEXT_PUBLIC_*` 값만 빌드 인자로 전달하고 서비스 역할 키는 컨테이너 실행 시에만 주입합니다.
+- 연구소는 별도 OpenAI 키를 저장하지 않습니다. AI 요청은 연구소 로그인 세션을 다시 검증한 뒤 비공개 Docker 네트워크에서 아지트의 `vibe-ai`로 전달합니다.

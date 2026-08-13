@@ -37,7 +37,6 @@ export interface TeacherProfile {
   id: string;
   user_id: string;
   name: string;
-  vault_secret_id: string | null;
   created_at: string;
 }
 

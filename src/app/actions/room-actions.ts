@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "./auth-actions";
 import { correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
-import { getTeacherOpenAiAccess, logApiUsage } from "@/lib/service-admin";
+import { callAgitAi, parseAiJsonObject } from "@/lib/agit-ai";
 import { buildHanjaWritingBoard } from "@/lib/hanja-writing";
 import { getTeacherQuestionCardSettingsTree } from "@/lib/question-card-sets";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
@@ -48,10 +48,6 @@ export async function enhanceOutlineTemplateWithAI(
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
 
-  const keyAccess = await getTeacherOpenAiAccess(user.id);
-  if (keyAccess.error || !keyAccess.access) return { error: keyAccess.error ?? "OpenAI API 키를 불러올 수 없습니다." };
-
-  const client = (await import("@/lib/gpt")).createOpenAIClient(keyAccess.access.apiKey);
   const gradeDesc = { "저학년": "1~2학년", "중학년": "3~4학년", "고학년": "5~6학년" }[gradeLevel] ?? gradeLevel;
 
   const GENRE_GUIDES: Record<SubjectType, { desc: string; sectionFocus: Record<"처음" | "가운데" | "끝", string> }> = {
@@ -108,22 +104,7 @@ JSON 형식으로만 응답:
 }`;
 
   try {
-    await logApiUsage({
-      teacherId: user.id,
-      feature: "enhance_outline_template",
-      model: "gpt-4o",
-      usedSharedApi: keyAccess.access.usedSharedApi,
-      metadata: { subjectType, section },
-    });
-    const response = await client.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-    });
-    const content = response.choices[0].message.content;
-    if (!content) return { items: [] };
-    const parsed = JSON.parse(content) as { items?: unknown };
+    const parsed = parseAiJsonObject(await callAgitAi(user.id, prompt)) as { items?: unknown };
     if (!Array.isArray(parsed.items)) return { items: [] };
     return {
       items: parsed.items
@@ -718,14 +699,6 @@ export async function getQuestionGeneratorRoomResults(roomId: string): Promise<Q
   return results;
 }
 
-async function loadTeacherOpenAiKey(teacherId: string): Promise<{ apiKey?: string; usedSharedApi?: boolean; error?: string }> {
-  const keyAccess = await getTeacherOpenAiAccess(teacherId);
-  if (keyAccess.error || !keyAccess.access) {
-    return { error: keyAccess.error ?? "OpenAI API 키를 불러올 수 없습니다." };
-  }
-  return { apiKey: keyAccess.access.apiKey, usedSharedApi: keyAccess.access.usedSharedApi };
-}
-
 type QuestionUpdate = { sessionId: string; selectionId: string; newText: string };
 
 async function applyQuestionUpdatesForRoom(
@@ -839,9 +812,6 @@ export async function correctQuestionGeneratorSpelling(
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
 
-  const keyResult = await loadTeacherOpenAiKey(user.id);
-  if (keyResult.error || !keyResult.apiKey) return { error: keyResult.error };
-
   const results = await getQuestionGeneratorRoomResults(roomId);
   if (results.length === 0) return { candidates: [] };
 
@@ -861,16 +831,8 @@ export async function correctQuestionGeneratorSpelling(
   if (inputs.length === 0) return { candidates: [] };
 
   try {
-    await logApiUsage({
-      teacherId: user.id,
-      feature: "correct_question_generator_spelling",
-      model: "gpt-4o",
-      usedSharedApi: keyResult.usedSharedApi ?? true,
-      roomId,
-      metadata: { inputCount: inputs.length },
-    });
     const corrected = await correctKoreanSpelling(
-      keyResult.apiKey,
+      user.id,
       inputs.map(({ id, text }) => ({ id, text })),
     );
     const correctedById = new Map(corrected.map((entry) => [entry.id, entry.corrected.trim()]));
@@ -1042,6 +1004,7 @@ export async function getOrGenerateHanjaCard(
 
   const trimmedWord = word.trim();
   if (!trimmedWord) return { error: "단어를 입력해 주세요." };
+  if (trimmedWord.length > 30) return { error: "단어는 30자 이내로 입력해 주세요." };
   const clampedGrade = Math.min(Math.max(Math.trunc(Number(grade) || 4), 3), 6);
 
   const admin = createSupabaseAdminClient();
@@ -1062,18 +1025,8 @@ export async function getOrGenerateHanjaCard(
     return { error: "이 단어는 한자어 카드로 만들기 어렵습니다. 추천 목록의 단어를 고르거나 다른 한자어를 입력해 주세요." };
   }
 
-  const keyResult = await loadTeacherOpenAiKey(user.id);
-  if (keyResult.error || !keyResult.apiKey) return { error: keyResult.error };
-
   try {
-    await logApiUsage({
-      teacherId: user.id,
-      feature: "generate_hanja_card",
-      model: "gpt-4o",
-      usedSharedApi: keyResult.usedSharedApi ?? true,
-      metadata: { word: trimmedWord, grade: clampedGrade },
-    });
-    const generated = await generateHanjaWordCard(keyResult.apiKey, trimmedWord, clampedGrade);
+    const generated = await generateHanjaWordCard(user.id, trimmedWord, clampedGrade);
     if (generated.isHanjaWord !== true || !isUsableHanjaWordCard(generated)) {
       return {
         error: generated.rejectionReason

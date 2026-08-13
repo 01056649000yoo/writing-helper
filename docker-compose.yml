@@ -22,8 +22,17 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?NEXT_PUBLIC_APP_URL is required}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}
       SERVICE_ADMIN_EMAIL: ${SERVICE_ADMIN_EMAIL:?SERVICE_ADMIN_EMAIL is required}
+      AGIT_AI_INTERNAL_URL: http://agit-edge-functions:9000/vibe-ai
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "3000:3000"
     restart: unless-stopped
+    networks:
+      - default
+      - agit-internal
+
+networks:
+  agit-internal:
+    external: true
+    name: agit_default
