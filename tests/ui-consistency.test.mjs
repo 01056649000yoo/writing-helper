@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [globals, layout, nav, dashboard, classPage, roomNew, guide] = await Promise.all([
+const [globals, layout, nav, dashboard, classPage, roomNew, guide, login, compose, readme] = await Promise.all([
   readFile("src/app/globals.css", "utf8"),
   readFile("src/app/dashboard/layout.tsx", "utf8"),
   readFile("src/app/dashboard/dashboard-nav.tsx", "utf8"),
@@ -10,6 +10,9 @@ const [globals, layout, nav, dashboard, classPage, roomNew, guide] = await Promi
   readFile("src/app/dashboard/class/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/room/new/page.tsx", "utf8"),
   readFile("src/app/dashboard/dashboard-tabs.tsx", "utf8"),
+  readFile("src/app/login/page-client.tsx", "utf8"),
+  readFile("docker-compose.yml", "utf8"),
+  readFile("README.md", "utf8"),
 ]);
 
 test("연구소는 끄적끄적 아지트 공통 디자인 토큰을 사용한다", () => {
@@ -41,6 +44,22 @@ test("교사용 대시보드는 공통 셸과 현재 메뉴 표시를 한 번만
   }
   assert.doesNotMatch(dashboard, /<header/);
   assert.doesNotMatch(classPage, /<header/);
+});
+
+test("연구소의 별도 서비스 관리와 화면 배포 번호를 제거한다", async () => {
+  assert.doesNotMatch(layout, /BUILD_LABEL|deploy\s/);
+  assert.doesNotMatch(nav, /서비스 관리|dashboard\/admin|isServiceAdmin/);
+  assert.doesNotMatch(login, /BUILD_LABEL|fixed bottom-4 right-4/);
+  assert.doesNotMatch(compose, /SERVICE_ADMIN_EMAIL/);
+  assert.doesNotMatch(readme, /SERVICE_ADMIN_EMAIL|deploy <commit>/);
+
+  await Promise.all([
+    assert.rejects(access("src/app/dashboard/admin/page.tsx")),
+    assert.rejects(access("src/app/dashboard/admin/admin-dashboard-client.tsx")),
+    assert.rejects(access("src/app/actions/admin-actions.ts")),
+    assert.rejects(access("src/lib/service-admin.ts")),
+    assert.rejects(access("src/lib/build-version.ts")),
+  ]);
 });
 
 test("활동 선택과 설명은 통합 대상 다섯 활동만 같은 꾸러미로 안내한다", async () => {

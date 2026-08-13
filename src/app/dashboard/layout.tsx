@@ -1,17 +1,12 @@
 import Link from "next/link";
-import { isCurrentUserServiceAdmin } from "@/app/actions/admin-actions";
 import { getTeacherProfile, signOut } from "@/app/actions/auth-actions";
-import { BUILD_LABEL } from "@/lib/build-version";
 import { DashboardNav } from "./dashboard-nav";
 
 const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
   ?? "https://xn--vz0ba242ncqcba79xhwx.site";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [profile, isServiceAdmin] = await Promise.all([
-    getTeacherProfile(),
-    isCurrentUserServiceAdmin(),
-  ]);
+  const profile = await getTeacherProfile();
 
   return (
     <div className="lab-shell">
@@ -20,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/dashboard" className="lab-brand" aria-label="글쓰기 연구소 대시보드">
             <span className="lab-brand__mark" aria-hidden="true">✏️</span>
             <span>
-              <span className="lab-brand__eyebrow">끄적끄적 아지트 · {BUILD_LABEL}</span>
+              <span className="lab-brand__eyebrow">끄적끄적 아지트</span>
               <span className="lab-brand__title">글쓰기 연구소</span>
             </span>
           </Link>
@@ -34,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </header>
         <div className="lab-shell__nav-wrap">
-          <DashboardNav isServiceAdmin={isServiceAdmin} />
+          <DashboardNav />
         </div>
       </div>
       {children}

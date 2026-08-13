@@ -3,27 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type DashboardNavProps = {
-  isServiceAdmin: boolean;
-};
-
 const primaryItems = [
   { href: "/dashboard", label: "학급·활동", section: "home" },
   { href: "/dashboard/settings", label: "질문 카드", section: "settings" },
   { href: "/dashboard/hanja-wordbook", label: "한자 단어집", section: "hanja" },
 ] as const;
 
-function isCurrentSection(pathname: string, section: (typeof primaryItems)[number]["section"] | "admin") {
+function isCurrentSection(pathname: string, section: (typeof primaryItems)[number]["section"]) {
   if (section === "settings") return pathname.startsWith("/dashboard/settings");
   if (section === "hanja") return pathname.startsWith("/dashboard/hanja-wordbook");
-  if (section === "admin") return pathname.startsWith("/dashboard/admin");
-
   return pathname === "/dashboard"
     || pathname.startsWith("/dashboard/class")
     || pathname.startsWith("/dashboard/room");
 }
 
-export function DashboardNav({ isServiceAdmin }: DashboardNavProps) {
+export function DashboardNav() {
   const pathname = usePathname();
 
   return (
@@ -41,15 +35,6 @@ export function DashboardNav({ isServiceAdmin }: DashboardNavProps) {
           </Link>
         );
       })}
-      {isServiceAdmin && (
-        <Link
-          href="/dashboard/admin"
-          className="lab-nav-link"
-          aria-current={isCurrentSection(pathname, "admin") ? "page" : undefined}
-        >
-          서비스 관리
-        </Link>
-      )}
     </nav>
   );
 }
