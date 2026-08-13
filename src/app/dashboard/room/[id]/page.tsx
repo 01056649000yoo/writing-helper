@@ -53,13 +53,14 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   const shortUrl = room.short_code ? `${protocol}://${host}${withBasePath(`/s/${room.short_code}`)}` : null;
   // eslint-disable-next-line react-hooks/purity
   const renderNow = Date.now();
+  const dashboardClassId = room.agit_class_id ?? room.class_id;
 
   return (
     <main className="lab-page">
       <div className="lab-page__content lab-page__content--medium space-y-6">
         <div className="flex items-center justify-between">
-          <Link href={room.class_id ? `/dashboard/class/${room.class_id}` : "/dashboard"} className="lab-breadcrumb mb-0">
-            ← {room.class_id ? "학급으로" : "대시보드로"}
+          <Link href={dashboardClassId ? `/dashboard/class/${dashboardClassId}` : "/dashboard"} className="lab-breadcrumb mb-0">
+            ← {dashboardClassId ? "학급으로" : "대시보드로"}
           </Link>
           {room.is_active && (
             <form action={async () => { "use server"; await closeRoom(id); }}>

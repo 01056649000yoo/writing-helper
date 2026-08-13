@@ -24,6 +24,7 @@ import {
 type Student = { id: string; student_number: number; student_name: string };
 type Session = {
   id: string;
+  agit_student_id?: string | null;
   student_number: number;
   student_name: string;
   level: string | null;
@@ -881,8 +882,16 @@ export default function LiveStudentPanel({
 
   const doneSessions = sessions.filter(s => s.status === "done");
   const activeSessions = sessions.filter(s => s.status === "in_progress");
-  const connectedNums = new Set(sessions.map(s => s.student_number));
-  const notConnected = students.filter(s => !connectedNums.has(s.student_number));
+  const connectedStudentIds = new Set(
+    sessions.flatMap((session) => session.agit_student_id ? [session.agit_student_id] : []),
+  );
+  const connectedLegacyNumbers = new Set(
+    sessions.flatMap((session) => session.agit_student_id ? [] : [session.student_number]),
+  );
+  const notConnected = students.filter((student) => (
+    !connectedStudentIds.has(student.id)
+    && !connectedLegacyNumbers.has(student.student_number)
+  ));
   return (
     <>
       {qrTarget && (

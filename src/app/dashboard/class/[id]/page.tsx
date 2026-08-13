@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getClass, getClassStudents, getClassRooms } from "@/app/actions/class-actions";
+import { getClassWorkspace } from "@/app/actions/class-actions";
 import { isActivityType } from "@/features/activities/types";
 import { DeleteClassButton } from "./delete-button";
 import { DeleteRoomButton } from "./delete-room-button";
@@ -12,13 +12,10 @@ type UnifiedRoom = { kind: "writing"; id: string; title: string; topic: string; 
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [cls, students, rooms] = await Promise.all([
-    getClass(id),
-    getClassStudents(id),
-    getClassRooms(id),
-  ]);
-
-  if (!cls) notFound();
+  const integratedRoster = process.env.LAB_SSO_ENABLED === "true";
+  const workspace = await getClassWorkspace(id);
+  if (!workspace) notFound();
+  const { class: cls, students, rooms } = workspace;
 
   const unified: UnifiedRoom[] = [
     ...rooms
@@ -49,7 +46,11 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               <h1>🏫 {cls.name}</h1>
               <span className="lab-chip">{cls.grade_level}</span>
             </div>
-            <p>학생 명단과 글쓰기 활동 세션을 한곳에서 관리합니다.</p>
+            <p>
+              {integratedRoster
+                ? "아지트 학생 명단으로 글쓰기 활동을 운영합니다."
+                : "학생 명단과 글쓰기 활동 세션을 한곳에서 관리합니다."}
+            </p>
           </div>
           <Link href={`/dashboard/room/new?class_id=${id}`} className="lab-button lab-button--primary">
             + 활동 만들기
@@ -59,10 +60,17 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-7">
         <div className="lg:col-span-1">
           <div className="space-y-4">
-            <RosterManager classId={id} students={students} rosterLocked={activeRooms.length > 0} />
-            <div className="lab-panel p-7">
-              <DeleteClassButton classId={id} />
-            </div>
+            <RosterManager
+              classId={id}
+              students={students}
+              rosterLocked={activeRooms.length > 0}
+              readOnly={integratedRoster}
+            />
+            {!integratedRoster && (
+              <div className="lab-panel p-7">
+                <DeleteClassButton classId={id} />
+              </div>
+            )}
           </div>
         </div>
 

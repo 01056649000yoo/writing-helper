@@ -7,7 +7,10 @@ export default async function DashboardPage() {
   return (
     <main className="lab-page">
       <div className="lab-page__content">
-        <DashboardTabs classes={classes} />
+        <DashboardTabs
+          classes={classes}
+          integratedRoster={process.env.LAB_SSO_ENABLED === "true"}
+        />
       </div>
     </main>
   );

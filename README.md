@@ -21,6 +21,16 @@ npm run dev
 
 과학·도덕·낱말 게임의 실행 화면과 서버 코드는 제거했지만 기존 DB 테이블과 과거 데이터는 롤백과 이력 확인을 위해 삭제하지 않습니다.
 
+### 통합 학급·학생 원장
+
+통합 `/lab`은 별도의 학급이나 학생 명단을 만들지 않습니다. 끄적끄적 아지트의 `public.classes`와
+`public.students`가 유일한 원장이며, 아지트에서 변경한 현재 활성 명단을 화면을 열 때 직접 읽습니다.
+
+- 신규 활동은 `writing_helper.rooms.agit_class_id`로 아지트 학급을 직접 참조합니다.
+- 학생 결과는 `writing_helper.student_sessions.agit_student_id`로 아지트 학생을 직접 참조합니다.
+- 번호와 이름은 활동 당시 표시 스냅샷으로 유지합니다.
+- 구 `writing_helper.classes`·`class_students`는 기존 자료와 롤백용 `helper.` 호환을 위해 삭제하지 않습니다.
+
 ## Production: Docker
 
 이 앱은 운영 시 Docker Compose 기준으로 실행합니다.

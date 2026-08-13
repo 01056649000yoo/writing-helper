@@ -44,6 +44,7 @@ export interface Room {
   id: string;
   teacher_id: string;
   class_id: string | null;
+  agit_class_id?: string | null;
   title: string;
   topic: string;
   topic_description: string;
@@ -67,6 +68,7 @@ export interface RoomStudent {
   room_id: string;
   student_number: number;
   student_name: string;
+  agit_student_id?: string | null;
   created_at: string;
 }
 
@@ -74,6 +76,7 @@ export interface StudentSession {
   id: string;
   room_id: string;
   room_student_id: string | null;
+  agit_student_id?: string | null;
   student_number: number;
   student_name: string;
   level: StudentLevel | null;

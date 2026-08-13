@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { withBasePath } from "@/lib/app-path";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import {
+  getIntegratedClassStudents,
+  getIntegratedTeacherClass,
+  isIntegratedLab,
+} from "@/lib/lab-roster";
 import { getCurrentUser } from "./auth-actions";
 import { correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
 import { callAgitAi, parseAiJsonObject } from "@/lib/agit-ai";
@@ -139,10 +144,27 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   if (!classId) return { error: "학급을 선택해주세요." };
 
   const admin = createSupabaseAdminClient();
+  const integratedLab = isIntegratedLab();
+  if (integratedLab) {
+    const classRow = await getIntegratedTeacherClass(admin, user.id, classId);
+    if (!classRow) return { error: "아지트에서 관리 중인 학급을 찾을 수 없습니다." };
+  } else {
+    const { data: classRow } = await admin
+      .schema("writing_helper")
+      .from("classes")
+      .select("id")
+      .eq("id", classId)
+      .eq("teacher_id", user.id)
+      .maybeSingle();
+    if (!classRow) return { error: "학급을 찾을 수 없습니다." };
+  }
+
   const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
   const baseRoomPayload = {
     teacher_id: user.id,
-    class_id: classId,
+    ...(integratedLab
+      ? { class_id: null, agit_class_id: classId }
+      : { class_id: classId }),
     title: topic,
     topic,
     topic_description: topicDescription,
@@ -474,12 +496,19 @@ export async function deleteRoom(roomId: string): Promise<{ error?: string }> {
   const admin = createSupabaseAdminClient();
 
   // 종료된 활동 세션만 삭제 허용
-  const { data: room } = await admin
-    .schema("writing_helper")
-    .from("rooms")
-    .select("is_active, class_id, teacher_id")
-    .eq("id", roomId)
-    .maybeSingle();
+  const { data: room } = isIntegratedLab()
+    ? await admin
+        .schema("writing_helper")
+        .from("rooms")
+        .select("is_active, class_id, agit_class_id, teacher_id")
+        .eq("id", roomId)
+        .maybeSingle()
+    : await admin
+        .schema("writing_helper")
+        .from("rooms")
+        .select("is_active, class_id, teacher_id")
+        .eq("id", roomId)
+        .maybeSingle();
 
   if (!room) return { error: "활동 세션을 찾을 수 없습니다." };
   if (room.teacher_id !== user.id) return { error: "권한이 없습니다." };
@@ -494,7 +523,10 @@ export async function deleteRoom(roomId: string): Promise<{ error?: string }> {
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");
-  if (room.class_id) revalidatePath(`/dashboard/class/${room.class_id}`);
+  const dashboardClassId = "agit_class_id" in room && room.agit_class_id
+    ? String(room.agit_class_id)
+    : room.class_id;
+  if (dashboardClassId) revalidatePath(`/dashboard/class/${dashboardClassId}`);
   return {};
 }
 
@@ -558,7 +590,20 @@ export async function getRoomStudents(roomId: string): Promise<RoomStudent[]> {
   if (!user) return [];
   const admin = createSupabaseAdminClient();
 
-  // 소유권 확인하면서 class_id도 함께 조회
+  if (isIntegratedLab()) {
+    const { data: room } = await admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("agit_class_id, teacher_id")
+      .eq("id", roomId)
+      .maybeSingle();
+
+    if (!room || room.teacher_id !== user.id || !room.agit_class_id) return [];
+    const students = await getIntegratedClassStudents(admin, user.id, room.agit_class_id);
+    return students.map((student) => ({ ...student, room_id: roomId }));
+  }
+
+  // 구 helper 호환: 독립 연구소 학급의 명단을 조회한다.
   const { data: room } = await admin
     .schema("writing_helper")
     .from("rooms")
@@ -883,7 +928,7 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
     .order("created_at", { ascending: false });
 
   if (classId) {
-    query = query.eq("class_id", classId);
+    query = query.eq(isIntegratedLab() ? "agit_class_id" : "class_id", classId);
   }
 
   const { data: rooms } = await query;

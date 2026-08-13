@@ -1,6 +1,10 @@
 "use server";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import {
+  findIntegratedStudentByRosterIdentity,
+  isIntegratedLab,
+} from "@/lib/lab-roster";
 import { parseOutlineResult } from "@/lib/result-format";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { deterministicShuffle } from "@/lib/anonymous-order";
@@ -38,12 +42,20 @@ export async function verifyStudent(
   const admin = createSupabaseAdminClient();
 
   // 방이 활성화 상태인지 확인
-  const { data: room } = await admin
-    .schema("writing_helper")
-    .from("rooms")
-    .select("id, is_active, expires_at, class_id")
-    .eq("id", roomId)
-    .maybeSingle();
+  const integratedLab = isIntegratedLab();
+  const { data: room } = integratedLab
+    ? await admin
+        .schema("writing_helper")
+        .from("rooms")
+        .select("id, is_active, expires_at, class_id, agit_class_id")
+        .eq("id", roomId)
+        .maybeSingle()
+    : await admin
+        .schema("writing_helper")
+        .from("rooms")
+        .select("id, is_active, expires_at, class_id")
+        .eq("id", roomId)
+        .maybeSingle();
 
   if (!room) return { error: "방을 찾을 수 없습니다." };
   if (!room.is_active) return { error: "이미 종료된 활동입니다." };
@@ -51,10 +63,20 @@ export async function verifyStudent(
     return { error: "활동 시간이 만료됐습니다." };
   }
 
-  // 명단 확인 (class_students 우선, fallback room_students)
+  // 통합 /lab은 아지트 학생 원장을 직접 확인한다. 구 helper만 독립 명단을 사용한다.
   let studentId: string | null = null;
+  let agitStudentId: string | null = null;
 
-  if (room.class_id) {
+  if (integratedLab && "agit_class_id" in room && room.agit_class_id) {
+    const agitStudent = await findIntegratedStudentByRosterIdentity(
+      admin,
+      String(room.agit_class_id),
+      studentNumber,
+      studentName,
+    );
+    studentId = agitStudent?.id ?? null;
+    agitStudentId = agitStudent?.id ?? null;
+  } else if (room.class_id) {
     const { data: cs } = await admin
       .schema("writing_helper")
       .from("class_students")
@@ -80,14 +102,15 @@ export async function verifyStudent(
   const student = { id: studentId };
 
   // 기존 세션 확인
-  const { data: existing } = await admin
+  let existingQuery = admin
     .schema("writing_helper")
     .from("student_sessions")
     .select("id, status")
-    .eq("room_id", roomId)
-    .eq("student_number", studentNumber)
-    .eq("student_name", studentName)
-    .maybeSingle();
+    .eq("room_id", roomId);
+  existingQuery = agitStudentId
+    ? existingQuery.eq("agit_student_id", agitStudentId)
+    : existingQuery.eq("student_number", studentNumber).eq("student_name", studentName);
+  const { data: existing } = await existingQuery.maybeSingle();
 
   if (existing) {
     return { studentId: student.id, sessionId: existing.id, status: existing.status };
@@ -100,6 +123,7 @@ export async function verifyStudent(
     .insert({
       room_id: roomId,
       room_student_id: null,
+      ...(agitStudentId ? { agit_student_id: agitStudentId } : {}),
       student_number: studentNumber,
       student_name: studentName,
     })

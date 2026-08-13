@@ -6,6 +6,8 @@ import { createClass } from "@/app/actions/class-actions";
 
 const GRADE_LEVELS = ["저학년", "중학년", "고학년"] as const;
 const COL_SIZE = 10;
+const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
+  ?? "https://끄적끄적아지트.site";
 
 export default function NewClassPage() {
   const [error, setError] = useState("");
@@ -71,6 +73,32 @@ export default function NewClassPage() {
   const setRef = useCallback((el: HTMLInputElement | null, idx: number) => {
     inputRefs.current[idx] = el;
   }, []);
+
+  if (process.env.NEXT_PUBLIC_LAB_SSO_ENABLED === "true") {
+    return (
+      <main className="lab-page">
+        <div className="lab-page__content lab-page__content--narrow">
+          <Link href="/dashboard" className="lab-breadcrumb">← 학급 목록</Link>
+          <div className="lab-panel lab-panel--raised p-7 text-center sm:p-10">
+            <div className="text-5xl mb-4">🏫</div>
+            <h1 className="text-2xl font-bold text-gray-800">학급은 아지트에서 한 번만 관리합니다</h1>
+            <p className="mt-3 text-base leading-relaxed text-gray-500">
+              글쓰기 연구소는 끄적끄적 아지트의 학급과 학생 명단을 그대로 사용합니다.
+              아지트에서 변경한 내용은 연구소를 다시 열거나 새로고침하면 바로 반영됩니다.
+            </p>
+            <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+              <a href={AGIT_HOME_URL} className="lab-button lab-button--primary">
+                아지트에서 학급 관리
+              </a>
+              <Link href="/dashboard" className="lab-button lab-button--quiet">
+                연구소 학급 목록
+              </Link>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="lab-page">

@@ -14,10 +14,12 @@ export function RosterManager({
   classId,
   students,
   rosterLocked,
+  readOnly = false,
 }: {
   classId: string;
   students: Student[];
   rosterLocked: boolean;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -74,7 +76,11 @@ export function RosterManager({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-gray-800">👥 학생 명단</h2>
-            <p className="text-sm text-gray-500 mt-1">번호와 이름으로 바로 입장할 수 있는 참여자 목록입니다.</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {readOnly
+                ? "아지트 학급 관리의 현재 활성 학생 명단입니다."
+                : "번호와 이름으로 바로 입장할 수 있는 참여자 목록입니다."}
+            </p>
           </div>
           <div className="shrink-0 rounded-2xl bg-white/90 border border-indigo-100 px-3 py-2 text-right shadow-sm">
             <p className="text-xs font-medium text-gray-400">등록 인원</p>
@@ -93,7 +99,9 @@ export function RosterManager({
           {students.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 px-5 py-8 text-center">
               <p className="text-sm font-medium text-gray-500">아직 등록된 학생이 없습니다.</p>
-              <p className="text-xs text-gray-400 mt-1">오른쪽 입력칸에서 학생 이름을 하나씩 추가해보세요.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {readOnly ? "아지트 학급 관리에서 학생을 등록해주세요." : "아래 입력칸에서 학생 이름을 추가해보세요."}
+              </p>
             </div>
           ) : (
             <div className={shouldScrollRoster ? "max-h-[420px] overflow-y-auto pr-1" : ""}>
@@ -109,7 +117,7 @@ export function RosterManager({
                     <p className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-semibold text-gray-800 sm:text-[15px]">
                       {student.student_name}
                     </p>
-                    {pendingDeleteId !== student.id ? (
+                    {!readOnly && (pendingDeleteId !== student.id ? (
                       <button
                         type="button"
                         onClick={() => setPendingDeleteId(student.id)}
@@ -139,7 +147,7 @@ export function RosterManager({
                           확인
                         </button>
                       </div>
-                    )}
+                    ))}
                   </div>
                 ))}
               </div>
@@ -148,6 +156,12 @@ export function RosterManager({
         </div>
       </div>
 
+      {readOnly ? (
+        <div className="border-t border-blue-100 bg-blue-50 px-5 py-4 text-sm text-blue-800 sm:px-7">
+          학생 추가·이름 변경·삭제는 아지트 학급 관리에서 한 번만 처리합니다. 변경된 명단은
+          이 화면을 다시 열거나 새로고침하면 바로 반영됩니다.
+        </div>
+      ) : (
       <div className="border-t border-gray-100 bg-slate-50/70 px-4 py-4 sm:px-6 sm:py-5">
         <div className="rounded-3xl border border-white bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -198,6 +212,7 @@ export function RosterManager({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

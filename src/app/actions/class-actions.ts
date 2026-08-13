@@ -4,12 +4,23 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { withBasePath } from "@/lib/app-path";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import {
+  getIntegratedClassRooms,
+  getIntegratedClassStudents,
+  getIntegratedClassWorkspace,
+  getIntegratedTeacherClass,
+  getIntegratedTeacherClasses,
+  isIntegratedLab,
+} from "@/lib/lab-roster";
 import { getCurrentUser } from "./auth-actions";
 import type { GradeLevel } from "@/types";
 
 export async function createClass(formData: FormData): Promise<{ error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
+  if (isIntegratedLab()) {
+    return { error: "통합 연구소의 학급과 학생은 끄적끄적 아지트에서 관리합니다." };
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
@@ -53,6 +64,10 @@ export async function getClasses() {
   if (!user) return [];
 
   const admin = createSupabaseAdminClient();
+  if (isIntegratedLab()) {
+    return getIntegratedTeacherClasses(admin, user.id);
+  }
+
   const { data } = await admin
     .schema("writing_helper")
     .from("classes")
@@ -67,6 +82,10 @@ export async function getClass(classId: string) {
   const user = await getCurrentUser();
   if (!user) return null;
   const admin = createSupabaseAdminClient();
+  if (isIntegratedLab()) {
+    return getIntegratedTeacherClass(admin, user.id, classId);
+  }
+
   const { data } = await admin
     .schema("writing_helper")
     .from("classes")
@@ -81,6 +100,10 @@ export async function getClassStudents(classId: string) {
   const user = await getCurrentUser();
   if (!user) return [];
   const admin = createSupabaseAdminClient();
+  if (isIntegratedLab()) {
+    return getIntegratedClassStudents(admin, user.id, classId);
+  }
+
   // 소유권 확인
   const { data: cls } = await admin
     .schema("writing_helper")
@@ -103,6 +126,10 @@ export async function getClassRooms(classId: string) {
   const user = await getCurrentUser();
   if (!user) return [];
   const admin = createSupabaseAdminClient();
+  if (isIntegratedLab()) {
+    return getIntegratedClassRooms(admin, user.id, classId);
+  }
+
   // 소유권 확인
   const { data: cls } = await admin
     .schema("writing_helper")
@@ -121,9 +148,49 @@ export async function getClassRooms(classId: string) {
   return data ?? [];
 }
 
+export async function getClassWorkspace(classId: string) {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const admin = createSupabaseAdminClient();
+  if (isIntegratedLab()) {
+    return getIntegratedClassWorkspace(admin, user.id, classId);
+  }
+
+  const { data: classRow } = await admin
+    .schema("writing_helper")
+    .from("classes")
+    .select("*")
+    .eq("id", classId)
+    .eq("teacher_id", user.id)
+    .maybeSingle();
+  if (!classRow) return null;
+
+  const [{ data: students }, { data: rooms }] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("class_students")
+      .select("*")
+      .eq("class_id", classId)
+      .order("student_number"),
+    admin
+      .schema("writing_helper")
+      .from("rooms")
+      .select("*")
+      .eq("class_id", classId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+
+  return { class: classRow, students: students ?? [], rooms: rooms ?? [] };
+}
+
 export async function addClassStudents(formData: FormData): Promise<{ error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
+  if (isIntegratedLab()) {
+    return { error: "학생 명단은 끄적끄적 아지트의 학급 관리에서 수정해주세요." };
+  }
 
   const classId = String(formData.get("class_id") ?? "").trim();
   const studentsRaw = String(formData.get("students") ?? "").trim();
@@ -165,6 +232,9 @@ export async function addClassStudents(formData: FormData): Promise<{ error?: st
 export async function deleteClassStudent(formData: FormData): Promise<{ error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
+  if (isIntegratedLab()) {
+    return { error: "학생 명단은 끄적끄적 아지트의 학급 관리에서 수정해주세요." };
+  }
 
   const classId = String(formData.get("class_id") ?? "").trim();
   const studentId = String(formData.get("student_id") ?? "").trim();
@@ -194,6 +264,9 @@ export async function deleteClassStudent(formData: FormData): Promise<{ error?: 
 export async function deleteClass(classId: string): Promise<{ error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "로그인이 필요합니다." };
+  if (isIntegratedLab()) {
+    return { error: "학급은 끄적끄적 아지트의 학급 관리에서 관리해주세요." };
+  }
 
   const admin = createSupabaseAdminClient();
   const { error } = await admin
