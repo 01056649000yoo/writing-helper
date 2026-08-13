@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import { isIntegratedLab } from "@/lib/lab-roster";
+import { ensureIntegratedStudentRoomSession } from "@/lib/lab-student-session";
 import { isActivityType, type ActivityType } from "@/features/activities/types";
 import { RoomEntryClient } from "./room-entry-client";
 
@@ -27,12 +29,16 @@ export default async function RoomEntryPage({
     : isActivityType(room.activity_type)
       ? room.activity_type
       : notFound();
+  const integratedEntry = isIntegratedLab()
+    ? await ensureIntegratedStudentRoomSession(roomId)
+    : null;
 
   return (
     <RoomEntryClient
       roomId={roomId}
       activityType={activityType}
       topic={room.topic ?? ""}
+      integratedEntry={integratedEntry}
     />
   );
 }

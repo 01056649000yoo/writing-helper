@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { QUESTION_CARD_SETS } from "./question-card-sets";
 import { QUESTION_CARD_ROLE_PRESETS, normalizeQuestionCardLabel } from "./question-card-roles";
+import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 
 export const questionGeneratorDefinition: ActivityDefinition<
   QuestionGeneratorConfig,
@@ -25,6 +26,17 @@ export const questionGeneratorDefinition: ActivityDefinition<
   integration: {
     schemaVersion: 1,
     resultKind: "questions",
+    toPortableResult: ({ submission }) => {
+      const normalized = normalizeQuestionGeneratorSubmission(submission);
+      return {
+        chunks: (normalized?.selections ?? []).map((selection) => ({
+          id: selection.id,
+          kind: "question" as const,
+          label: selection.cardSetLabel,
+          text: selection.remixedQuestion,
+        })),
+      };
+    },
   },
   createDefaultConfig: () => ({
     enabledCardSetIds: QUESTION_CARD_SETS.map((set) => set.id),

@@ -15,6 +15,30 @@ export const outlineBuilderDefinition: ActivityDefinition<
   integration: {
     schemaVersion: 1,
     resultKind: "outline",
+    toPortableResult: ({ answers }) => {
+      const chunks = Array.isArray(answers)
+        ? answers
+            .filter(isRecord)
+            .map((answer, index) => {
+              const text = typeof answer.answer === "string" ? answer.answer.trim() : "";
+              const section: "처음" | "가운데" | "끝" = answer.section === "가운데" || answer.section === "끝"
+                ? answer.section
+                : "처음";
+              return {
+                id: typeof answer.itemId === "string" && answer.itemId.trim()
+                  ? answer.itemId.trim()
+                  : `outline-${index + 1}`,
+                kind: "outline_item" as const,
+                section,
+                label: typeof answer.label === "string" ? answer.label.trim() : "",
+                text,
+              };
+            })
+            .filter((chunk) => chunk.text.length > 0)
+        : [];
+
+      return { chunks };
+    },
   },
   createDefaultConfig: () => ({
     subjectType: "생활문",

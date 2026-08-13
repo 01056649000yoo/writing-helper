@@ -5,6 +5,7 @@ import type {
   HanjaWritingRoomResult,
   HanjaWritingSubmission,
 } from "../types";
+import { extractHanjaWritingContents } from "@/lib/hanja-writing";
 
 export const hanjaWritingDefinition: ActivityDefinition<
   HanjaWritingConfig,
@@ -22,6 +23,14 @@ export const hanjaWritingDefinition: ActivityDefinition<
   integration: {
     schemaVersion: 1,
     resultKind: "hanja_sentences",
+    toPortableResult: ({ submission }) => ({
+      chunks: extractHanjaWritingContents(submission).map((text, index) => ({
+        id: `hanja-sentence-${index + 1}`,
+        kind: "sentence" as const,
+        label: "한자 활용 문장",
+        text,
+      })),
+    }),
   },
   createDefaultConfig: () => ({
     promptTitle: "한자 카드를 보고 문장을 만들어 보세요",

@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, createSupabaseAdminClient } from "@/lib/supabase-server";
-import { withBasePath } from "@/lib/app-path";
 
 type AuthResult = { error?: string; success?: boolean; email?: string };
 
@@ -73,13 +72,13 @@ export async function signIn(_prevState: unknown, formData: FormData): Promise<{
 
   if (error) return { error: "이메일 또는 비밀번호가 올바르지 않습니다." };
 
-  redirect(withBasePath("/dashboard"));
+  redirect("/dashboard");
 }
 
 export async function signOut() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
-  redirect(withBasePath("/login"));
+  redirect("/login");
 }
 
 export async function requestPasswordReset(formData: FormData): Promise<AuthResult> {

@@ -5,6 +5,10 @@ import type {
   QuestionVotingRoomResult,
   QuestionVotingSubmission,
 } from "../types";
+import {
+  normalizeQuestionVotingConfig,
+  normalizeQuestionVotingSubmission,
+} from "@/lib/question-voting";
 
 export const questionVotingDefinition: ActivityDefinition<
   QuestionVotingConfig,
@@ -22,6 +26,24 @@ export const questionVotingDefinition: ActivityDefinition<
   integration: {
     schemaVersion: 1,
     resultKind: "selected_questions",
+    toPortableResult: ({ config, submission }) => {
+      const normalizedConfig = normalizeQuestionVotingConfig(config);
+      const normalizedSubmission = normalizeQuestionVotingSubmission(submission);
+      const questions = new Map(
+        (normalizedConfig?.sourceQuestions ?? []).map((question) => [question.id, question.text] as const),
+      );
+
+      return {
+        chunks: (normalizedSubmission?.selectedQuestionIds ?? [])
+          .map((questionId) => ({
+            id: questionId,
+            kind: "selected_question" as const,
+            label: "좋은 질문",
+            text: questions.get(questionId) ?? "",
+          }))
+          .filter((chunk) => chunk.text.length > 0),
+      };
+    },
   },
   createDefaultConfig: () => ({
     sourceRoomId: null,

@@ -56,13 +56,15 @@ test("통합 모드는 별도 비밀번호 인증을 막고 DB 승인 교사 RPC
   assert.match(authActions, /access\?\.allowed !== true/);
   assert.match(authActions, /통합 연구소는 끄적끄적 아지트에서 로그인한 승인 교사/);
   assert.match(loginPage, /await getCurrentUser\(\)/);
-  assert.match(loginPage, /redirect\(withBasePath\("\/dashboard"\)\)/);
+  assert.match(loginPage, /redirect\("\/dashboard"\)/);
+  assert.doesNotMatch(loginPage, /redirect\(withBasePath\(/);
   assert.match(loginClient, /ssoEnabled \? \"아지트 교사 계정으로 바로 이어집니다/);
   assert.match(loginClient, /별도 가입이나 비밀번호 입력은 필요하지 않습니다/);
 });
 
 test("승인 실패는 연구소 전용 안내로 보내고 아지트 복귀 동선을 제공한다", () => {
   assert.match(proxy, /"\/access-denied"/);
-  assert.match(dashboardLayout, /if \(!profile\) redirect\(withBasePath\("\/access-denied"\)\)/);
+  assert.match(dashboardLayout, /if \(!profile\) redirect\("\/access-denied"\)/);
+  assert.doesNotMatch(dashboardLayout, /redirect\(withBasePath\(/);
   assert.match(dashboardLayout, /아지트로 돌아가기/);
 });

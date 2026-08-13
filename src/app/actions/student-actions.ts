@@ -1,11 +1,13 @@
 "use server";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import { isIntegratedLab } from "@/lib/lab-roster";
 import {
-  findIntegratedStudentByRosterIdentity,
-  isIntegratedLab,
-} from "@/lib/lab-roster";
+  ensureIntegratedStudentRoomSession,
+  ownsIntegratedStudentSession,
+} from "@/lib/lab-student-session";
 import { parseOutlineResult } from "@/lib/result-format";
+import { persistPortableResult } from "@/lib/portable-results";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildOneLineShareBoard, includesAllConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
@@ -34,28 +36,23 @@ export async function verifyStudent(
   studentNumber: number,
   studentName: string
 ): Promise<{ error?: string; studentId?: string; sessionId?: string; status?: string }> {
-  // 서버 측 입력 유효성 검사
   if (!roomId || typeof roomId !== "string" || roomId.length > 100) return { error: "잘못된 요청입니다." };
+  if (isIntegratedLab()) {
+    return ensureIntegratedStudentRoomSession(roomId);
+  }
+
+  // 구 helper의 번호·이름 입장 호환 경로
   if (!Number.isInteger(studentNumber) || studentNumber < 1 || studentNumber > 100) return { error: "출석 번호는 1~100 사이여야 합니다." };
   if (!studentName || typeof studentName !== "string" || studentName.trim().length === 0 || studentName.length > 50) return { error: "이름을 올바르게 입력해주세요." };
 
   const admin = createSupabaseAdminClient();
 
-  // 방이 활성화 상태인지 확인
-  const integratedLab = isIntegratedLab();
-  const { data: room } = integratedLab
-    ? await admin
-        .schema("writing_helper")
-        .from("rooms")
-        .select("id, is_active, expires_at, class_id, agit_class_id")
-        .eq("id", roomId)
-        .maybeSingle()
-    : await admin
-        .schema("writing_helper")
-        .from("rooms")
-        .select("id, is_active, expires_at, class_id")
-        .eq("id", roomId)
-        .maybeSingle();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("id, is_active, expires_at, class_id")
+    .eq("id", roomId)
+    .maybeSingle();
 
   if (!room) return { error: "방을 찾을 수 없습니다." };
   if (!room.is_active) return { error: "이미 종료된 활동입니다." };
@@ -63,20 +60,8 @@ export async function verifyStudent(
     return { error: "활동 시간이 만료됐습니다." };
   }
 
-  // 통합 /lab은 아지트 학생 원장을 직접 확인한다. 구 helper만 독립 명단을 사용한다.
   let studentId: string | null = null;
-  let agitStudentId: string | null = null;
-
-  if (integratedLab && "agit_class_id" in room && room.agit_class_id) {
-    const agitStudent = await findIntegratedStudentByRosterIdentity(
-      admin,
-      String(room.agit_class_id),
-      studentNumber,
-      studentName,
-    );
-    studentId = agitStudent?.id ?? null;
-    agitStudentId = agitStudent?.id ?? null;
-  } else if (room.class_id) {
+  if (room.class_id) {
     const { data: cs } = await admin
       .schema("writing_helper")
       .from("class_students")
@@ -107,9 +92,9 @@ export async function verifyStudent(
     .from("student_sessions")
     .select("id, status")
     .eq("room_id", roomId);
-  existingQuery = agitStudentId
-    ? existingQuery.eq("agit_student_id", agitStudentId)
-    : existingQuery.eq("student_number", studentNumber).eq("student_name", studentName);
+  existingQuery = existingQuery
+    .eq("student_number", studentNumber)
+    .eq("student_name", studentName);
   const { data: existing } = await existingQuery.maybeSingle();
 
   if (existing) {
@@ -123,7 +108,6 @@ export async function verifyStudent(
     .insert({
       room_id: roomId,
       room_student_id: null,
-      ...(agitStudentId ? { agit_student_id: agitStudentId } : {}),
       student_number: studentNumber,
       student_name: studentName,
     })
@@ -138,6 +122,8 @@ export async function verifyStudent(
 // 결과 조회
 export async function getStudentResult(sessionId: string, roomId: string) {
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) return null;
+
   const [sessionRes, roomRes] = await Promise.all([
     admin.schema("writing_helper").from("student_sessions")
       .select("student_name, submission, answers, result").eq("id", sessionId).maybeSingle(),
@@ -308,6 +294,10 @@ export async function setStudentLevel(
   level: StudentLevel
 ): Promise<{ error?: string }> {
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId)) {
+    return { error: "내 활동만 수정할 수 있습니다." };
+  }
+
   const { error } = await admin
     .schema("writing_helper")
     .from("student_sessions")
@@ -324,6 +314,10 @@ export async function saveAnswers(
   answers: OutlineTemplateAnswer[]
 ): Promise<{ error?: string }> {
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId)) {
+    return { error: "내 활동만 수정할 수 있습니다." };
+  }
+
   const { error } = await admin
     .schema("writing_helper")
     .from("student_sessions")
@@ -340,6 +334,9 @@ export async function requestOutline(
   latestAnswers?: OutlineTemplateAnswer[]
 ): Promise<{ error?: string; done?: boolean }> {
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId)) {
+    return { error: "내 활동만 제출할 수 있습니다." };
+  }
 
   if (latestAnswers && latestAnswers.length > 0) {
     const { error: updateError } = await admin
@@ -354,7 +351,7 @@ export async function requestOutline(
   const { data: session } = await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("id, answers")
+    .select("id, room_id, answers")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -365,11 +362,9 @@ export async function requestOutline(
     return { error: "작성한 항목이 없습니다. 한 가지 이상 골라서 써 보세요." };
   }
 
-  await admin
-    .schema("writing_helper")
-    .from("student_sessions")
-    .update({ status: "done", updated_at: new Date().toISOString() })
-    .eq("id", sessionId);
+  if (!await persistPortableResult(admin, sessionId, session.room_id ?? "")) {
+    return { error: "활동 결과를 아지트에 연결하지 못했습니다. 다시 제출해주세요." };
+  }
 
   return { done: true };
 }
@@ -400,6 +395,8 @@ export async function getShareableResult(sessionId: string) {
 // 학생 세션 가져오기
 export async function getStudentSession(sessionId: string) {
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId)) return null;
+
   const { data } = await admin
     .schema("writing_helper")
     .from("student_sessions")
@@ -413,6 +410,7 @@ export async function getStudentSession(sessionId: string) {
 export async function getStudentRoomQuestions(sessionId: string, roomId: string) {
   if (!sessionId || !roomId) return null;
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) return null;
 
   // 해당 세션이 이 방에 속하는지 확인
   const { data: session } = await admin
@@ -525,6 +523,10 @@ export async function submitQuestionGenerator(
   }
 
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) {
+    return { error: "내 활동만 제출할 수 있습니다." };
+  }
+
   const [sessionRes, roomRes] = await Promise.all([
     admin
       .schema("writing_helper")
@@ -576,13 +578,15 @@ export async function submitQuestionGenerator(
     .update({
       submission: { selections: sanitizedSelections },
       result: { submittedCount: sanitizedSelections.length },
-      status: "done",
       updated_at: new Date().toISOString(),
     })
     .eq("id", sessionId)
     .eq("room_id", roomId);
 
   if (error) return { error: "질문 저장에 실패했습니다." };
+  if (!await persistPortableResult(admin, sessionId, roomId)) {
+    return { error: "질문 결과를 아지트에 연결하지 못했습니다. 다시 제출해주세요." };
+  }
   return {};
 }
 
@@ -594,6 +598,10 @@ export async function submitQuestionVoting(
   if (!sessionId || !roomId) return { error: "잘못된 요청입니다." };
 
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) {
+    return { error: "내 활동만 제출할 수 있습니다." };
+  }
+
   const [sessionRes, roomRes] = await Promise.all([
     admin
       .schema("writing_helper")
@@ -641,13 +649,15 @@ export async function submitQuestionVoting(
       result: {
         selectedQuestionIds,
       },
-      status: "done",
       updated_at: new Date().toISOString(),
     })
     .eq("id", sessionId)
     .eq("room_id", roomId);
 
   if (error) return { error: "질문 평가 저장에 실패했습니다." };
+  if (!await persistPortableResult(admin, sessionId, roomId)) {
+    return { error: "질문 결과를 아지트에 연결하지 못했습니다. 다시 제출해주세요." };
+  }
   return {};
 }
 
@@ -664,6 +674,10 @@ export async function submitOneLineShare(
   }
 
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) {
+    return { error: "내 활동만 제출할 수 있습니다." };
+  }
+
   const [sessionRes, roomRes, existingEntryRes] = await Promise.all([
     admin
       .schema("writing_helper")
@@ -742,13 +756,15 @@ export async function submitOneLineShare(
         submitted: true,
         likeCount: reactionCount,
       },
-      status: "done",
       updated_at: new Date().toISOString(),
     })
     .eq("id", sessionId)
     .eq("room_id", roomId);
 
   if (error) return { error: "학생 활동 상태 저장에 실패했습니다." };
+  if (!await persistPortableResult(admin, sessionId, roomId)) {
+    return { error: "한 줄 결과를 아지트에 연결하지 못했습니다. 다시 제출해주세요." };
+  }
   return { entryId: entryRes.data.id };
 }
 
@@ -767,6 +783,10 @@ export async function submitHanjaWriting(
   }
 
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) {
+    return { error: "내 활동만 제출할 수 있습니다." };
+  }
+
   const [sessionRes, roomRes] = await Promise.all([
     admin
       .schema("writing_helper")
@@ -806,13 +826,15 @@ export async function submitHanjaWriting(
         content: normalizedContents[0],
       },
       result: { submitted: true, likeCount: 0 },
-      status: "done",
       updated_at: new Date().toISOString(),
     })
     .eq("id", sessionId)
     .eq("room_id", roomId);
 
   if (error) return { error: "문장 저장에 실패했습니다." };
+  if (!await persistPortableResult(admin, sessionId, roomId)) {
+    return { error: "문장 결과를 아지트에 연결하지 못했습니다. 다시 제출해주세요." };
+  }
   return {};
 }
 
@@ -830,6 +852,10 @@ export async function toggleHanjaWritingReaction(
   }
 
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) {
+    return { error: "내 활동에서만 반응할 수 있습니다." };
+  }
+
   const [sessionRes, roomRes, targetRes, existingReactionRes, currentCountRes] = await Promise.all([
     admin
       .schema("writing_helper")
@@ -926,6 +952,10 @@ export async function toggleOneLineReaction(
   if (!sessionId || !roomId || !entryId) return { error: "잘못된 요청입니다." };
 
   const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) {
+    return { error: "내 활동에서만 반응할 수 있습니다." };
+  }
+
   const [sessionRes, roomRes, entryRes, existingReactionRes] = await Promise.all([
     admin
       .schema("writing_helper")

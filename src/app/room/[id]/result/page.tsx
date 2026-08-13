@@ -46,6 +46,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const [hanjaWritingBoard, setHanjaWritingBoard] = useState<HanjaWritingBoardEntry[]>([]);
   const [reactionPendingEntryId, setReactionPendingEntryId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     params.then((p) => setRoomId(p.id));
@@ -54,6 +55,12 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (!sessionId || !roomId) return;
     getStudentResult(sessionId, roomId).then((data) => {
+      if (!data) {
+        setLoadError("내 활동 결과만 확인할 수 있어요.");
+        setLoaded(true);
+        return;
+      }
+
       const rawAnswers = (data as { outlineAnswers?: unknown }).outlineAnswers;
       setOutlineAnswers(
         Array.isArray(rawAnswers)
@@ -78,6 +85,9 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
       setHanjaWritingConfig(data.hanjaWritingConfig ?? null);
       setHanjaWritingEntry(data.hanjaWritingEntry ?? null);
       setHanjaWritingBoard(data.hanjaWritingBoard ?? []);
+      setLoaded(true);
+    }).catch(() => {
+      setLoadError("결과를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
       setLoaded(true);
     });
   }, [sessionId, roomId]);
@@ -175,6 +185,24 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
         <div className="text-center">
           <div className="text-5xl mb-4 animate-bounce">⏳</div>
           <p className="text-gray-500">결과를 불러오고 있어요...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-xl">
+          <div className="mb-4 text-5xl" aria-hidden="true">🔒</div>
+          <h1 className="text-xl font-bold text-gray-800">결과를 열 수 없어요</h1>
+          <p className="mt-3 text-sm text-gray-600">{loadError}</p>
+          <Link
+            href={roomId ? `/room/${roomId}` : "/"}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white"
+          >
+            활동 입장으로 돌아가기
+          </Link>
         </div>
       </div>
     );

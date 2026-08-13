@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { verifyStudent } from "@/app/actions/student-actions";
 import type { ActivityType } from "@/features/activities/types";
+import type { IntegratedStudentEntry } from "@/lib/lab-student-session";
 
 type EntryShellProps = {
   roomId: string;
@@ -14,9 +15,20 @@ export function RoomEntryClient({
   roomId,
   activityType,
   topic,
+  integratedEntry,
 }: EntryShellProps & {
   activityType: ActivityType;
+  integratedEntry: IntegratedStudentEntry | null;
 }) {
+  if (integratedEntry) {
+    return (
+      <IntegratedEntry
+        roomId={roomId}
+        entry={integratedEntry}
+      />
+    );
+  }
+
   if (activityType === "question_generator") {
     return <QuestionGeneratorEntry roomId={roomId} topic={topic} />;
   }
@@ -34,6 +46,72 @@ export function RoomEntryClient({
   }
 
   return <OutlineBuilderEntry roomId={roomId} topic={topic} />;
+}
+
+function IntegratedEntry({
+  roomId,
+  entry,
+}: {
+  roomId: string;
+  entry: IntegratedStudentEntry;
+}) {
+  if (entry.sessionId) {
+    return (
+      <IntegratedEntryRedirect
+        roomId={roomId}
+        sessionId={entry.sessionId}
+        status={entry.status}
+      />
+    );
+  }
+
+  const agitHomeUrl = process.env.NEXT_PUBLIC_AGIT_APP_URL
+    ?? "https://xn--vz0ba242ncqcba79xhwx.site";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
+        <div className="text-5xl mb-4" aria-hidden="true">🔐</div>
+        <h1 className="text-xl font-bold text-gray-800">학생 로그인이 필요해요</h1>
+        <p className="mt-3 text-sm leading-relaxed text-gray-600">
+          {entry.error ?? "끄적끄적 아지트 학생 계정으로 로그인한 뒤 다시 들어와 주세요."}
+        </p>
+        <a
+          href={agitHomeUrl}
+          className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white transition-colors hover:bg-orange-600"
+        >
+          끄적끄적 아지트로 이동
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function IntegratedEntryRedirect({
+  roomId,
+  sessionId,
+  status,
+}: {
+  roomId: string;
+  sessionId: string;
+  status?: string;
+}) {
+  const router = useRouter();
+
+  useEffect(() => {
+    const destination = status === "done" ? "result" : "activity";
+    router.replace(`/room/${roomId}/${destination}?session=${sessionId}`);
+  }, [roomId, router, sessionId, status]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
+        <div className="text-5xl mb-4 animate-bounce" aria-hidden="true">✏️</div>
+        <h1 className="text-xl font-bold text-gray-800">내 활동을 준비하고 있어요</h1>
+        <p className="mt-2 text-sm text-gray-500">아지트 학생 계정으로 바로 입장합니다.</p>
+      </div>
+    </div>
+  );
 }
 
 function OutlineBuilderEntry({ roomId, topic }: EntryShellProps) {

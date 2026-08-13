@@ -2,14 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTeacherProfile, signOut } from "@/app/actions/auth-actions";
 import { DashboardNav } from "./dashboard-nav";
-import { withBasePath } from "@/lib/app-path";
 
 const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
   ?? "https://xn--vz0ba242ncqcba79xhwx.site";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const profile = await getTeacherProfile();
-  if (!profile) redirect(withBasePath("/access-denied"));
+  if (!profile) redirect("/access-denied");
 
   return (
     <div className="lab-shell">

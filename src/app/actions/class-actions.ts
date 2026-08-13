@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { withBasePath } from "@/lib/app-path";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import {
   getIntegratedClassRooms,
@@ -56,7 +55,7 @@ export async function createClass(formData: FormData): Promise<{ error?: string 
   if (studentsError) return { error: "학생 명단 저장에 실패했습니다." };
 
   revalidatePath("/dashboard");
-  redirect(withBasePath(`/dashboard/class/${cls.id}`));
+  redirect(`/dashboard/class/${cls.id}`);
 }
 
 export async function getClasses() {
@@ -279,7 +278,7 @@ export async function deleteClass(classId: string): Promise<{ error?: string }> 
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");
-  redirect(withBasePath("/dashboard"));
+  redirect("/dashboard");
 }
 
 type AdminClient = ReturnType<typeof createSupabaseAdminClient>;

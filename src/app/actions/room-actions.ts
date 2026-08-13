@@ -3,7 +3,6 @@
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { withBasePath } from "@/lib/app-path";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import {
   getIntegratedClassStudents,
@@ -415,7 +414,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/class/${classId}`);
-  redirect(withBasePath(`/dashboard/room/${room.id}`));
+  redirect(`/dashboard/room/${room.id}`);
 }
 
 function parseActivityType(value: FormDataEntryValue | null): ActivityType {
@@ -1393,7 +1392,8 @@ async function getShortCodeForRoom(roomId: string, teacherId: string) {
     .eq("room_id", roomId)
     .maybeSingle();
 
-  if (error && !isMissingShortLinksTableError(error.message)) {
+  if (error && !isMissingShortLinksTableError(error)) {
+    console.error("[short-links] existing code lookup failed", error.code ?? "unknown");
     return null;
   }
 
@@ -1434,7 +1434,7 @@ async function ensureShortLinkForRoom(roomId: string, _teacherId: string, expire
       return data.code;
     }
 
-    if (error && isMissingShortLinksTableError(error.message)) {
+    if (error && isMissingShortLinksTableError(error)) {
       return null;
     }
 
@@ -1450,6 +1450,9 @@ async function ensureShortLinkForRoom(roomId: string, _teacherId: string, expire
     }
 
     if (!error?.message.includes("duplicate")) {
+      if (error) {
+        console.error("[short-links] code creation failed", error.code ?? "unknown");
+      }
       return null;
     }
   }
@@ -1465,6 +1468,11 @@ function generateShortCode() {
     .toLowerCase();
 }
 
-function isMissingShortLinksTableError(message: string) {
-  return message.includes("short_links");
+function isMissingShortLinksTableError(error: { code?: string; message: string }) {
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
+
+  return (
+    /relation .*short_links.* does not exist/i.test(error.message) ||
+    /could not find the table .*short_links.*schema cache/i.test(error.message)
+  );
 }

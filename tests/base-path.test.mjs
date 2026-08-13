@@ -11,12 +11,16 @@ const [
   appPath,
   proxy,
   authActions,
+  classActions,
+  roomActions,
   authCallback,
   authConfirm,
   shortLink,
   roomPage,
   loginPage,
   signupPage,
+  rootPage,
+  dashboardLayout,
 ] = await Promise.all([
   readFile("next.config.ts", "utf8"),
   readFile("Dockerfile", "utf8"),
@@ -26,12 +30,16 @@ const [
   readFile("src/lib/app-path.ts", "utf8"),
   readFile("src/proxy.ts", "utf8"),
   readFile("src/app/actions/auth-actions.ts", "utf8"),
+  readFile("src/app/actions/class-actions.ts", "utf8"),
+  readFile("src/app/actions/room-actions.ts", "utf8"),
   readFile("src/app/auth/callback/route.ts", "utf8"),
   readFile("src/app/auth/confirm/route.ts", "utf8"),
   readFile("src/app/s/[code]/route.ts", "utf8"),
   readFile("src/app/dashboard/room/[id]/page.tsx", "utf8"),
   readFile("src/app/login/page-client.tsx", "utf8"),
   readFile("src/app/signup/page.tsx", "utf8"),
+  readFile("src/app/page.tsx", "utf8"),
+  readFile("src/app/dashboard/layout.tsx", "utf8"),
 ]);
 
 test("/lab basePath는 빌드 인자로 고정하고 기존 루트 빌드도 유지한다", () => {
@@ -53,13 +61,18 @@ test("통합 연구소는 별도 프로젝트·로컬 포트·agit 네트워크�
   assert.doesNotMatch(labCompose, /host\.docker\.internal|supabase-db|0\.0\.0\.0:3001/);
 });
 
-test("서버 리다이렉트·인증 콜백·단축링크·QR은 basePath를 보존한다", () => {
+test("Next 서버 리다이렉트는 basePath를 중복하지 않고 외부 URL은 basePath를 보존한다", () => {
   assert.match(appPath, /export function withBasePath/);
   assert.match(appPath, /export function withoutBasePath/);
   assert.match(proxy, /withoutBasePath\(request\.nextUrl\.pathname\)/);
   assert.match(proxy, /loginUrl\.pathname = "\/login"/);
   assert.doesNotMatch(proxy, /loginUrl\.pathname = withBasePath/);
-  assert.match(authActions, /redirect\(withBasePath\("\/dashboard"\)\)/);
+  for (const source of [authActions, classActions, roomActions, rootPage, dashboardLayout]) {
+    assert.doesNotMatch(source, /redirect\(withBasePath\(/);
+  }
+  assert.match(authActions, /redirect\("\/dashboard"\)/);
+  assert.match(classActions, /redirect\(`\/dashboard\/class\/\$\{cls\.id\}`\)/);
+  assert.match(roomActions, /redirect\(`\/dashboard\/room\/\$\{room\.id\}`\)/);
   assert.match(authCallback, /withBasePath\(next\)/);
   assert.match(authConfirm, /withBasePath\(next\)/);
   assert.match(shortLink, /withBasePath\(link\.target_path\)/);

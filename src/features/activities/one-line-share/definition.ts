@@ -22,6 +22,22 @@ export const oneLineShareDefinition: ActivityDefinition<
   integration: {
     schemaVersion: 1,
     resultKind: "one_line",
+    toPortableResult: ({ submission }) => {
+      const raw = isRecord(submission) ? submission : {};
+      const text = typeof raw.content === "string" ? raw.content.trim() : "";
+      return {
+        chunks: text
+          ? [{
+              id: typeof raw.entryId === "string" && raw.entryId.trim()
+                ? raw.entryId.trim()
+                : "one-line",
+              kind: "sentence" as const,
+              label: "한줄모아",
+              text,
+            }]
+          : [],
+      };
+    },
   },
   createDefaultConfig: () => ({
     promptTitle: "오늘 수업 한 줄 정리",

@@ -2,11 +2,26 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [roster, classActions, roomActions, studentActions, dashboard, classPage, rosterManager, livePanel] = await Promise.all([
+const [
+  roster,
+  classActions,
+  roomActions,
+  studentActions,
+  studentSession,
+  roomEntryPage,
+  roomEntryClient,
+  dashboard,
+  classPage,
+  rosterManager,
+  livePanel,
+] = await Promise.all([
   readFile("src/lib/lab-roster.ts", "utf8"),
   readFile("src/app/actions/class-actions.ts", "utf8"),
   readFile("src/app/actions/room-actions.ts", "utf8"),
   readFile("src/app/actions/student-actions.ts", "utf8"),
+  readFile("src/lib/lab-student-session.ts", "utf8"),
+  readFile("src/app/room/[id]/page.tsx", "utf8"),
+  readFile("src/app/room/[id]/room-entry-client.tsx", "utf8"),
   readFile("src/app/dashboard/dashboard-tabs.tsx", "utf8"),
   readFile("src/app/dashboard/class/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/class/[id]/roster-manager.tsx", "utf8"),
@@ -41,8 +56,25 @@ test("신규 활동과 결과는 아지트 학급·학생 ID를 직접 저장한
   assert.match(roomActions, /getIntegratedTeacherClass\(admin, user\.id, classId\)/);
   assert.match(roster, /\.eq\("agit_class_id", classId\)/);
   assert.match(roomActions, /isIntegratedLab\(\) \? "agit_class_id" : "class_id"/);
-  assert.match(studentActions, /findIntegratedStudentByRosterIdentity/);
-  assert.match(studentActions, /agit_student_id: agitStudentId/);
-  assert.match(studentActions, /existingQuery\.eq\("agit_student_id", agitStudentId\)/);
+  assert.match(studentSession, /agit_student_id: student\.id/);
+  assert.match(studentSession, /\.eq\("agit_student_id", student\.id\)/);
   assert.match(livePanel, /connectedStudentIds\.has\(student\.id\)/);
+});
+
+test("통합 학생은 실제 로그인 연결로 자동 입장하고 번호·이름 입력을 사용하지 않는다", () => {
+  assert.match(studentSession, /supabase\.auth\.getUser\(\)/);
+  assert.match(studentSession, /\.eq\("auth_id", authData\.user\.id\)/);
+  assert.match(studentSession, /room\.agit_class_id !== student\.class_id/);
+  assert.match(studentSession, /\.eq\("is_active", true\)/);
+  assert.match(studentSession, /\.is\("deleted_at", null\)/);
+  assert.match(roomEntryPage, /ensureIntegratedStudentRoomSession\(roomId\)/);
+  assert.match(roomEntryClient, /router\.replace\(/);
+  assert.match(studentActions, /if \(isIntegratedLab\(\)\) \{[\s\S]*ensureIntegratedStudentRoomSession\(roomId\)/);
+});
+
+test("통합 학생의 읽기·저장·반응은 본인 세션 소유권을 공통 검사한다", () => {
+  assert.match(studentSession, /getAuthenticatedIntegratedStudent\(admin\)/);
+  assert.match(studentSession, /\.eq\("id", sessionId\)[\s\S]*\.eq\("agit_student_id", student\.id\)/);
+  const guardCalls = studentActions.match(/await ownsIntegratedStudentSession\(/g) ?? [];
+  assert.ok(guardCalls.length >= 12, `학생 동작 소유권 검사가 부족합니다: ${guardCalls.length}개`);
 });

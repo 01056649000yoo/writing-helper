@@ -37,6 +37,26 @@ export type PortableResultKind =
   | "one_line"
   | "hanja_sentences";
 
+export type PortableResultChunk = {
+  id: string;
+  kind: "outline_item" | "question" | "selected_question" | "sentence";
+  text: string;
+  label?: string;
+  section?: "처음" | "가운데" | "끝";
+};
+
+export type PortableResultContent = {
+  chunks: PortableResultChunk[];
+  metadata?: Record<string, unknown>;
+};
+
+export type PortableResultBuildContext = {
+  config: unknown;
+  submission: unknown;
+  result: unknown;
+  answers: unknown;
+};
+
 /**
  * 연구소 활동 결과를 아지트로 연결할 때 지켜야 하는 계약.
  * 새 활동은 매니페스트에서 결과 종류와 스키마 버전을 반드시 선언한다.
@@ -44,6 +64,7 @@ export type PortableResultKind =
 export type ActivityIntegrationContract = {
   schemaVersion: 1;
   resultKind: PortableResultKind;
+  toPortableResult: (context: PortableResultBuildContext) => PortableResultContent;
 };
 
 export type ActivityConfigValidation<TConfig> =
