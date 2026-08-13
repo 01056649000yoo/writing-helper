@@ -53,6 +53,15 @@ docker compose down
 5. Compose 스택 교체
 6. 컨테이너 버전과 로그인 URL 확인
 
+## UI 디자인 계약
+
+연구소는 별도 Next.js 앱으로 유지하지만 교사용 화면은 끄적끄적 아지트와 같은 디자인 계약을 사용합니다.
+
+- 공통 색상·간격·모서리·그림자 토큰과 셸 클래스는 `src/app/globals.css`에서 관리합니다.
+- 교사용 상단바와 현재 메뉴 표시는 `src/app/dashboard/layout.tsx`와 `dashboard-nav.tsx`가 한 번만 렌더링합니다.
+- 활동별 색상은 다섯 활동을 빠르게 구별하는 보조 표현으로만 쓰고, 기본 버튼·카드·페이지 배경은 공통 토큰을 사용합니다.
+- 공통 토큰을 바꿀 때는 아지트 `src/styles/design-system.css`와 함께 확인하고 `npm test`의 UI 계약 검사를 통과시킵니다.
+
 ### Required Environment Variables
 
 러너 호스트의 `/Users/seunghyeonmaegmini/writing-helper/.env.local`에 있어야 하는 값:

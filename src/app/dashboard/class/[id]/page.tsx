@@ -40,33 +40,27 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
   const closedRooms = unified.filter((r) => !r.is_active);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-10 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 text-base">← 대시보드</Link>
-            <span className="text-gray-300">/</span>
-            <h1 className="text-xl font-bold text-gray-800">🏫 {cls.name}</h1>
-            <span className="text-sm bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-medium">{cls.grade_level}</span>
+    <main className="lab-page">
+      <div className="lab-page__content">
+        <Link href="/dashboard" className="lab-breadcrumb">← 학급 목록</Link>
+        <div className="lab-page-heading">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1>🏫 {cls.name}</h1>
+              <span className="lab-chip">{cls.grade_level}</span>
+            </div>
+            <p>학생 명단과 글쓰기 활동 세션을 한곳에서 관리합니다.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard/hanja-wordbook"
-              className="px-5 py-2.5 bg-amber-50 text-amber-700 rounded-xl font-semibold text-sm border border-amber-200 hover:bg-amber-100 transition-colors">
-              📚 한자 단어집
-            </Link>
-            <Link href={`/dashboard/room/new?class_id=${id}`}
-              className="px-5 py-2.5 bg-indigo-500 text-white rounded-xl font-semibold text-sm hover:bg-indigo-600 transition-colors">
-              + 활동 만들기
-            </Link>
-          </div>
+          <Link href={`/dashboard/room/new?class_id=${id}`} className="lab-button lab-button--primary">
+            + 활동 만들기
+          </Link>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-10 py-8 grid grid-cols-1 lg:grid-cols-3 gap-7">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-7">
         <div className="lg:col-span-1">
           <div className="space-y-4">
             <RosterManager classId={id} students={students} rosterLocked={activeRooms.length > 0} />
-            <div className="bg-white rounded-2xl shadow-sm p-7">
+            <div className="lab-panel p-7">
               <DeleteClassButton classId={id} />
             </div>
           </div>
@@ -78,7 +72,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
           <div>
             <h2 className="text-lg font-bold text-gray-800 mb-4">🟢 진행 중인 활동 세션 ({activeRooms.length})</h2>
             {activeRooms.length === 0 ? (
-              <div className="bg-white rounded-2xl p-10 text-center shadow-sm">
+              <div className="lab-panel lab-empty">
                 <p className="text-base text-gray-400">진행 중인 활동 세션이 없습니다.</p>
                 <Link href={`/dashboard/room/new?class_id=${id}`}
                   className="inline-block mt-3 text-indigo-500 text-base hover:underline">
@@ -98,8 +92,9 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
             <ClosedRoomsTabs closedRooms={closedRooms} />
           )}
         </div>
-      </main>
-    </div>
+        </div>
+      </div>
+    </main>
   );
 }
 

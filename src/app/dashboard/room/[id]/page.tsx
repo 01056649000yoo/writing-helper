@@ -54,15 +54,15 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   const renderNow = Date.now();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-5xl mx-auto pt-8 pb-16 space-y-6">
+    <main className="lab-page">
+      <div className="lab-page__content lab-page__content--medium space-y-6">
         <div className="flex items-center justify-between">
-          <Link href={room.class_id ? `/dashboard/class/${room.class_id}` : "/dashboard"} className="text-indigo-500 text-base hover:underline">
+          <Link href={room.class_id ? `/dashboard/class/${room.class_id}` : "/dashboard"} className="lab-breadcrumb mb-0">
             ← {room.class_id ? "학급으로" : "대시보드로"}
           </Link>
           {room.is_active && (
             <form action={async () => { "use server"; await closeRoom(id); }}>
-              <button type="submit" className="text-base text-red-500 border border-red-200 px-5 py-2.5 rounded-xl hover:bg-red-50">
+              <button type="submit" className="lab-button lab-button--danger">
                 활동 종료하기
               </button>
             </form>
@@ -70,7 +70,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
         </div>
 
         {/* 활동 세션 정보 */}
-        <div className="bg-white rounded-3xl shadow-xl p-10">
+        <div className="lab-panel lab-panel--raised p-6 sm:p-10">
           <div className="flex items-start justify-between mb-5">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -118,7 +118,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
         hanjaWritingResults={hanjaWritingResults}
       />
       </div>
-    </div>
+    </main>
   );
 }
 

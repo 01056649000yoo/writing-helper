@@ -138,13 +138,13 @@ const WRITING_BUNDLE_DEFINITIONS = activityDefinitions.filter(
 
 function ActivitySelectionScreen({ classId }: { classId: string }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-7xl mx-auto py-4">
-        <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="text-indigo-500 text-sm hover:underline">
+    <main className="lab-page">
+      <div className="lab-page__content">
+        <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="lab-breadcrumb">
           ← {classId ? "학급으로" : "대시보드로"}
         </Link>
 
-        <div className="mt-3 bg-white rounded-3xl shadow-xl border border-white/70 overflow-hidden">
+        <div className="lab-panel lab-panel--raised overflow-hidden">
           {/* 헤더 */}
           <div className="px-6 py-4 bg-gradient-to-r from-slate-50 via-white to-indigo-50 border-b border-gray-100">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -196,7 +196,7 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -213,18 +213,18 @@ function PageShell({
   const meta = ACTIVITY_META[activityType];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-4xl mx-auto pt-8 pb-16">
+    <main className="lab-page">
+      <div className="lab-page__content lab-page__content--medium">
         <div className="flex items-center justify-between gap-4">
-          <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="text-indigo-500 text-sm hover:underline">
+          <Link href={classId ? `/dashboard/class/${classId}` : "/dashboard"} className="lab-breadcrumb mb-0">
             ← {classId ? "학급으로" : "대시보드로"}
           </Link>
-          <Link href={`/dashboard/room/new?class_id=${classId}`} className="text-sm text-gray-400 hover:text-gray-600 hover:underline">
+          <Link href={`/dashboard/room/new?class_id=${classId}`} className="lab-button lab-button--quiet">
             활동 다시 고르기
           </Link>
         </div>
 
-        <div className="mt-4 bg-white rounded-[32px] shadow-xl overflow-hidden">
+        <div className="lab-panel lab-panel--raised mt-4 overflow-hidden">
           <div className={`px-8 py-8 bg-gradient-to-r ${meta.tone} border-b border-gray-100`}>
             <div className="flex items-start gap-4">
               <span className="text-5xl">{meta.emoji}</span>
@@ -239,7 +239,7 @@ function PageShell({
           <div className="p-6 sm:p-8">{children}</div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

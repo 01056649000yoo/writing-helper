@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   deleteQuestionCardRole,
   deleteQuestionCardSetting,
@@ -42,7 +40,6 @@ type EditableQuestionCardRole = {
 };
 
 export default function SettingsPage() {
-  const router = useRouter();
   const [roles, setRoles] = useState<EditableQuestionCardRole[]>([]);
   const [cardSets, setCardSets] = useState<EditableQuestionCardSet[]>([]);
   const [cardSettingsLoading, setCardSettingsLoading] = useState(true);
@@ -255,25 +252,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-5xl mx-auto pt-8 pb-16 space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <Link
-            href="/dashboard"
-            onClick={(event) => {
-              if (typeof window === "undefined") return;
-              if (window.history.length > 1) {
-                event.preventDefault();
-                router.back();
-              }
-            }}
-            className="text-indigo-500 text-base hover:underline"
-          >
-            ← 돌아가기
-          </Link>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-xl p-8">
+    <main className="lab-page">
+      <div className="lab-page__content lab-page__content--medium space-y-6">
+        <div className="lab-panel lab-panel--raised p-6 sm:p-8">
           <div className="text-5xl mb-3">🃏</div>
           <h1 className="text-2xl font-bold text-gray-800">질문 카드 설정</h1>
           <p className="text-sm text-gray-500 mt-2 leading-relaxed">
@@ -281,7 +262,7 @@ export default function SettingsPage() {
             역할도 직접 만들고, 역할 안의 질문 카드도 추가하거나 수정해서 학생용 질문 만들기 흐름에 그대로 반영할 수 있습니다.
           </p>
 
-          <div className="grid gap-3 mt-6 grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 mt-6 md:grid-cols-4">
             <Stat label="연구원 역할" value={`${roles.length}개`} tone="emerald" />
             <Stat label="역할별 카드" value={`${roleCardSetCount}개`} tone="sky" />
             <Stat label="전체 질문" value={`${totalPrompts}개`} tone="amber" />
@@ -289,7 +270,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl p-8 space-y-5">
+        <div className="lab-panel lab-panel--raised p-6 sm:p-8 space-y-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-xl font-bold text-gray-800">🧭 연구원 역할 트리</h2>
@@ -565,7 +546,7 @@ export default function SettingsPage() {
       />
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

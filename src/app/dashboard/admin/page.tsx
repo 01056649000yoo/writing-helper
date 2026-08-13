@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServiceAdminDashboardData } from "@/app/actions/admin-actions";
 import { AdminDashboardClient } from "./admin-dashboard-client";
@@ -12,18 +11,16 @@ export default async function ServiceAdminDashboardPage() {
   const { data } = result;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-      <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
+    <main className="lab-page">
+      <div className="lab-page__content">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/dashboard" className="text-sm font-medium text-indigo-600 hover:underline">
-            ← 대시보드
-          </Link>
+          <span />
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
             관리자 전용
           </span>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-indigo-100 bg-white px-6 py-6 shadow-sm">
+        <div className="lab-panel lab-panel--raised mt-4 px-6 py-6">
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-indigo-500">Service Admin</p>
           <h1 className="mt-2 text-3xl font-bold text-gray-900">서비스 관리자 대시보드</h1>
           <p className="mt-2 text-sm leading-relaxed text-gray-600">
@@ -44,7 +41,7 @@ export default async function ServiceAdminDashboardPage() {
           <AdminDashboardClient initialUsers={data.users} auditLogs={data.auditLogs} />
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -67,7 +64,7 @@ function StatCard({
   }[tone];
 
   return (
-    <div className={`rounded-3xl border px-5 py-4 shadow-sm ${toneClass}`}>
+    <div className={`rounded-2xl border px-5 py-4 shadow-sm ${toneClass}`}>
       <p className="text-sm font-semibold">{label}</p>
       <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>

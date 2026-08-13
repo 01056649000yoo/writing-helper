@@ -20,22 +20,26 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
   return (
     <div className="space-y-6">
       {/* 탭 헤더 */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex overflow-x-auto border-b border-gray-200" aria-label="대시보드 보기">
         <button
+          type="button"
+          aria-pressed={activeTab === "classes"}
           onClick={() => setActiveTab("classes")}
-          className={`flex items-center gap-2 px-6 py-3.5 font-semibold text-lg border-b-2 transition-all cursor-pointer ${
+          className={`flex min-h-11 shrink-0 items-center gap-2 px-5 py-3 font-semibold text-base border-b-2 transition-all ${
             activeTab === "classes"
-              ? "border-indigo-600 text-indigo-600"
+              ? "border-blue-600 text-blue-600 bg-blue-50"
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
           🏫 내 학급 목록
         </button>
         <button
+          type="button"
+          aria-pressed={activeTab === "manual"}
           onClick={() => setActiveTab("manual")}
-          className={`flex items-center gap-2 px-6 py-3.5 font-semibold text-lg border-b-2 transition-all cursor-pointer ${
+          className={`flex min-h-11 shrink-0 items-center gap-2 px-5 py-3 font-semibold text-base border-b-2 transition-all ${
             activeTab === "manual"
-              ? "border-indigo-600 text-indigo-600"
+              ? "border-blue-600 text-blue-600 bg-blue-50"
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
@@ -50,14 +54,14 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
             <h2 className="text-xl font-bold text-gray-800">내 학급 목록</h2>
             <Link
               href="/dashboard/class/new"
-              className="px-6 py-3 rounded-xl font-semibold text-base bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-sm"
+              className="lab-button lab-button--primary"
             >
               + 새 학급 만들기
             </Link>
           </div>
 
           {classes.length === 0 ? (
-            <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100">
+            <div className="lab-panel lab-empty">
               <div className="text-6xl mb-5">🏫</div>
               <p className="text-xl text-gray-500 font-medium">아직 만든 학급이 없습니다.</p>
               <p className="text-base text-gray-400 mt-2">
@@ -65,7 +69,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
               </p>
               <Link
                 href="/dashboard/class/new"
-                className="inline-block mt-6 px-8 py-3.5 bg-indigo-500 text-white rounded-xl text-base font-semibold hover:bg-indigo-600 transition-colors"
+                className="lab-button lab-button--primary mt-6"
               >
                 첫 학급 만들기
               </Link>
@@ -76,17 +80,17 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
                 <Link
                   key={cls.id}
                   href={`/dashboard/class/${cls.id}`}
-                  className="bg-white rounded-2xl p-7 shadow-sm hover:shadow-md transition-all border border-gray-100 hover:border-indigo-200 group"
+                  className="lab-panel p-7 hover:shadow-md hover:border-blue-200 group"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <span className="text-4xl group-hover:scale-110 transition-transform duration-200">
                       🏫
                     </span>
-                    <span className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-medium">
+                    <span className="lab-chip">
                       {cls.grade_level}
                     </span>
                   </div>
-                  <h3 className="font-bold text-gray-800 text-xl group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-bold text-gray-800 text-xl group-hover:text-blue-600 transition-colors">
                     {cls.name}
                   </h3>
                   <p className="text-sm text-gray-400 mt-3">
@@ -100,16 +104,16 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
       ) : (
         <div className="space-y-8">
           {/* 가이드 소개 헤더 */}
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-8 text-white shadow-md">
-            <h2 className="text-2xl font-bold">✏️ 아지트 글쓰기 활동 꾸러미 완전 정복</h2>
-            <p className="text-base text-indigo-100 mt-2 leading-relaxed max-w-3xl">
+          <div className="lab-panel border-blue-100 bg-blue-50 p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-slate-800">✏️ 글쓰기 활동 꾸러미 사용 안내</h2>
+            <p className="text-base text-slate-600 mt-2 leading-relaxed max-w-3xl">
               아지트 글쓰기 연구소의 대표 기능인 <strong>글쓰기 활동 꾸러미</strong>의 설정 및 5가지 핵심 활동 사용 가이드입니다.
             </p>
             <div className="mt-4 flex gap-3">
-              <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
+              <span className="lab-chip">
                 준비 단계: 질문 카드 설정
               </span>
-              <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
+              <span className="lab-chip">
                 활동 구성: 5종 글쓰기 연계 활동
               </span>
             </div>
@@ -118,7 +122,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
           {/* 설정 가이드 섹션 */}
           <div className="grid gap-6">
             {/* 질문 카드 설정 */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="lab-panel p-6">
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-3xl">🃏</span>
                 <div>
@@ -129,7 +133,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
               <ul className="space-y-3.5 text-sm text-gray-600 leading-relaxed">
                 <li className="flex items-start gap-2">
                   <span className="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded text-xs mt-0.5 shrink-0">Step 1</span>
-                  <span>대시보드 우측 상단 <strong className="text-indigo-600 font-semibold">🃏 질문 카드 설정</strong> 버튼을 눌러 관리 페이지로 진입합니다.</span>
+                  <span>상단 메뉴의 <strong className="text-blue-600 font-semibold">질문 카드</strong>를 눌러 관리 페이지로 이동합니다.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded text-xs mt-0.5 shrink-0">Step 2</span>
@@ -149,42 +153,42 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
             </div>
           </div>
 
-          {/* 4가지 글쓰기 꾸러미 핵심 활동 설명 */}
+          {/* 다섯 가지 글쓰기 꾸러미 핵심 활동 설명 */}
           <div className="space-y-5">
             <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <span>🚀</span> 글쓰기 활동 꾸러미 4대 모듈 안내
+              <span>🚀</span> 글쓰기 활동 꾸러미 5가지 핵심 활동
             </h3>
 
             <div className="grid gap-6 sm:grid-cols-2">
               {/* 글 개요 짜기 */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="lab-panel p-6 hover:shadow-md">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-2xl px-3 py-1 bg-indigo-50 text-indigo-600 rounded-xl font-bold">1</span>
                   <h4 className="text-lg font-bold text-gray-800">글 개요 짜기 (Outline Builder)</h4>
                 </div>
                 <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                  학생들이 각자의 수준(저학년·중학년·고학년 / low·mid·high)에 맞는 세부 문항에 카드 선택 혹은 단답 입력을 수행하면, GPT가 답변을 취합하여 **개별 학생 맞춤형 개요 및 문단별 초고**를 작성합니다.
+                  학생이 학년과 글 종류에 맞는 질문에 답하면서 처음·가운데·끝의 흐름을 직접 구성합니다. 완성된 개요는 이후 아지트 글쓰기에서 불러와 글의 뼈대로 활용할 수 있도록 연동할 예정입니다.
                 </p>
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-gray-400 font-medium">교사 권장 설정</span>
-                    <span className="text-gray-700 font-semibold">글 종류, 대상 학년, 개요 분량, 초고 생성 활성화</span>
+                    <span className="text-gray-700 font-semibold">글 종류, 대상 학년, 개요 질문</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 font-medium">특화 포인트</span>
-                    <span className="text-indigo-600 font-semibold">AI 자동 대기열 병렬 처리 & 맞춤형 글 다듬기</span>
+                    <span className="text-indigo-600 font-semibold">학생 답변 기반 개요 구성</span>
                   </div>
                 </div>
               </div>
 
               {/* 질문 만들기 */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="lab-panel p-6 hover:shadow-md">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-2xl px-3 py-1 bg-purple-50 text-purple-600 rounded-xl font-bold">2</span>
                   <h4 className="text-lg font-bold text-gray-800">질문 만들기 (Question Generator)</h4>
                 </div>
                 <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                  주제 글쓰기에 앞서 학생들이 마음에 드는 질문 카드(비계)를 한 개 이상 골라 오늘 주제에 알맞게 단어를 바꾸는 **질문 리믹스(Remix)** 및 **직접 발문** 활동을 통해 질문 생성 능력을 증진시킵니다.
+                  주제 글쓰기에 앞서 학생이 질문 카드를 고르고 오늘 주제에 알맞게 바꾸거나, 직접 질문을 만들며 질문 생성 능력을 기릅니다.
                 </p>
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
                   <div className="flex justify-between">
@@ -199,7 +203,7 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
               </div>
 
               {/* 좋은 질문 고르기 */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="lab-panel p-6 hover:shadow-md">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-2xl px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl font-bold">3</span>
                   <h4 className="text-lg font-bold text-gray-800">좋은 질문 고르기 (Question Voting)</h4>
@@ -220,13 +224,13 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
               </div>
 
               {/* 한줄모아 */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="lab-panel p-6 hover:shadow-md">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-2xl px-3 py-1 bg-rose-50 text-rose-600 rounded-xl font-bold">4</span>
                   <h4 className="text-lg font-bold text-gray-800">한줄모아 (One Line Share)</h4>
                 </div>
                 <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                  교과 차시 정리 및 피드백용으로 활용 가능한 실시간 보드입니다. 교사가 정한 필수 **핵심 단어(Keywords)**를 한 문장 속에 자연스럽게 구성하여 짧은 소감을 올리고, 실시간으로 하트를 주며 상호 공감합니다.
+                  교과 차시 정리와 피드백에 활용하는 공유 보드입니다. 교사가 정한 핵심 단어를 한 문장에 자연스럽게 넣고, 친구 문장에 하트를 보내며 함께 생각을 나눕니다.
                 </p>
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
                   <div className="flex justify-between">
@@ -239,18 +243,26 @@ export function DashboardTabs({ classes }: DashboardTabsProps) {
                   </div>
                 </div>
               </div>
+              <div className="lab-panel p-6 hover:shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl px-3 py-1 bg-amber-50 text-amber-600 rounded-xl font-bold">5</span>
+                  <h4 className="text-lg font-bold text-gray-800">한자 활용 문장 만들기</h4>
+                </div>
+                <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                  교사가 만든 한자 카드에서 단어와 관련 어휘를 읽고, 그 단어의 뜻을 살린 한 문장을 만들어 친구들과 공유합니다.
+                </p>
+                <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400 font-medium">교사 권장 설정</span>
+                    <span className="text-gray-700 font-semibold text-right">한자 단어, 뜻, 관련 어휘</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400 font-medium">특화 포인트</span>
+                    <span className="text-amber-600 font-semibold text-right">한자 어휘를 실제 문장에 활용</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-amber-100">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl px-3 py-1 bg-amber-50 text-amber-600 rounded-xl font-bold">별도</span>
-              <h4 className="text-lg font-bold text-gray-800">한자 활용 문장 만들기</h4>
-            </div>
-            <p className="text-sm text-gray-500 leading-relaxed">
-              이 활동은 글쓰기 활동 꾸러미 4개 모듈과는 별도로 운영되는 문해력 활동입니다. 교사가 한자 카드를 만들고,
-              학생은 단어와 관련 어휘를 읽은 뒤 해당 단어를 살린 문장을 만들어 공유합니다.
-            </p>
           </div>
         </div>
       )}

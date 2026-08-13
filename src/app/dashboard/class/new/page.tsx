@@ -73,10 +73,10 @@ export default function NewClassPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-2xl mx-auto pt-8 pb-16">
-        <Link href="/dashboard" className="text-indigo-500 text-base hover:underline">← 대시보드로</Link>
-        <div className="bg-white rounded-3xl shadow-xl p-10 mt-5">
+    <main className="lab-page">
+      <div className="lab-page__content lab-page__content--narrow">
+        <Link href="/dashboard" className="lab-breadcrumb">← 학급 목록</Link>
+        <div className="lab-panel lab-panel--raised p-6 sm:p-10">
           <div className="text-center mb-8">
             <div className="text-5xl mb-3">🏫</div>
             <h1 className="text-2xl font-bold text-gray-800">새 학급 만들기</h1>
@@ -148,13 +148,13 @@ export default function NewClassPage() {
             {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
 
             <button type="submit" disabled={pending}
-              className="w-full py-4 bg-indigo-500 text-white rounded-xl font-bold text-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors">
+              className="lab-button lab-button--primary w-full min-h-13 text-base disabled:opacity-50">
               {pending ? "학급 만드는 중..." : "✅ 학급 만들기"}
             </button>
           </form>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

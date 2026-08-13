@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "아지트 글쓰기 연구소",
-  description: "초등학생 글쓰기 개요 도우미",
+  title: "끄적끄적 아지트 | 글쓰기 연구소",
+  description: "끄적끄적 아지트의 교실 글쓰기 활동 연구소",
 };
 
 export default function RootLayout({
@@ -33,7 +33,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <div className="flex-1">{children}</div>
-        <footer className="border-t border-slate-200 bg-white/80 px-4 py-4 text-center text-xs text-slate-500 backdrop-blur-sm">
+        <footer className="border-t border-slate-200 bg-white px-4 py-4 text-center text-xs text-slate-500">
           상호명: 끄적끄적아지트 · 운영책임자: 유승현 · 문의:{" "}
           <a className="font-medium text-slate-600 underline-offset-2 hover:underline" href="mailto:yshgg@naver.com">
             yshgg@naver.com

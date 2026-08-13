@@ -93,10 +93,10 @@ export default async function TeacherResultPage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-2xl mx-auto pt-8 pb-16">
-        <Link href={`/dashboard/room/${id}`} className="text-indigo-500 text-sm hover:underline">← 방으로</Link>
-        <div className="bg-white rounded-3xl shadow-xl p-8 mt-4 space-y-6">
+    <main className="lab-page">
+      <div className="lab-page__content lab-page__content--narrow">
+        <Link href={`/dashboard/room/${id}`} className="lab-breadcrumb">← 활동으로</Link>
+        <div className="lab-panel lab-panel--raised p-6 sm:p-8 space-y-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm text-gray-400">{room?.title} · {room?.topic}</p>
@@ -285,7 +285,7 @@ export default async function TeacherResultPage({
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
