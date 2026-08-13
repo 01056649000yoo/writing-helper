@@ -16,7 +16,6 @@ jobs:
     timeout-minutes: 30
     env:
       RUNTIME_ENV_FILE: /Users/seunghyeonmaegmini/writing-helper/.env.local
-      NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache
     steps:
       - name: Checkout latest code
         uses: actions/checkout@v7
@@ -25,6 +24,9 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 20
+
+      - name: Isolate npm cache
+        run: echo "NPM_CONFIG_CACHE=$RUNNER_TEMP/npm-cache" >> "$GITHUB_ENV"
 
       - name: Set BUILD_VERSION
         run: echo "BUILD_VERSION=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
