@@ -73,6 +73,8 @@ test("통합 병행 환경은 별도 회원가입을 화면과 서버 양쪽에�
   assert.match(authActions, /process\.env\.LAB_ALLOW_SIGNUP === "false"/);
   assert.match(loginPage, /NEXT_PUBLIC_LAB_SIGNUP_ENABLED !== "false"/);
   assert.match(signupPage, /별도 회원가입은 받지 않습니다/);
+  assert.match(labCompose, /NEXT_PUBLIC_LAB_SSO_ENABLED: "true"/);
+  assert.match(labCompose, /LAB_SSO_ENABLED: "true"/);
 });
 
 test("main 배포는 기존 연구소와 통합 /lab 컨테이너를 각각 검증한다", () => {

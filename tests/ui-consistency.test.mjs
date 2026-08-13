@@ -32,7 +32,7 @@ test("교사용 대시보드는 공통 셸과 현재 메뉴 표시를 한 번만
   assert.match(layout, /글쓰기 연구소/);
   assert.match(layout, /DashboardNav/);
   assert.match(layout, /NEXT_PUBLIC_AGIT_APP_URL/);
-  assert.match(layout, /아지트 홈/);
+  assert.match(layout, /아지트로 돌아가기/);
   assert.match(nav, /usePathname/);
   assert.match(nav, /aria-current/);
   assert.match(nav, /학급·활동/);

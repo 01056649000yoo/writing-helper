@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { withoutBasePath } from "@/lib/app-path";
+import { getServerAuthCookieOptions } from "@/lib/auth-config";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/room", "/auth", "/share"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/access-denied", "/room", "/auth", "/share"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
@@ -21,6 +22,7 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: getServerAuthCookieOptions(),
     cookies: {
       getAll() { return request.cookies.getAll(); },
       setAll(cookiesToSet) {

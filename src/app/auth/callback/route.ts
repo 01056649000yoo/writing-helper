@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { withBasePath } from "@/lib/app-path";
+import { getServerAuthCookieOptions } from "@/lib/auth-config";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: getServerAuthCookieOptions(),
     cookies: {
       getAll() { return cookieStore.getAll(); },
       setAll(cookiesToSet) {

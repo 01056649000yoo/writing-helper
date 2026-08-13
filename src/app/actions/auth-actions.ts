@@ -6,12 +6,14 @@ import { withBasePath } from "@/lib/app-path";
 
 type AuthResult = { error?: string; success?: boolean; email?: string };
 
+const isSsoEnabled = () => process.env.LAB_SSO_ENABLED === "true";
+
 function isValidSchoolName(schoolName: string) {
   return schoolName.length >= 2 && schoolName.length <= 60;
 }
 
 export async function signUp(formData: FormData): Promise<AuthResult> {
-  if (process.env.LAB_ALLOW_SIGNUP === "false") {
+  if (isSsoEnabled() || process.env.LAB_ALLOW_SIGNUP === "false") {
     return { error: "통합 연구소는 끄적끄적 아지트에서 승인된 교사만 이용할 수 있습니다." };
   }
 
@@ -57,6 +59,10 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
 }
 
 export async function signIn(_prevState: unknown, formData: FormData): Promise<{ error?: string }> {
+  if (isSsoEnabled()) {
+    return { error: "통합 연구소는 끄적끄적 아지트에서 로그인한 승인 교사 계정으로 이용합니다." };
+  }
+
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
@@ -77,6 +83,10 @@ export async function signOut() {
 }
 
 export async function requestPasswordReset(formData: FormData): Promise<AuthResult> {
+  if (isSsoEnabled()) {
+    return { error: "통합 연구소의 계정과 로그인은 끄적끄적 아지트에서 관리합니다." };
+  }
+
   const email = String(formData.get("email") ?? "").trim();
 
   if (!email) return { error: "이메일을 입력해주세요." };
@@ -92,6 +102,10 @@ export async function requestPasswordReset(formData: FormData): Promise<AuthResu
 }
 
 export async function updatePassword(formData: FormData): Promise<AuthResult> {
+  if (isSsoEnabled()) {
+    return { error: "통합 연구소의 계정과 로그인은 끄적끄적 아지트에서 관리합니다." };
+  }
+
   const password = String(formData.get("password") ?? "");
   const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
@@ -110,7 +124,14 @@ export async function updatePassword(formData: FormData): Promise<AuthResult> {
 
 export async function getCurrentUser() {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return null;
+
+  if (isSsoEnabled()) {
+    const { data: access, error: accessError } = await supabase.rpc("ensure_lab_teacher_profile_v1");
+    if (accessError || access?.version !== 1 || access?.allowed !== true) return null;
+  }
+
   return user;
 }
 

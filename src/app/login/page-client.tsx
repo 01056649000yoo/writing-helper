@@ -17,6 +17,7 @@ const loginInputClass =
   "[&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]";
 
 const signupEnabled = process.env.NEXT_PUBLIC_LAB_SIGNUP_ENABLED !== "false";
+const ssoEnabled = process.env.NEXT_PUBLIC_LAB_SSO_ENABLED === "true";
 
 export default function LoginPageClient() {
   const [state, formAction, pending] = useActionState(signIn, null);
@@ -85,7 +86,9 @@ export default function LoginPageClient() {
                   BETA
                 </span>
               </div>
-              <p className="text-lg text-gray-500">교사 계정으로 로그인하여 시작하세요.</p>
+              <p className="text-lg text-gray-500">
+                {ssoEnabled ? "아지트 교사 계정으로 바로 이어집니다." : "교사 계정으로 로그인하여 시작하세요."}
+              </p>
             </div>
 
             <div className="mb-8 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
@@ -95,89 +98,109 @@ export default function LoginPageClient() {
               </p>
             </div>
 
-            <form action={formAction} className="space-y-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 ml-1">이메일</label>
-                <input
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  className={loginInputClass}
-                  placeholder="teacher@school.kr"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center px-1">
-                  <label className="block text-sm font-semibold text-gray-700">비밀번호</label>
-                  <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">
-                    비밀번호 찾기
-                  </Link>
-                </div>
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  className={loginInputClass}
-                  placeholder="비밀번호 입력"
-                />
-              </div>
-
-              {state?.error && (
-                <div className="flex items-center gap-3 text-red-500 text-sm bg-red-50 p-4 rounded-2xl border border-red-100 animate-in fade-in slide-in-from-top-2">
-                  <span className="text-lg">⚠️</span>
-                  {state.error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={pending}
-                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 transition-all shadow-lg shadow-indigo-200"
-              >
-                {pending ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    로그인 중...
+            {ssoEnabled ? (
+              <section className="rounded-3xl border border-blue-100 bg-blue-50/70 p-6">
+                <div className="flex items-start gap-4">
+                  <span className="text-2xl" aria-hidden="true">🔗</span>
+                  <div>
+                    <h3 className="font-bold text-blue-950">로그인을 한 번만 하면 돼요</h3>
+                    <p className="mt-2 text-sm leading-6 text-blue-800">
+                      끄적끄적 아지트에서 로그인한 승인 교사 계정을 그대로 확인합니다. 별도 가입이나 비밀번호 입력은 필요하지 않습니다.
+                    </p>
                   </div>
-                ) : (
-                  "로그인"
-                )}
-              </button>
-            </form>
+                </div>
+              </section>
+            ) : (
+              <>
+                <form action={formAction} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-700 ml-1">이메일</label>
+                    <input
+                      name="email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      className={loginInputClass}
+                      placeholder="teacher@school.kr"
+                    />
+                  </div>
 
-            <div className="mt-10 pt-10 border-t border-gray-50 text-center">
-              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-6 flex items-start gap-3 text-left">
-                <span className="text-amber-500 text-lg">💡</span>
-                <p className="text-sm text-amber-700 leading-relaxed font-medium">
-                  <strong>끄적끄적아지트</strong>와는 별개의 시스템입니다.
-                  <br />
-                  이용을 위해 <strong>새로운 회원가입</strong>이 필요합니다.
-                </p>
-              </div>
-              {signupEnabled ? (
-                <p className="text-gray-500">
-                  아직 계정이 없으신가요?{" "}
-                  <Link href="/signup" className="text-indigo-600 font-bold hover:underline underline-offset-4 ml-1">
-                    회원가입
-                  </Link>
-                </p>
-              ) : (
-                <p className="text-sm leading-relaxed text-gray-500">
-                  통합 연구소는 끄적끄적 아지트에서 승인된 교사 계정으로 이용합니다.
-                </p>
-              )}
-            </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="block text-sm font-semibold text-gray-700">비밀번호</label>
+                      <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">
+                        비밀번호 찾기
+                      </Link>
+                    </div>
+                    <input
+                      name="password"
+                      type="password"
+                      required
+                      autoComplete="current-password"
+                      className={loginInputClass}
+                      placeholder="비밀번호 입력"
+                    />
+                  </div>
+
+                  {state?.error && (
+                    <div className="flex items-center gap-3 text-red-500 text-sm bg-red-50 p-4 rounded-2xl border border-red-100 animate-in fade-in slide-in-from-top-2">
+                      <span className="text-lg">⚠️</span>
+                      {state.error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 transition-all shadow-lg shadow-indigo-200"
+                  >
+                    {pending ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        로그인 중...
+                      </span>
+                    ) : (
+                      "로그인"
+                    )}
+                  </button>
+                </form>
+
+                <div className="mt-10 pt-10 border-t border-gray-50 text-center">
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-6 flex items-start gap-3 text-left">
+                    <span className="text-amber-500 text-lg">💡</span>
+                    <p className="text-sm text-amber-700 leading-relaxed font-medium">
+                      <strong>끄적끄적아지트</strong>와는 별개의 시스템입니다.
+                      <br />
+                      이용을 위해 <strong>새로운 회원가입</strong>이 필요합니다.
+                    </p>
+                  </div>
+                  {signupEnabled ? (
+                    <p className="text-gray-500">
+                      아직 계정이 없으신가요?{" "}
+                      <Link href="/signup" className="text-indigo-600 font-bold hover:underline underline-offset-4 ml-1">
+                        회원가입
+                      </Link>
+                    </p>
+                  ) : (
+                    <p className="text-sm leading-relaxed text-gray-500">
+                      통합 연구소는 끄적끄적 아지트에서 승인된 교사 계정으로 이용합니다.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             <a
               href="https://xn--vz0ba242ncqcba79xhwx.site"
               className="mt-6 flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50 px-5 py-4 text-left transition-colors hover:border-sky-200 hover:bg-sky-100"
             >
               <span>
-                <span className="block text-sm font-bold text-sky-900">끄적끄적아지트로 이동</span>
-                <span className="mt-1 block text-xs text-sky-700">글쓰기 활동하러 이동하기</span>
+                <span className="block text-sm font-bold text-sky-900">
+                  {ssoEnabled ? "아지트에서 교사 로그인하기" : "끄적끄적아지트로 이동"}
+                </span>
+                <span className="mt-1 block text-xs text-sky-700">
+                  {ssoEnabled ? "로그인 후 글쓰기 연구소 메뉴를 눌러주세요" : "글쓰기 활동하러 이동하기"}
+                </span>
               </span>
               <span className="text-lg font-semibold text-sky-700">→</span>
             </a>

@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTeacherProfile, signOut } from "@/app/actions/auth-actions";
 import { DashboardNav } from "./dashboard-nav";
+import { withBasePath } from "@/lib/app-path";
 
 const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
   ?? "https://xn--vz0ba242ncqcba79xhwx.site";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const profile = await getTeacherProfile();
+  if (!profile) redirect(withBasePath("/access-denied"));
 
   return (
     <div className="lab-shell">
@@ -22,7 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
           <div className="lab-shell__actions">
             <span className="lab-profile">{profile?.name} 선생님</span>
-            <a className="lab-button" href={AGIT_HOME_URL}>아지트 홈</a>
+            <a className="lab-button" href={AGIT_HOME_URL}>아지트로 돌아가기</a>
             <form action={signOut}>
               <button type="submit" className="lab-button lab-button--quiet">로그아웃</button>
             </form>
