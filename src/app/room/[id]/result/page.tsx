@@ -22,6 +22,23 @@ import type {
   QuestionVotingSubmission,
 } from "@/features/activities/types";
 
+const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
+  ?? "https://xn--vz0ba242ncqcba79xhwx.site";
+const INTEGRATED_LAB = process.env.NEXT_PUBLIC_LAB_SSO_ENABLED === "true";
+
+function AgitDashboardReturnLink() {
+  if (!INTEGRATED_LAB) return null;
+
+  return (
+    <a
+      href={AGIT_HOME_URL}
+      className="block w-full rounded-2xl bg-slate-800 py-4 text-center font-bold text-white transition-colors hover:bg-slate-900"
+    >
+      🏠 글쓰기 대시보드로 돌아가기
+    </a>
+  );
+}
+
 export default function StudentResultPage({ params }: { params: Promise<{ id: string }> }) {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session") ?? "";
@@ -269,6 +286,8 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
             ✏️ 질문 다시 수정하기
           </Link>
 
+          <AgitDashboardReturnLink />
+
           <div className="bg-white rounded-3xl shadow-xl p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -340,6 +359,8 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               ✏️ 선택 다시 수정하기
             </Link>
           )}
+
+          <AgitDashboardReturnLink />
 
           {questionVotingClosed && questionVotingRanking.length > 0 && (
             <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
@@ -433,6 +454,8 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
           >
             ✏️ 한 줄 다시 수정하기
           </Link>
+
+          <AgitDashboardReturnLink />
         </div>
       </div>
     );
@@ -494,6 +517,8 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               </Link>
             </div>
           )}
+
+          <AgitDashboardReturnLink />
 
           <div className="bg-white rounded-3xl shadow-xl p-6">
             {topHanjaEntries.length > 0 && (
@@ -646,6 +671,8 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
         >
           ✏️ 개요 다시 만들기
         </Link>
+
+        <AgitDashboardReturnLink />
 
         <p className="text-center text-xs text-gray-400">
           이 개요를 보면서 글을 완성해봐요 ✍️

@@ -32,3 +32,12 @@ test("학생과 교사의 개요 완성 화면은 입력 화면과 같은 1200px
   assert.match(teacherResultPage, /isOutlineBuilder \? "lab-page__content--writing"/);
   assert.match(globalStyles, /\.lab-page__content--writing \{\s*max-width: 1200px;/);
 });
+
+test("통합 연구소의 다섯 학생 활동 완료 화면에서 아지트 글쓰기 대시보드로 돌아갈 수 있다", () => {
+  assert.match(studentResultPage, /process\.env\.NEXT_PUBLIC_AGIT_APP_URL/);
+  assert.match(studentResultPage, /process\.env\.NEXT_PUBLIC_LAB_SSO_ENABLED === "true"/);
+  assert.match(studentResultPage, /if \(!INTEGRATED_LAB\) return null/);
+  assert.match(studentResultPage, /<a\s+href=\{AGIT_HOME_URL\}/);
+  assert.match(studentResultPage, /글쓰기 대시보드로 돌아가기/);
+  assert.equal(studentResultPage.match(/<AgitDashboardReturnLink \/>/g)?.length, 5);
+});
