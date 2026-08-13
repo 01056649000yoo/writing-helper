@@ -158,6 +158,30 @@ textarea {
   background-size: 6px 3px;
 }
 
+.lab-spelling__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.lab-spelling__toolbar button {
+  min-height: 38px;
+  padding: 7px 13px;
+  border: 1px solid #cfd8e3;
+  border-radius: 999px;
+  background: #fff;
+  color: #35516f;
+  font-size: 0.78rem;
+  font-weight: 850;
+  box-shadow: 0 2px 8px rgb(45 72 98 / 0.07);
+}
+
+.lab-spelling__toolbar button:hover {
+  border-color: #7795b5;
+  background: #f4f8fc;
+  transform: translateY(-1px);
+}
+
 .lab-spelling__notice {
   display: flex;
   align-items: center;
@@ -194,6 +218,12 @@ textarea {
   font-weight: 850;
 }
 
+.lab-spelling__suggestion:hover {
+  border-color: #c97979;
+  background: #fff0f0;
+  transform: translateY(-1px);
+}
+
 .lab-spelling__notice small {
   color: #8b6a6a;
   font-weight: 750;
@@ -214,6 +244,388 @@ textarea {
 
   .lab-spelling__suggestion {
     flex: 0 0 auto;
+  }
+}
+
+.lab-spelling-lookup__loading,
+.lab-spelling-lookup__overlay {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(24 38 54 / 0.56);
+  backdrop-filter: blur(5px);
+}
+
+.lab-spelling-lookup__loading {
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 850;
+}
+
+.lab-spelling-lookup__panel {
+  width: min(100%, 820px);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.7);
+  border-radius: 24px;
+  background: #fff;
+  color: #24374a;
+  box-shadow: 0 24px 70px rgb(13 26 40 / 0.3);
+}
+
+.lab-spelling-lookup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e3e9f0;
+  background: linear-gradient(135deg, #edf6ff, #f7fbff 54%, #fff8e7);
+}
+
+.lab-spelling-lookup__heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.lab-spelling-lookup__heading > span {
+  font-size: 1.8rem;
+}
+
+.lab-spelling-lookup__heading small {
+  display: block;
+  margin-bottom: 1px;
+  color: #698199;
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.lab-spelling-lookup__heading h2 {
+  margin: 0;
+  color: #233d58;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.lab-spelling-lookup__header > button {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 1px solid #ccd9e6;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.84);
+  color: #536b83;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.lab-spelling-lookup__header > button:hover {
+  background: #fff;
+  color: #1f3f60;
+  transform: rotate(3deg);
+}
+
+.lab-spelling-lookup__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px;
+  overscroll-behavior: contain;
+}
+
+.lab-spelling-lookup__correction {
+  padding: 14px 16px;
+  border: 1px solid #f1cdcd;
+  border-radius: 14px;
+  background: #fff7f7;
+}
+
+.lab-spelling-lookup__correction small {
+  color: #986161;
+  font-weight: 850;
+}
+
+.lab-spelling-lookup__correction p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 0;
+  font-size: 1rem;
+}
+
+.lab-spelling-lookup__correction del {
+  color: #a05050;
+}
+
+.lab-spelling-lookup__correction strong {
+  color: #28694d;
+}
+
+.lab-spelling-lookup__promise {
+  margin: 14px 0;
+  color: #65798d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+.lab-spelling-lookup__search label {
+  display: block;
+  margin-bottom: 7px;
+  color: #334e68;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.lab-spelling-lookup__search > div {
+  display: flex;
+  gap: 8px;
+}
+
+.lab-spelling-lookup__search input {
+  min-width: 0;
+  min-height: 48px;
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #b8c8d8;
+  border-radius: 12px;
+  background: #fff;
+  color: #24374a;
+  font-size: 0.95rem;
+}
+
+.lab-spelling-lookup__search input:focus {
+  border-color: #537ea7;
+}
+
+.lab-spelling-lookup__search button {
+  min-width: 92px;
+  min-height: 48px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #315f8b;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 850;
+}
+
+.lab-spelling-lookup__search button:hover:not(:disabled) {
+  background: #244d75;
+  transform: translateY(-1px);
+}
+
+.lab-spelling-lookup__search button:disabled {
+  opacity: 0.45;
+}
+
+.lab-spelling-lookup__popular {
+  margin-top: 18px;
+}
+
+.lab-spelling-lookup__popular > strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #5d7185;
+  font-size: 0.76rem;
+}
+
+.lab-spelling-lookup__popular > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.lab-spelling-lookup__popular button {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid #cddceb;
+  border-radius: 999px;
+  background: #f4f8fc;
+  color: #395c7c;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.lab-spelling-lookup__popular button:hover {
+  border-color: #7e9cba;
+  background: #eaf3fb;
+}
+
+.lab-spelling-lookup__results {
+  margin-top: 18px;
+}
+
+.lab-spelling-lookup__message,
+.lab-spelling-lookup__empty {
+  padding: 22px;
+  border: 1px dashed #c8d5e1;
+  border-radius: 15px;
+  background: #f8fafc;
+  color: #617589;
+  text-align: center;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.lab-spelling-lookup__count {
+  margin: 0 0 10px;
+  color: #617589;
+  font-size: 0.78rem;
+}
+
+.lab-spelling-lookup__card {
+  padding: 16px;
+  border: 1px solid #dbe4ec;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgb(46 73 97 / 0.06);
+}
+
+.lab-spelling-lookup__card + .lab-spelling-lookup__card {
+  margin-top: 10px;
+}
+
+.lab-spelling-lookup__answer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.lab-spelling-lookup__answer span,
+.lab-spelling-lookup__answer strong {
+  padding: 10px 12px;
+  border-radius: 11px;
+  text-align: center;
+  line-height: 1.45;
+}
+
+.lab-spelling-lookup__answer span {
+  background: #fff1f1;
+  color: #994f57;
+  text-decoration: line-through;
+}
+
+.lab-spelling-lookup__answer strong {
+  position: relative;
+  background: #edf8f2;
+  color: #276849;
+}
+
+.lab-spelling-lookup__answer strong::before {
+  content: "→";
+  position: absolute;
+  left: -17px;
+  color: #7890a5;
+}
+
+.lab-spelling-lookup__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.lab-spelling-lookup__meta span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef3f7;
+  color: #587087;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.lab-spelling-lookup__card > p {
+  margin: 13px 0 0;
+  color: #3f5569;
+  font-size: 0.83rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.lab-spelling-lookup__examples {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 11px;
+  background: #f6f8fa;
+  color: #52697e;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.lab-spelling-lookup__examples strong {
+  color: #3e5870;
+}
+
+.lab-spelling-lookup__card > a,
+.lab-spelling-lookup__empty a {
+  display: inline-block;
+  margin-top: 12px;
+  color: #2f679c;
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lab-spelling-lookup__empty > span {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 1.5rem;
+}
+
+.lab-spelling-lookup__empty strong {
+  display: block;
+  color: #485f74;
+}
+
+.lab-spelling-lookup__empty p {
+  margin: 6px 0 0;
+  font-weight: 650;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .lab-spelling-lookup__loading,
+  .lab-spelling-lookup__overlay {
+    align-items: end;
+    padding: 0;
+  }
+
+  .lab-spelling-lookup__panel {
+    max-height: 94dvh;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .lab-spelling-lookup__header,
+  .lab-spelling-lookup__body {
+    padding: 16px;
+  }
+
+  .lab-spelling-lookup__search > div {
+    align-items: stretch;
+  }
+
+  .lab-spelling-lookup__search button {
+    min-width: 78px;
+    padding-inline: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-spelling__toolbar button:hover,
+  .lab-spelling__suggestion:hover,
+  .lab-spelling-lookup__header > button:hover,
+  .lab-spelling-lookup__search button:hover:not(:disabled) {
+    transform: none;
   }
 }
 

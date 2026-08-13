@@ -2,9 +2,11 @@
 
 import type { ReactNode, TextareaHTMLAttributes } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 
-const SHARED_CATALOG_URL = "/spelling/elementary-detection-v1.json";
+const SHARED_DETECTION_CATALOG_URL = "/spelling/elementary-detection-v1.json";
+const SHARED_LOOKUP_CATALOG_URL = "/spelling/elementary-lookup-v1.json";
 const SCAN_DELAY_MS = 350;
 const MAX_ISSUES = 50;
 
@@ -39,11 +41,31 @@ type SharedCatalog = {
   elementaryRules: ElementaryRule[];
 };
 
-type ClassEntry = {
+type SharedLookupCatalog = {
+  version: number;
+  lookupEntries: SpellingLookupEntry[];
+};
+
+export type SpellingLookupEntry = {
+  id: string;
+  question: string;
+  answer: string;
+  learningLabel: string;
+  category: string;
+  subcategory: string;
+  explanation: string;
+  examples: string[];
+  searchable: string[];
+  source: { label: string; url: string } | null;
+};
+
+export type ClassSpellingEntry = {
   id: string;
   wrong_expression: string;
   correct_expression: string;
   label?: string;
+  explanation?: string;
+  examples?: string[];
 };
 
 type IndexedPattern = ElementaryPattern & {
@@ -59,7 +81,7 @@ type CompiledCatalog = {
   elementaryByFirstCharacter: Map<string, IndexedPattern[]>;
 };
 
-type SpellingIssue = {
+export type SpellingIssue = {
   id: string;
   entryId: string;
   start: number;
@@ -70,7 +92,14 @@ type SpellingIssue = {
 
 type SpellingSources = {
   catalog: CompiledCatalog | null;
-  classEntries: ClassEntry[];
+  classEntries: ClassSpellingEntry[];
+};
+
+type LookupRequest = {
+  key: number;
+  query: string;
+  entryId?: string;
+  correction?: SpellingIssue;
 };
 
 type StudentSpellingTextareaProps = Omit<
@@ -82,6 +111,20 @@ type StudentSpellingTextareaProps = Omit<
 };
 
 let spellingSourcesPromise: Promise<SpellingSources> | null = null;
+let spellingLookupEntriesPromise: Promise<SpellingLookupEntry[]> | null = null;
+
+const StudentSpellingLookupDialog = dynamic(
+  () => import("@/components/student-spelling-lookup-dialog")
+    .then((module) => module.StudentSpellingLookupDialog),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="lab-spelling-lookup__loading" role="status">
+        맞춤법 수첩을 여는 중이에요.
+      </div>
+    ),
+  },
+);
 
 function compileCatalog(catalog: SharedCatalog): CompiledCatalog {
   const elementaryByFirstCharacter = new Map<string, IndexedPattern[]>();
@@ -115,13 +158,17 @@ function compileCatalog(catalog: SharedCatalog): CompiledCatalog {
     ? new RegExp(quickRules.map((rule) => `(${rule.source})`).join("|"), "g")
     : null;
 
-  return { quickRules, quickPattern, elementaryByFirstCharacter };
+  return {
+    quickRules,
+    quickPattern,
+    elementaryByFirstCharacter,
+  };
 }
 
 async function loadSpellingSources(): Promise<SpellingSources> {
   if (!spellingSourcesPromise) {
     spellingSourcesPromise = Promise.all([
-      fetch(SHARED_CATALOG_URL, { cache: "force-cache", credentials: "same-origin" })
+      fetch(SHARED_DETECTION_CATALOG_URL, { cache: "force-cache", credentials: "same-origin" })
         .then(async (response) => {
           if (!response.ok) throw new Error(`맞춤법 목록 응답 오류: ${response.status}`);
           const catalog = await response.json() as SharedCatalog;
@@ -134,12 +181,31 @@ async function loadSpellingSources(): Promise<SpellingSources> {
       Promise.resolve(createSupabaseBrowserClient().rpc("get_student_spelling_entries_v1"))
         .then(({ data, error }) => {
           if (error) throw error;
-          return Array.isArray(data) ? data as ClassEntry[] : [];
+          return Array.isArray(data) ? data as ClassSpellingEntry[] : [];
         })
-        .catch(() => [] as ClassEntry[]),
+        .catch(() => [] as ClassSpellingEntry[]),
     ]).then(([catalog, classEntries]) => ({ catalog, classEntries }));
   }
   return spellingSourcesPromise;
+}
+
+async function loadSpellingLookupEntries(): Promise<SpellingLookupEntry[]> {
+  if (!spellingLookupEntriesPromise) {
+    spellingLookupEntriesPromise = fetch(SHARED_LOOKUP_CATALOG_URL, {
+      cache: "force-cache",
+      credentials: "same-origin",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`맞춤법 검색 목록 응답 오류: ${response.status}`);
+        const catalog = await response.json() as SharedLookupCatalog;
+        if (catalog.version !== 1 || !Array.isArray(catalog.lookupEntries)) {
+          throw new Error("지원하지 않는 맞춤법 검색 목록 형식입니다.");
+        }
+        return catalog.lookupEntries;
+      })
+      .catch(() => [] as SpellingLookupEntry[]);
+  }
+  return spellingLookupEntriesPromise;
 }
 
 function overlaps(existing: SpellingIssue[], candidate: SpellingIssue) {
@@ -257,16 +323,30 @@ export function StudentSpellingTextarea({
 }: StudentSpellingTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlighterRef = useRef<HTMLDivElement>(null);
+  const lookupReturnFocusRef = useRef<HTMLElement | null>(null);
+  const lookupRequestSequenceRef = useRef(0);
+  const mountedRef = useRef(true);
   const normalizedValue = useMemo(() => String(value || "").normalize("NFC"), [value]);
   const [scannedValue, setScannedValue] = useState(normalizedValue);
   const [sources, setSources] = useState<SpellingSources>({ catalog: null, classEntries: [] });
+  const [sourcesLoaded, setSourcesLoaded] = useState(false);
+  const [lookupEntries, setLookupEntries] = useState<SpellingLookupEntry[]>([]);
+  const [lookupEntriesLoaded, setLookupEntriesLoaded] = useState(false);
+  const [lookupRequest, setLookupRequest] = useState<LookupRequest | null>(null);
 
   useEffect(() => {
+    mountedRef.current = true;
     let active = true;
     loadSpellingSources().then((loaded) => {
-      if (active) setSources(loaded);
+      if (active) {
+        setSources(loaded);
+        setSourcesLoaded(true);
+      }
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      mountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -296,6 +376,29 @@ export function StudentSpellingTextarea({
     highlighterRef.current.scrollLeft = textareaRef.current.scrollLeft;
   }
 
+  function openLookup(trigger: HTMLElement, issue?: SpellingIssue) {
+    lookupReturnFocusRef.current = trigger;
+    lookupRequestSequenceRef.current += 1;
+    setLookupRequest({
+      key: lookupRequestSequenceRef.current,
+      query: issue?.text || "",
+      entryId: issue?.entryId,
+      correction: issue,
+    });
+    if (!lookupEntriesLoaded) {
+      loadSpellingLookupEntries().then((entries) => {
+        if (!mountedRef.current) return;
+        setLookupEntries(entries);
+        setLookupEntriesLoaded(true);
+      });
+    }
+  }
+
+  function closeLookup() {
+    setLookupRequest(null);
+    window.requestAnimationFrame(() => lookupReturnFocusRef.current?.focus());
+  }
+
   return (
     <div className="lab-spelling">
       <div className="lab-spelling__field">
@@ -322,6 +425,16 @@ export function StudentSpellingTextarea({
         />
       </div>
 
+      <div className="lab-spelling__toolbar">
+        <button
+          type="button"
+          onClick={(event) => openLookup(event.currentTarget)}
+          aria-haspopup="dialog"
+        >
+          <span aria-hidden="true">🔎</span> 맞춤법 찾아보기
+        </button>
+      </div>
+
       {suggestions.length > 0 && (
         <div className="lab-spelling__notice" role="status">
           <strong>
@@ -329,14 +442,33 @@ export function StudentSpellingTextarea({
           </strong>
           <div>
             {suggestions.slice(0, 4).map((issue) => (
-              <span className="lab-spelling__suggestion" key={issue.entryId}>
+              <button
+                type="button"
+                className="lab-spelling__suggestion"
+                key={issue.entryId}
+                onClick={(event) => openLookup(event.currentTarget, issue)}
+                aria-haspopup="dialog"
+              >
                 {issue.text} <span aria-hidden="true">→</span> {issue.right}
-              </span>
+              </button>
             ))}
             {suggestions.length > 4 && <small>외 {suggestions.length - 4}개</small>}
           </div>
         </div>
       )}
+
+      {lookupRequest ? (
+        <StudentSpellingLookupDialog
+          key={lookupRequest.key}
+          entries={lookupEntries}
+          classEntries={sources.classEntries}
+          sourcesLoaded={sourcesLoaded && lookupEntriesLoaded}
+          initialQuery={lookupRequest.query}
+          initialEntryId={lookupRequest.entryId}
+          correction={lookupRequest.correction}
+          onClose={closeLookup}
+        />
+      ) : null}
     </div>
   );
 }
