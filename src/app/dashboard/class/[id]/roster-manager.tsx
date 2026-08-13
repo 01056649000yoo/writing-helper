@@ -48,7 +48,7 @@ export function RosterManager({
     });
   }
 
-  function handleDeleteStudent(studentId: string, studentName: string) {
+  function handleDeleteStudent(studentId: string) {
     if (rosterLocked) return;
 
     setError("");
@@ -132,7 +132,7 @@ export function RosterManager({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteStudent(student.id, student.student_name)}
+                          onClick={() => handleDeleteStudent(student.id)}
                           disabled={isPending}
                           className="rounded-lg bg-red-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-red-600 disabled:opacity-40"
                         >

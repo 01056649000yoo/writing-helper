@@ -11,11 +11,9 @@ import {
   getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
-  getWordGameRoomResults,
   closeRoom,
 } from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
-import { normalizeWordGameActivityState } from "@/lib/word-game";
 
 export default async function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,13 +37,6 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   const hanjaWritingResults = room.activity_type === "hanja_writing"
     ? await getHanjaWritingRoomResults(id)
     : [];
-  const wordGameResults = room.activity_type === "word_game"
-    ? await getWordGameRoomResults(id)
-    : null;
-  const wordGameActivityState = room.activity_type === "word_game"
-    ? normalizeWordGameActivityState(room.activity_state)
-    : null;
-
   const headersList = await headers();
   const rawHost = headersList.get("host") ?? "localhost:3002";
   const forwardedProto = headersList.get("x-forwarded-proto");
@@ -125,8 +116,6 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
         questionVotingResults={questionVotingResults}
         oneLineShareResults={oneLineShareResults}
         hanjaWritingResults={hanjaWritingResults}
-        wordGameResults={wordGameResults}
-        initialWordGameActivityState={wordGameActivityState}
       />
       </div>
     </div>

@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { verifyStudent } from "@/app/actions/student-actions";
-
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "word_game";
+import type { ActivityType } from "@/features/activities/types";
 
 type EntryShellProps = {
   roomId: string;
@@ -30,8 +29,8 @@ export function RoomEntryClient({
     return <OneLineShareEntry roomId={roomId} topic={topic} />;
   }
 
-  if (activityType === "word_game") {
-    return <WordGameEntry roomId={roomId} topic={topic} />;
+  if (activityType === "hanja_writing") {
+    return <HanjaWritingEntry roomId={roomId} topic={topic} />;
   }
 
   return <OutlineBuilderEntry roomId={roomId} topic={topic} />;
@@ -109,20 +108,20 @@ function OneLineShareEntry({ roomId, topic }: EntryShellProps) {
   );
 }
 
-function WordGameEntry({ roomId, topic }: EntryShellProps) {
+function HanjaWritingEntry({ roomId, topic }: EntryShellProps) {
   return (
     <EntryShell
       roomId={roomId}
       topic={topic}
-      shellClassName="from-sky-50 to-indigo-100"
-      topicClassName="bg-sky-50 text-sky-700"
-      buttonClassName="bg-indigo-500 hover:bg-indigo-600"
-      inputFocusClassName="focus:border-indigo-400"
-      emoji="🎯"
-      title="스피드 매치"
-      subtitle="번호와 이름을 입력하고 제한 시간 안에 필수 어휘를 빠르게 맞혀 보세요"
-      helper="힌트와 회복 보너스가 있어서 끝까지 도전하기 좋아요."
-      buttonLabel="게임 시작"
+      shellClassName="from-amber-50 to-orange-100"
+      topicClassName="bg-amber-50 text-amber-700"
+      buttonClassName="bg-amber-500 hover:bg-amber-600"
+      inputFocusClassName="focus:border-amber-400"
+      emoji="📜"
+      title="한자 활용 문장 만들기"
+      subtitle="번호와 이름을 입력하고 한자어의 뜻을 살려 문장을 만들어요"
+      helper="한자 카드와 관련 단어를 살펴본 뒤 자연스러운 문장을 써 보세요."
+      buttonLabel="문장 만들기 시작"
     />
   );
 }

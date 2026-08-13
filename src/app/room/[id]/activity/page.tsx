@@ -13,9 +13,8 @@ import {
 } from "@/app/actions/student-actions";
 import { getMatchingConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import { normalizeHanjaWritingConfig, sentenceContainsWord } from "@/lib/hanja-writing";
-import { WordGamePlayer } from "@/components/word-game-player";
-import { WordGameWaitingRoom } from "@/components/word-game-waiting-room";
 import type {
+  ActivityType,
   HanjaWritingConfig,
   OneLineShareConfig,
   QuestionCardRole,
@@ -23,10 +22,8 @@ import type {
   QuestionGeneratorConfig,
   QuestionGeneratorSubmission,
   QuestionVotingConfig,
-  WordGameActivityState,
-  WordGameConfig,
-  WordGameSubmission,
 } from "@/features/activities/types";
+import { isActivityType } from "@/features/activities/types";
 import type { OutlineTemplateAnswer, OutlineTemplate } from "@/features/activities/types";
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import {
@@ -35,8 +32,6 @@ import {
   getRecommendedGradeChipClass,
   getRecommendedGradeLabel,
 } from "@/features/activities/question-generator/card-meta";
-
-type ActivityType = "outline_builder" | "question_generator" | "question_voting" | "one_line_share" | "hanja_writing" | "word_game";
 
 type Step =
   | "outline_sections"
@@ -50,9 +45,7 @@ type Step =
   | "one_line_share"
   | "one_line_submitting"
   | "hanja_writing"
-  | "hanja_submitting"
-  | "word_game_waiting"
-  | "submitting";
+  | "hanja_submitting";
 
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
 type QuestionBuildMode = "direct" | "card_remix";
@@ -163,15 +156,11 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
   const [oneLineShareConfig, setOneLineShareConfig] = useState<OneLineShareConfig | null>(null);
   const [hanjaWritingConfig, setHanjaWritingConfig] = useState<HanjaWritingConfig | null>(null);
-  const [wordGameConfig, setWordGameConfig] = useState<WordGameConfig | null>(null);
-  const [wordGameSubmission, setWordGameSubmission] = useState<WordGameSubmission | null>(null);
-  const [wordGameActivityState, setWordGameActivityState] = useState<WordGameActivityState | null>(null);
   const [hanjaContents, setHanjaContents] = useState<string[]>([""]);
   const [step, setStep] = useState<Step | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   // outline_builder 전용 상태
   const [outlineTemplate, setOutlineTemplate] = useState<OutlineTemplate | null>(null);
-  const [isLegacyOutlineRoom, setIsLegacyOutlineRoom] = useState(false);
   const [templateAnswers, setTemplateAnswers] = useState<OutlineTemplateAnswer[]>([]);
   const [outlineSubmitting, setOutlineSubmitting] = useState(false);
   const [topic, setTopic] = useState("");
@@ -188,7 +177,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [promptSearch, setPromptSearch] = useState("");
   const [selectedVotingQuestionIds, setSelectedVotingQuestionIds] = useState<string[]>([]);
   const [oneLineContent, setOneLineContent] = useState("");
-  const [stepVisible, setStepVisible] = useState(false);
 
   const enabledCardSets = useMemo(() => {
     const allowedIds = new Set(questionGeneratorConfig?.enabledCardSetIds ?? []);
@@ -231,6 +219,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     if (!selectedResearchRole) return null;
     return roleCardSets.find((cardSet) => buildRoleCardSetLabel(cardSet) === selectedCategoryLabel) ?? roleCardSets[0] ?? null;
   }, [roleCardSets, selectedCategoryLabel, selectedResearchRole]);
+  const activeCategoryLabel = activeRoleCardSet ? buildRoleCardSetLabel(activeRoleCardSet) : null;
   const filteredPrompts = useMemo(() => {
     const promptSource = activeRoleCardSet ?? selectedCardSet;
     if (!promptSource) return [];
@@ -241,29 +230,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
   const maxSelections = questionGeneratorConfig?.maxSelections ?? 1;
   const votingMaxSelections = questionVotingConfig?.maxSelections ?? 1;
-
-  useEffect(() => {
-    if (!selectedResearchRole) return;
-    const nextCategory =
-      roleCardSets[0];
-
-    setSelectedCategoryLabel((prev) => (
-      prev && roleCardSets.some((cardSet) => buildRoleCardSetLabel(cardSet) === prev)
-        ? prev
-        : (nextCategory ? buildRoleCardSetLabel(nextCategory) : null)
-    ));
-  }, [roleCardSets, selectedResearchRole]);
-
-  useEffect(() => {
-    if (!step) return;
-    if (!["question_intro", "question_path", "question_set", "question_rewrite", "question_submitting"].includes(step)) {
-      return;
-    }
-
-    setStepVisible(false);
-    const frame = requestAnimationFrame(() => setStepVisible(true));
-    return () => cancelAnimationFrame(frame);
-  }, [step]);
 
   useEffect(() => {
     params.then((p) => setRoomId(p.id));
@@ -295,12 +261,14 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       setTopic(data.topic ?? "");
       setTopicDescription(typeof data.topic_description === "string" ? data.topic_description : "");
 
-      const type = data.activity_type;
-      if (type === "question_generator" || type === "question_voting" || type === "one_line_share" || type === "hanja_writing" || type === "word_game") {
-        setActivityType(type);
-      } else {
-        setActivityType("outline_builder");
+      const type = data.activity_type ?? "outline_builder";
+      if (!isActivityType(type)) {
+        setError("이 활동은 현재 지원하지 않습니다. 선생님께 새 활동을 만들어 달라고 요청해주세요.");
+        setActivityType(null);
+        setPageLoading(false);
+        return;
       }
+      setActivityType(type);
 
       if (type === "question_generator") {
         setQuestionGeneratorConfig(normalizeQuestionGeneratorConfig(data.activity_config));
@@ -335,28 +303,17 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         const nextContents = Array.from({ length: nextCount }, (_, index) => existingHanja?.contents?.[index] ?? "");
         setHanjaContents(nextContents);
         setStep("hanja_writing");
-      } else if (type === "word_game") {
-        setWordGameConfig(data.activity_config as WordGameConfig);
-        setWordGameSubmission((data.existing_word_game_submission as WordGameSubmission | null) ?? null);
-        const activityState = (data.word_game_activity_state as WordGameActivityState | null) ?? null;
-        setWordGameActivityState(activityState);
-        setStep(activityState?.status === "in_progress" ? "submitting" : "word_game_waiting");
       } else {
         // outline_builder
         const config = data.activity_config as Record<string, unknown> | null;
         const subjectType = (config?.subjectType as import("@/types").SubjectType | undefined) ?? "생활문";
         const template = data.outline_template ?? getDefaultOutlineTemplate(subjectType);
         setOutlineTemplate(template);
-        setIsLegacyOutlineRoom(data.is_legacy_outline_room ?? false);
         const savedAnswers = (data.existing_outline_answers ?? []) as OutlineTemplateAnswer[];
         if (savedAnswers.length > 0) {
           setTemplateAnswers(savedAnswers);
         }
-        if (data.is_legacy_outline_room) {
-          router.push(`/room/${roomId}/waiting?session=${sessionId}`);
-        } else {
-          setStep("outline_sections");
-        }
+        setStep("outline_sections");
       }
       setPageLoading(false);
     });
@@ -393,31 +350,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           </button>
         </div>
       </div>
-    );
-  }
-
-  if (activityType === "word_game" && wordGameConfig && step === "word_game_waiting") {
-    return (
-      <WordGameWaitingRoom
-        roomId={roomId}
-        onStarted={(startedAt) => {
-          setWordGameActivityState({ status: "in_progress", startedAt });
-          setStep("submitting");
-        }}
-      />
-    );
-  }
-
-  if (activityType === "word_game" && wordGameConfig && wordGameActivityState?.status === "in_progress") {
-    return (
-      <WordGamePlayer
-        roomId={roomId}
-        sessionId={sessionId}
-        topic={topic}
-        config={wordGameConfig}
-        existingSubmission={wordGameSubmission}
-        serverStartedAt={wordGameActivityState.startedAt ?? new Date().toISOString()}
-      />
     );
   }
 
@@ -481,10 +413,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       return;
     }
     router.push(`/room/${roomId}/result?session=${sessionId}`);
-  }
-
-  function toggleChoice(choice: string) {
-    void choice;
   }
 
   function selectQuestionPrompt(prompt: string) {
@@ -584,7 +512,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     if (step === "question_intro") {
       return (
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 flex items-center justify-center p-4">
-          <div className={`bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center transition-all duration-300 ease-out ${stepVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}>
+          <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center">
             <div className="text-6xl mb-4">🃏</div>
             <h1 className="text-2xl font-bold text-gray-800">질문 만들기</h1>
             <div className="mt-4 rounded-3xl bg-gradient-to-br from-sky-50 to-cyan-100 px-5 py-5 text-left">
@@ -628,7 +556,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       return (
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
           <div className="max-w-3xl mx-auto py-8">
-            <div className={`space-y-4 transition-all duration-300 ease-out ${stepVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}>
+            <div className="space-y-4">
             <QuestionWizardHeader currentStep={1} completedCount={questionSelections.length} maxSelections={maxSelections} />
 
             <div className="bg-white rounded-3xl shadow-xl p-6">
@@ -757,7 +685,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       return (
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
           <div className="max-w-3xl mx-auto py-8">
-            <div className={`space-y-4 transition-all duration-300 ease-out ${stepVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}>
+            <div className="space-y-4">
             <QuestionWizardHeader currentStep={2} completedCount={questionSelections.length} maxSelections={maxSelections} />
 
             <div className="bg-white rounded-3xl shadow-xl p-6">
@@ -814,7 +742,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               <div className="flex flex-wrap gap-2">
                 {roleCardSets.map((cardSet) => {
                   const label = buildRoleCardSetLabel(cardSet);
-                  const selected = selectedCategoryLabel === label;
+                  const selected = activeCategoryLabel === label;
                   const meta = getCardMeta(cardSet.label);
                   const theme = getCardTheme(cardSet.label);
                   return (
@@ -954,7 +882,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     if (step === "question_rewrite") {
       return (
         <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 flex items-center justify-center p-4">
-          <div className={`w-full max-w-2xl space-y-4 transition-all duration-300 ease-out ${stepVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}>
+          <div className="w-full max-w-2xl space-y-4">
             <QuestionWizardHeader currentStep={3} completedCount={questionSelections.length} maxSelections={maxSelections} />
 
             <div className="bg-white rounded-3xl shadow-xl p-8">
@@ -973,7 +901,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               <div className="mt-5 space-y-4">
                 <div className="rounded-2xl bg-sky-50 px-4 py-3">
                   <p className="text-xs font-semibold text-sky-700">
-                    {questionBuildMode === "direct" ? "직접 질문 만들기" : selectedCardSet?.label ?? selectedCategoryLabel ?? "질문 카드"}
+                    {questionBuildMode === "direct" ? "직접 질문 만들기" : selectedCardSet?.label ?? activeCategoryLabel ?? "질문 카드"}
                   </p>
                   <p className="text-sm text-sky-900 mt-1">오늘 주제: <strong>{topic}</strong></p>
                 </div>

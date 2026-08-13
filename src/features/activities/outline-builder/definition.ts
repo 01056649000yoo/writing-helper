@@ -10,8 +10,12 @@ export const outlineBuilderDefinition: ActivityDefinition<
   description: "교사가 준비한 글 종류별 개요 틀에 학생이 처음·가운데·끝 내용을 채우며 글의 구조를 잡는 활동입니다.",
   category: "writing",
   version: 2,
-  usesAi: true,
+  usesAi: false,
   supportsRoomResult: false,
+  integration: {
+    schemaVersion: 1,
+    resultKind: "outline",
+  },
   createDefaultConfig: () => ({
     subjectType: "생활문",
     gradeLevel: "중학년",

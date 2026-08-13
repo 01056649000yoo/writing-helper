@@ -22,6 +22,10 @@ export const questionGeneratorDefinition: ActivityDefinition<
   version: 1,
   usesAi: false,
   supportsRoomResult: true,
+  integration: {
+    schemaVersion: 1,
+    resultKind: "questions",
+  },
   createDefaultConfig: () => ({
     enabledCardSetIds: QUESTION_CARD_SETS.map((set) => set.id),
     cardSets: QUESTION_CARD_SETS,

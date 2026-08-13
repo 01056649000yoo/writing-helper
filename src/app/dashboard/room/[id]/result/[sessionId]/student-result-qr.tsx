@@ -49,6 +49,7 @@ export function StudentResultQr({
             className="bg-green-50 border border-green-200 rounded-2xl p-2 hover:border-green-400 hover:shadow-md transition-all group"
             title="클릭하면 크게 볼 수 있어요"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qrSmall} alt="학생 결과 QR" className="w-20 h-20" />
             <p className="text-xs text-green-600 text-center mt-1 group-hover:font-medium">크게 보기</p>
           </button>
@@ -72,7 +73,10 @@ export function StudentResultQr({
                 {studentNumber}번 {studentName}
               </h3>
             </div>
-            {qrLarge && <img src={qrLarge} alt="QR 확대" className="w-full max-w-xs rounded-2xl" />}
+            {qrLarge && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={qrLarge} alt="QR 확대" className="w-full max-w-xs rounded-2xl" />
+            )}
             <p className="text-xs text-gray-400 text-center">
               학생이 이 QR을 스캔하면 개요를 바로 복사할 수 있어요
             </p>

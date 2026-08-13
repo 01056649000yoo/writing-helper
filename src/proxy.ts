@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/room", "/science", "/morals", "/auth", "/share"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/room", "/auth", "/share"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
@@ -10,7 +10,7 @@ function isPublicPath(pathname: string) {
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (isPublicPath(pathname) || pathname === "/api/queue" || pathname === "/api/github-deploy") {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 

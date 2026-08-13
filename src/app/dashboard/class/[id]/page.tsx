@@ -1,37 +1,29 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClass, getClassStudents, getClassRooms } from "@/app/actions/class-actions";
-import { getClassScienceRooms } from "@/app/actions/science-actions";
-import { getClassMoralsRooms } from "@/app/actions/morals-actions";
-import { TRACK_META } from "@/types/science";
-import { MORALS_TRACK_META } from "@/types/morals";
+import { isActivityType } from "@/features/activities/types";
 import { DeleteClassButton } from "./delete-button";
 import { DeleteRoomButton } from "./delete-room-button";
-import { DeleteScienceRoomButton } from "./delete-science-room-button";
-import { DeleteMoralsRoomButton } from "./delete-morals-room-button";
 import { RosterManager } from "./roster-manager";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
 import { ClosedRoomsTabs } from "./closed-rooms-tabs";
 
-type UnifiedRoom =
-  | { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; activity_type: string | null; is_active: boolean; created_at: string; expires_at: string | null }
-  | { kind: "science"; id: string; title: string; topic: string; inquiry_track: "basic" | "integrated" | null; is_active: boolean; created_at: string; expires_at: string | null }
-  | { kind: "morals"; id: string; title: string; topic: string; track: "reflection" | "judgement"; is_active: boolean; created_at: string; expires_at: string | null };
+type UnifiedRoom = { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; activity_type: string | null; is_active: boolean; created_at: string; expires_at: string | null };
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [cls, students, rooms, scienceRooms, moralsRooms] = await Promise.all([
+  const [cls, students, rooms] = await Promise.all([
     getClass(id),
     getClassStudents(id),
     getClassRooms(id),
-    getClassScienceRooms(id),
-    getClassMoralsRooms(id),
   ]);
 
   if (!cls) notFound();
 
   const unified: UnifiedRoom[] = [
-    ...rooms.map((r): UnifiedRoom => ({
+    ...rooms
+      .filter((room) => room.activity_type == null || isActivityType(room.activity_type))
+      .map((r): UnifiedRoom => ({
       kind: "writing",
       id: r.id,
       title: r.title,
@@ -42,31 +34,10 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       created_at: r.created_at,
       expires_at: r.expires_at ?? null,
     })),
-    ...scienceRooms.map((r): UnifiedRoom => ({
-      kind: "science",
-      id: r.id,
-      title: r.title,
-      topic: r.topic,
-      inquiry_track: r.inquiryTrack,
-      is_active: r.is_active,
-      created_at: r.created_at,
-      expires_at: r.expires_at ?? null,
-    })),
-    ...moralsRooms.map((r): UnifiedRoom => ({
-      kind: "morals",
-      id: r.id,
-      title: r.title,
-      topic: r.topic,
-      track: r.track,
-      is_active: r.is_active,
-      created_at: r.created_at,
-      expires_at: r.expires_at ?? null,
-    })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const activeRooms = unified.filter((r) => r.is_active);
   const closedRooms = unified.filter((r) => !r.is_active);
-  const renderNow = Date.now();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -117,14 +88,14 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
                 {activeRooms.map((room) => (
-                  <ActivityCard key={`${room.kind}-${room.id}`} room={room} status="active" now={renderNow} />
+                  <ActivityCard key={room.id} room={room} status="active" />
                 ))}
               </div>
             )}
           </div>
 
           {closedRooms.length > 0 && (
-            <ClosedRoomsTabs closedRooms={closedRooms} now={renderNow} />
+            <ClosedRoomsTabs closedRooms={closedRooms} />
           )}
         </div>
       </main>
@@ -132,18 +103,9 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
   );
 }
 
-function ActivityCard({ room, status, now }: { room: UnifiedRoom; status: "active" | "closed"; now: number }) {
-  const href =
-    room.kind === "writing" ? `/dashboard/room/${room.id}` :
-    room.kind === "science" ? `/dashboard/science/${room.id}` :
-    `/dashboard/morals/${room.id}`;
+function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | "closed" }) {
+  const href = `/dashboard/room/${room.id}`;
   const isActive = status === "active";
-
-  function deleteBtn() {
-    if (room.kind === "writing") return <DeleteRoomButton roomId={room.id} />;
-    if (room.kind === "science") return <DeleteScienceRoomButton roomId={room.id} />;
-    return <DeleteMoralsRoomButton roomId={room.id} />;
-  }
 
   if (status === "closed") {
     return (
@@ -158,13 +120,13 @@ function ActivityCard({ room, status, now }: { room: UnifiedRoom; status: "activ
             <span className={`text-xs px-2.5 py-1 rounded-full ${kindChipColor(room)}`}>
               {kindLabel(room)}
             </span>
-            {room.kind === "writing" && room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
+            {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
               <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
             )}
           </div>
           <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
         </Link>
-        <div className="absolute top-3 right-3">{deleteBtn()}</div>
+        <div className="absolute top-3 right-3"><DeleteRoomButton roomId={room.id} /></div>
       </div>
     );
   }
@@ -189,11 +151,11 @@ function ActivityCard({ room, status, now }: { room: UnifiedRoom; status: "activ
         <span className={`text-xs px-2.5 py-1 rounded-full ${kindChipColor(room)}`}>
           {kindLabel(room)}
         </span>
-        {room.kind === "writing" && room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
+        {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
           <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
         )}
         {isActive && room.expires_at && (
-          <ExpiryBadge expiresAt={room.expires_at} now={now} />
+          <ExpiryBadge expiresAt={room.expires_at} />
         )}
       </div>
       <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
@@ -201,65 +163,31 @@ function ActivityCard({ room, status, now }: { room: UnifiedRoom; status: "activ
   );
 }
 
-function ExpiryBadge({ expiresAt, now }: { expiresAt: string; now: number }) {
-  const exp = new Date(expiresAt).getTime();
-  const diffMs = exp - now;
-
-  if (diffMs <= 0) {
-    return (
-      <span className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-full font-medium">
-        ⛔ 시간 만료
-      </span>
-    );
-  }
-
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMin / 60);
-  const remainMin = diffMin % 60;
-
-  let label = "";
-  if (diffHour > 0) {
-    label = remainMin > 0 ? `${diffHour}시간 ${remainMin}분 남음` : `${diffHour}시간 남음`;
-  } else {
-    label = `${diffMin}분 남음`;
-  }
-
-  const isWarning = diffMin <= 30;
-
+function ExpiryBadge({ expiresAt }: { expiresAt: string }) {
   return (
-    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${isWarning ? "bg-amber-100 text-amber-700" : "bg-teal-50 text-teal-700"}`}>
-      ⏰ {label}
+    <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">
+      ⏰ {new Date(expiresAt).toLocaleString("ko-KR")}까지
     </span>
   );
 }
 
 function kindLabel(room: UnifiedRoom): string {
-  if (room.kind === "writing") return writingActivityMeta(room.activity_type).label;
-  if (room.kind === "science") return room.inquiry_track ? `과학 · ${TRACK_META[room.inquiry_track].label}` : "과학";
-  return `도덕 · ${MORALS_TRACK_META[room.track].label}`;
+  return writingActivityMeta(room.activity_type).label;
 }
 
 function kindChipColor(room: UnifiedRoom): string {
-  if (room.kind === "science") return "bg-cyan-50 text-cyan-700";
-  if (room.kind === "morals") return "bg-rose-50 text-rose-700";
   return writingActivityMeta(room.activity_type).chip;
 }
 
 function activeBadgeColor(room: UnifiedRoom): string {
-  if (room.kind === "science") return "text-emerald-700 bg-emerald-50";
-  if (room.kind === "morals") return "text-rose-700 bg-rose-50";
   return writingActivityMeta(room.activity_type).activeBadge;
 }
 
 function activeDotColor(room: UnifiedRoom): string {
-  if (room.kind === "science") return "bg-emerald-500";
-  if (room.kind === "morals") return "bg-rose-500";
   return writingActivityMeta(room.activity_type).activeDot;
 }
 
 function cardAccentBorder(room: UnifiedRoom): string {
-  if (room.kind === "science") return "border-cyan-300 hover:border-cyan-400";
-  if (room.kind === "morals") return "border-rose-300 hover:border-rose-400";
   switch (room.activity_type) {
     case "question_generator": return "border-violet-300 hover:border-violet-400";
     case "question_voting": return "border-amber-300 hover:border-amber-400";
@@ -271,8 +199,6 @@ function cardAccentBorder(room: UnifiedRoom): string {
 }
 
 function cardEmoji(room: UnifiedRoom): string {
-  if (room.kind === "science") return "🔬";
-  if (room.kind === "morals") return "🪞";
   const activityMeta = writingActivityMeta(room.activity_type);
   if (activityMeta.emoji) return activityMeta.emoji;
   return subjectEmoji(room.subject_type);

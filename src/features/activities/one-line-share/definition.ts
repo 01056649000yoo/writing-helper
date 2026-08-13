@@ -19,6 +19,10 @@ export const oneLineShareDefinition: ActivityDefinition<
   version: 1,
   usesAi: false,
   supportsRoomResult: true,
+  integration: {
+    schemaVersion: 1,
+    resultKind: "one_line",
+  },
   createDefaultConfig: () => ({
     promptTitle: "오늘 수업 한 줄 정리",
     promptDescription: "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.",

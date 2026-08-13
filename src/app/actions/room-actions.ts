@@ -13,13 +13,6 @@ import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-s
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
 import { buildOneLineShareBoard, normalizeKeywordText } from "@/lib/one-line-share";
-import {
-  assignWordGameTeam,
-  buildWordGameQuestions,
-  buildWordGameRoomSummary,
-  createDefaultWordGameTeams,
-  normalizeWordGameActivityState,
-} from "@/lib/word-game";
 import type {
   ActivityType,
   HanjaWordCard,
@@ -31,10 +24,6 @@ import type {
   QuestionVotingConfig,
   QuestionVotingRoomResult,
   HanjaWritingConfig,
-  WordGameConfig,
-  WordGameRoomResult,
-  WordGameResult,
-  WordGameStudentProgress,
 } from "@/features/activities/types";
 import type { SubjectType, GradeLevel, OutlineDepth, RoomStudent } from "@/types";
 
@@ -184,7 +173,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     is_active: true,
   };
 
-  let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig | OneLineShareConfig | HanjaWritingConfig | WordGameConfig;
+  let activityConfig: OutlineBuilderConfig | QuestionGeneratorConfig | QuestionVotingConfig | OneLineShareConfig | HanjaWritingConfig;
 
   if (activityType === "outline_builder") {
     // 교사가 커스텀 템플릿을 전달했으면 사용, 없으면 null (런타임에 기본값 사용)
@@ -303,58 +292,6 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       evaluationCriteria,
       maxSelections: clampNumber(formData.get("max_selections"), 1, shuffledQuestions.length, 1),
     };
-  } else if (activityType === "word_game") {
-    const grade = clampNumber(formData.get("word_game_grade"), 3, 6, 4) as 3 | 4 | 5 | 6;
-    const levelRaw = String(formData.get("word_game_level") ?? "mixed").trim();
-    const levelFilter = levelRaw === "1" || levelRaw === "2" || levelRaw === "3"
-      ? Number(levelRaw) as 1 | 2 | 3
-      : "mixed";
-    const categoryFilter = formData
-      .getAll("word_game_categories")
-      .map((value) => String(value).trim())
-      .filter(Boolean);
-    const wordCount = clampNumber(formData.get("word_game_word_count"), 8, 15, 10);
-    const timeLimit = clampNumber(formData.get("word_game_time_limit"), 60, 180, 90);
-    const mode = String(formData.get("word_game_mode") ?? "team") === "individual" ? "individual" : "team";
-    const teamCount = clampNumber(formData.get("word_game_team_count"), 2, 4, 2) as 2 | 3 | 4;
-    const teamMode = (() => {
-      const raw = String(formData.get("word_game_team_mode") ?? "number_alternate");
-      return raw === "random_balanced" || raw === "number_block" ? raw : "number_alternate";
-    })();
-    const allowHints = formData.getAll("word_game_allow_hints").map(String).includes("on");
-    const easyStart = formData.getAll("word_game_easy_start").map(String).includes("on");
-    const recoveryBonus = formData.getAll("word_game_recovery_bonus").map(String).includes("on");
-    const growthBonus = formData.getAll("word_game_growth_bonus").map(String).includes("on");
-    const teams = createDefaultWordGameTeams(teamCount);
-    const questions = buildWordGameQuestions({
-      grade,
-      levelFilter,
-      categoryFilter,
-      wordCount,
-      easyStart,
-    });
-
-    topic = "스피드 매치";
-
-    activityConfig = {
-      gameMode: "speed_match",
-      mode,
-      questionMode: "definition_to_word",
-      timeLimit,
-      grade,
-      levelFilter,
-      categoryFilter,
-      wordCount,
-      allowHints,
-      easyStart,
-      recoveryBonus,
-      growthBonus,
-      showLiveTeamBoard: mode === "team",
-      teamCount,
-      teamMode,
-      teams,
-      questions,
-    };
   } else if (activityType === "hanja_writing") {
     const cardRaw = String(formData.get("hanja_card") ?? "").trim();
     if (!cardRaw) return { error: "한자 카드 정보가 없습니다. 다시 시도해 주세요." };
@@ -432,9 +369,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
         ? "한줄모아"
         : activityType === "hanja_writing"
           ? "한자 활용 문장 만들기"
-          : activityType === "word_game"
-            ? "스피드 매치"
-            : topic,
+          : topic,
       topic,
       topic_description: topicDescription,
       activity_type: activityType,
@@ -480,57 +415,9 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 }
 
 function parseActivityType(value: FormDataEntryValue | null): ActivityType {
-  return value === "question_generator" || value === "question_voting" || value === "one_line_share" || value === "hanja_writing" || value === "word_game"
+  return value === "question_generator" || value === "question_voting" || value === "one_line_share" || value === "hanja_writing"
     ? value
     : "outline_builder";
-}
-
-function normalizeWordGameConfig(value: unknown): WordGameConfig {
-  const raw = isRecord(value) ? value : {};
-  const teamCount = raw.teamCount === 3 || raw.teamCount === 4 ? raw.teamCount : 2;
-  const teams = Array.isArray(raw.teams)
-    ? raw.teams
-        .filter(isRecord)
-        .map((team, index) => ({
-          id: typeof team.id === "string" ? team.id : `team-${index + 1}`,
-          name: typeof team.name === "string" ? team.name : `${String.fromCharCode(65 + index)}팀`,
-          color: typeof team.color === "string" ? team.color : ["#f97316", "#0ea5e9", "#22c55e", "#a855f7"][index] ?? "#f97316",
-        }))
-    : createDefaultWordGameTeams(teamCount);
-
-  return {
-    gameMode: "speed_match",
-    mode: raw.mode === "individual" ? "individual" : "team",
-    questionMode: "definition_to_word",
-    timeLimit: typeof raw.timeLimit === "number" ? raw.timeLimit : 90,
-    grade: raw.grade === 3 || raw.grade === 4 || raw.grade === 5 || raw.grade === 6 ? raw.grade : 4,
-    levelFilter: raw.levelFilter === 1 || raw.levelFilter === 2 || raw.levelFilter === 3 ? raw.levelFilter : "mixed",
-    categoryFilter: Array.isArray(raw.categoryFilter) ? raw.categoryFilter.filter((item): item is string => typeof item === "string") : [],
-    wordCount: typeof raw.wordCount === "number" ? raw.wordCount : 10,
-    allowHints: raw.allowHints !== false,
-    easyStart: raw.easyStart !== false,
-    recoveryBonus: raw.recoveryBonus !== false,
-    growthBonus: raw.growthBonus !== false,
-    showLiveTeamBoard: raw.showLiveTeamBoard !== false,
-    teamCount,
-    teamMode: raw.teamMode === "random_balanced" || raw.teamMode === "number_block" ? raw.teamMode : "number_alternate",
-    teams,
-    questions: Array.isArray(raw.questions)
-      ? raw.questions.filter((question): question is WordGameConfig["questions"][number] => {
-          return isRecord(question)
-            && typeof question.id === "string"
-            && typeof question.word === "string"
-            && typeof question.category === "string"
-            && (question.level === 1 || question.level === 2 || question.level === 3)
-            && typeof question.prompt === "string"
-            && typeof question.answer === "string"
-            && typeof question.definition === "string"
-            && typeof question.example === "string"
-            && Array.isArray(question.choices)
-            && question.choices.every((choice) => typeof choice === "string");
-        })
-      : [],
-  };
 }
 
 function isMissingActivityColumnError(message: string) {
@@ -648,41 +535,6 @@ export async function closeRoom(roomId: string): Promise<{ error?: string }> {
   return {};
 }
 
-export async function startWordGame(roomId: string): Promise<{ error?: string; startedAt?: string }> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "로그인이 필요합니다." };
-
-  const admin = createSupabaseAdminClient();
-  const { data: room } = await admin
-    .schema("writing_helper")
-    .from("rooms")
-    .select("teacher_id, activity_type, activity_state, is_active")
-    .eq("id", roomId)
-    .maybeSingle();
-
-  if (!room || room.teacher_id !== user.id) return { error: "권한이 없습니다." };
-  if (room.activity_type !== "word_game") return { error: "활동 종류가 맞지 않습니다." };
-  if (!room.is_active) return { error: "이미 종료된 활동입니다." };
-
-  const currentState = normalizeWordGameActivityState(room.activity_state);
-  if (currentState.status === "in_progress") {
-    return { startedAt: currentState.startedAt ?? undefined };
-  }
-
-  const startedAt = new Date().toISOString();
-  const { error } = await admin
-    .schema("writing_helper")
-    .from("rooms")
-    .update({ activity_state: { wordGame: { status: "in_progress", startedAt } } })
-    .eq("id", roomId)
-    .eq("teacher_id", user.id);
-
-  if (error) return { error: "게임을 시작하지 못했습니다." };
-
-  revalidatePath(`/dashboard/room/${roomId}`);
-  return { startedAt };
-}
-
 export async function getRooms() {
   const user = await getCurrentUser();
   if (!user) return [];
@@ -764,8 +616,7 @@ export async function getRoomQuestions(roomId: string) {
     .eq("id", roomId)
     .maybeSingle();
   if (!data || data.teacher_id !== user.id) return null;
-  const { teacher_id: _, ...rest } = data;
-  return rest;
+  return { topic: data.topic, question_sets: data.question_sets };
 }
 
 export async function getRoomSessions(roomId: string) {
@@ -791,146 +642,6 @@ export async function getRoomSessions(roomId: string) {
     .eq("room_id", roomId)
     .order("created_at");
   return data ?? [];
-}
-
-export async function getWordGameActivityState(roomId: string) {
-  const user = await getCurrentUser();
-  if (!user) return null;
-
-  const admin = createSupabaseAdminClient();
-  const { data: room } = await admin
-    .schema("writing_helper")
-    .from("rooms")
-    .select("teacher_id, activity_state")
-    .eq("id", roomId)
-    .maybeSingle();
-
-  if (!room || room.teacher_id !== user.id) return null;
-  return normalizeWordGameActivityState(room.activity_state);
-}
-
-export async function getWordGameRoomResults(roomId: string): Promise<WordGameRoomResult> {
-  const user = await getCurrentUser();
-  if (!user) {
-    return {
-      rankings: [],
-      teams: [],
-      progress: {
-        totalStudents: 0,
-        connectedStudents: 0,
-        activeStudents: 0,
-        completedStudents: 0,
-        averageCorrectRate: 0,
-      },
-      hardWords: [],
-    };
-  }
-
-  const admin = createSupabaseAdminClient();
-  const { data: room } = await admin
-    .schema("writing_helper")
-    .from("rooms")
-    .select("teacher_id, activity_type, activity_config, class_id")
-    .eq("id", roomId)
-    .maybeSingle();
-
-  if (!room || room.teacher_id !== user.id || room.activity_type !== "word_game") {
-    return {
-      rankings: [],
-      teams: [],
-      progress: {
-        totalStudents: 0,
-        connectedStudents: 0,
-        activeStudents: 0,
-        completedStudents: 0,
-        averageCorrectRate: 0,
-      },
-      hardWords: [],
-    };
-  }
-
-  const config = normalizeWordGameConfig(room.activity_config);
-  const students = await getRoomStudents(roomId);
-  const { data: sessions } = await admin
-    .schema("writing_helper")
-    .from("student_sessions")
-    .select("student_number, student_name, status, submission, result")
-    .eq("room_id", roomId)
-    .order("student_number");
-
-  const progressRows: WordGameStudentProgress[] = (sessions ?? []).map((session) => {
-    const submission = isRecord(session.submission) ? session.submission : {};
-    const result = isRecord(session.result) ? session.result : {};
-    const team = config.mode === "team"
-      ? assignWordGameTeam(session.student_number, config.teams, config.teamMode)
-      : null;
-    return {
-      studentNumber: session.student_number,
-      studentName: session.student_name,
-      status: session.status === "done" ? "done" : "in_progress",
-      score: typeof result.score === "number" ? result.score : typeof submission.score === "number" ? submission.score : 0,
-      correctCount: typeof result.correctCount === "number" ? result.correctCount : typeof submission.correctCount === "number" ? submission.correctCount : 0,
-      wrongCount: typeof result.wrongCount === "number" ? result.wrongCount : typeof submission.wrongCount === "number" ? submission.wrongCount : 0,
-      usedHints: typeof result.usedHints === "number" ? result.usedHints : typeof submission.usedHints === "number" ? submission.usedHints : 0,
-      currentIndex: typeof submission.currentIndex === "number" ? submission.currentIndex : 0,
-      totalQuestions: typeof submission.totalQuestions === "number" ? submission.totalQuestions : config.questions.length,
-      teamId: team?.teamId ?? null,
-    };
-  });
-
-  const resultRows: Array<WordGameResult & { studentNumber: number; studentName: string; status: "in_progress" | "done" }> = (sessions ?? []).map((session) => {
-    const raw = isRecord(session.result) ? session.result : isRecord(session.submission) ? session.submission : {};
-    const team = config.mode === "team"
-      ? assignWordGameTeam(session.student_number, config.teams, config.teamMode)
-      : null;
-    return {
-      score: typeof raw.score === "number" ? raw.score : 0,
-      correctCount: typeof raw.correctCount === "number" ? raw.correctCount : 0,
-      wrongCount: typeof raw.wrongCount === "number" ? raw.wrongCount : 0,
-      timeBonus: typeof raw.timeBonus === "number" ? raw.timeBonus : 0,
-      recoveryBonus: typeof raw.recoveryBonus === "number" ? raw.recoveryBonus : 0,
-      growthBonus: typeof raw.growthBonus === "number" ? raw.growthBonus : 0,
-      completionBonus: typeof raw.completionBonus === "number" ? raw.completionBonus : 0,
-      usedHints: typeof raw.usedHints === "number" ? raw.usedHints : 0,
-      elapsedMs: typeof raw.elapsedMs === "number" ? raw.elapsedMs : 0,
-      teamId: team?.teamId ?? null,
-      studentNumber: session.student_number,
-      studentName: session.student_name,
-      status: session.status === "done" ? "done" : "in_progress",
-    };
-  });
-
-  const summary = buildWordGameRoomSummary(
-    students.map((student) => ({ student_number: student.student_number, student_name: student.student_name })),
-    progressRows,
-    resultRows,
-    config.teams,
-    config.teamMode
-  );
-
-  const questionById = new Map(config.questions.map((question) => [question.id, question] as const));
-  const hardWordMap = new Map<string, { word: string; wrongCount: number; correctCount: number }>();
-  for (const session of sessions ?? []) {
-    const submission = isRecord(session.submission) ? session.submission : {};
-    const answers = Array.isArray(submission.answers) ? submission.answers : [];
-    for (const answer of answers) {
-      if (!isRecord(answer) || typeof answer.questionId !== "string" || typeof answer.isCorrect !== "boolean") continue;
-      const question = questionById.get(answer.questionId);
-      if (!question) continue;
-      const existing = hardWordMap.get(question.word) ?? { word: question.word, wrongCount: 0, correctCount: 0 };
-      if (answer.isCorrect) existing.correctCount += 1;
-      else existing.wrongCount += 1;
-      hardWordMap.set(question.word, existing);
-    }
-  }
-
-  return {
-    ...summary,
-    hardWords: [...hardWordMap.values()]
-      .filter((entry) => entry.wrongCount > 0)
-      .sort((a, b) => b.wrongCount - a.wrongCount || a.correctCount - b.correctCount || a.word.localeCompare(b.word, "ko-KR"))
-      .slice(0, 6),
-  };
 }
 
 export type QuestionGeneratorRoomResultSummary = {

@@ -32,7 +32,6 @@ import {
   type HanjaRecommendedGrade,
   type HanjaRecommendedWord,
 } from "@/lib/hanja-recommended-words";
-import { getVocabCategories } from "@/lib/vocabulary";
 import { useActivityDraft } from "@/lib/use-activity-draft";
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import type { OutlineTemplate, OutlineTemplateItem } from "@/lib/outline-templates";
@@ -122,11 +121,6 @@ const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary
     tone: "from-amber-50 via-white to-orange-50",
     summary: "단어 속 한자의 뜻을 살피고, 그 단어를 활용해 한 문장을 만들어 친구와 나누는 활동",
   },
-  word_game: {
-    emoji: "🎮",
-    tone: "from-sky-50 via-white to-indigo-50",
-    summary: "3~6학년 학년별 필수 단어를 활용하여 정해진 시간 동안 낱말을 맞추는 실시간 경쟁 게임",
-  },
 };
 
 const WRITING_BUNDLE_ACTIVITY_IDS: ActivityType[] = [
@@ -134,6 +128,7 @@ const WRITING_BUNDLE_ACTIVITY_IDS: ActivityType[] = [
   "question_generator",
   "question_voting",
   "one_line_share",
+  "hanja_writing",
 ];
 
 const WRITING_BUNDLE_DEFINITIONS = activityDefinitions.filter(
@@ -141,99 +136,7 @@ const WRITING_BUNDLE_DEFINITIONS = activityDefinitions.filter(
 );
 
 
-const COMING_SOON_ACTIVITIES: {
-  emoji: string;
-  tone: string;
-  label: string;
-  badge: string;
-  summary: string;
-  effect: string;
-  href?: string;
-  status?: "testing";
-}[] = [
-  {
-    emoji: "🔬",
-    tone: "from-cyan-50 via-white to-sky-50",
-    label: "[과학] 관찰하고 추론하기",
-    badge: "실험 관찰 글쓰기",
-    summary:
-      "본 것(관찰) → 생각한 것(추론) → 궁금한 것(질문) 3단계 틀로 과학적 사고를 글로 옮기는 활동",
-    effect: "단순 사실 나열을 넘어 과학적 사고력 훈련",
-    href: "__science__",
-    status: "testing",
-  },
-  {
-    emoji: "🎭",
-    tone: "from-violet-50 via-white to-purple-50",
-    label: "[사회] 입장 바꿔 생각하기",
-    badge: "역할 대입 글쓰기",
-    summary:
-      "사회·역사 속 인물이 되어 '내가 만약 ~라면?' 가정 아래 상황·선택·이유를 논리적으로 쓰는 활동",
-    effect: "공감 능력과 비판적 사고력을 동시에 성장",
-    status: "testing",
-  },
-  {
-    emoji: "🔢",
-    tone: "from-yellow-50 via-white to-amber-50",
-    label: "[수학] 풀이 과정 설명하기",
-    badge: "문장제 문제 정복",
-    summary:
-      "답이 아닌 '어떻게 풀었나, 왜 이 식을 세웠나'를 친구에게 설명하듯 글로 쓰는 활동",
-    effect: "수학 개념 이해도를 스스로 점검하는 메타인지 훈련",
-    status: "testing",
-  },
-  {
-    emoji: "🪞",
-    tone: "from-rose-50 via-white to-pink-50",
-    label: "[도덕] 마음 거울 비추기",
-    badge: "감정·가치 글쓰기",
-    summary:
-      "감정·가치를 떠올리고 다짐·실천 계획까지 풀어내는 도덕과 글쓰기 활동",
-    effect: "어휘력 향상과 정서 조절 능력 발달",
-    href: "__morals__",
-    status: "testing",
-  },
-];
-
-const LITERACY_ACTIVITIES: {
-  emoji: string;
-  tone: string;
-  label: string;
-  summary: string;
-  href?: string;
-  badge?: string;
-}[] = [
-  {
-    emoji: "📜",
-    tone: "from-amber-50 via-white to-orange-50",
-    label: "한자 활용 문장 만들기",
-    summary: "낱말 속 한자의 뜻을 살피고, 한자를 활용해 더 정확하고 풍부한 문장을 써보는 활동",
-    href: "__hanja_writing__",
-  },
-  {
-    emoji: "🎮",
-    tone: "from-sky-50 via-white to-indigo-50",
-    label: "필수 단어 맞추기 게임",
-    summary: "3~6학년 필수 단어를 활용하여 정해진 시간 동안 낱말을 맞추는 실시간 경쟁 게임",
-    href: "__word_game__",
-    badge: "테스트 중",
-  },
-  {
-    emoji: "🪄",
-    tone: "from-slate-50 via-white to-gray-50",
-    label: "문해력 활동 ③",
-    summary: "곧 새로운 글쓰기 문해력 활동이 추가될 예정이에요.",
-  },
-  {
-    emoji: "🪄",
-    tone: "from-slate-50 via-white to-gray-50",
-    label: "문해력 활동 ④",
-    summary: "곧 새로운 글쓰기 문해력 활동이 추가될 예정이에요.",
-  },
-];
-
 function ActivitySelectionScreen({ classId }: { classId: string }) {
-  const [subjectOpen, setSubjectOpen] = useState(false);
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto py-4">
@@ -253,11 +156,8 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
             </div>
           </div>
 
-          {/* 좌우 2-파트 레이아웃 */}
-          <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-
-            {/* ── 파트 1: 글쓰기 활동 꾸러미 ── */}
-            <section className="flex-1 p-5">
+          <div>
+            <section className="p-5">
               <div className="flex items-center justify-between gap-2 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-lg">📦</span>
@@ -269,7 +169,7 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 <span className="shrink-0 text-[11px] font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">바로 사용</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {WRITING_BUNDLE_DEFINITIONS.map((activity) => {
                   const meta = ACTIVITY_META[activity.id];
                   return (
@@ -292,142 +192,6 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                   );
                 })}
               </div>
-            </section>
-
-            {/* ── 파트 2: 글쓰기 문해력 활동 ── */}
-            <section className="flex-1 p-5 bg-gray-50/60">
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-lg">✍️</span>
-                  <h2 className="text-sm font-bold text-gray-800 truncate">글쓰기 문해력 활동</h2>
-                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-orange-600">
-                    {LITERACY_ACTIVITIES.length}개
-                  </span>
-                </div>
-                <span className="shrink-0 text-[11px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">문해력 강화</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {LITERACY_ACTIVITIES.map((activity) => {
-                  const resolvedHref = activity.href === "__hanja_writing__"
-                    ? (classId ? `/dashboard/room/new?class_id=${classId}&activity_type=hanja_writing` : null)
-                    : activity.href === "__word_game__"
-                      ? (classId ? `/dashboard/room/new?class_id=${classId}&activity_type=word_game` : null)
-                      : null;
-                  return resolvedHref ? (
-                    <Link
-                      key={activity.label}
-                      href={resolvedHref}
-                      className={`flex flex-col rounded-2xl border-2 border-amber-200 bg-gradient-to-br ${activity.tone} p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-2xl">{activity.emoji}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm ${activity.badge === "테스트 중" ? "bg-amber-500" : "bg-amber-400"}`}>
-                          {activity.badge || "NEW"}
-                        </span>
-                      </div>
-                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
-                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{activity.summary}</p>
-                      <div className="mt-3 pt-2 border-t border-amber-100/80 flex justify-end">
-                        <span className="inline-flex items-center gap-1 bg-amber-400 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
-                          선택 →
-                        </span>
-                      </div>
-                    </Link>
-                  ) : (
-                    <div
-                      key={activity.label}
-                      className={`flex flex-col rounded-2xl border border-gray-200/80 bg-gradient-to-br ${activity.tone} p-4 opacity-70 cursor-not-allowed`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-2xl">{activity.emoji}</span>
-                        <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-orange-500 shadow-sm">
-                          {activity.badge || "준비 중"}
-                        </span>
-                      </div>
-                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
-                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{activity.summary}</p>
-                      <div className="mt-3 pt-2 border-t border-gray-100/80 flex justify-end">
-                        <span className="inline-flex items-center gap-1 bg-gray-300 text-gray-500 text-[11px] font-semibold px-3 py-1 rounded-full">
-                          곧 출시 →
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-          </div>
-
-          {/* ── 파트 3: 과목별 글쓰기 활동 ── */}
-          <div className="border-t border-gray-100">
-            <section className="p-5">
-              <button
-                type="button"
-                onClick={() => setSubjectOpen((v) => !v)}
-                className="w-full flex items-center justify-between gap-2 mb-4"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-lg">📚</span>
-                  <h2 className="text-sm font-bold text-gray-800 truncate">과목별 글쓰기 활동</h2>
-                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600">
-                    테스트 중
-                  </span>
-                </div>
-                <span className="shrink-0 text-gray-400 text-sm">{subjectOpen ? "▲" : "▼"}</span>
-              </button>
-
-              {subjectOpen && <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {COMING_SOON_ACTIVITIES.map((activity) => {
-                  const resolvedHref = activity.href === "__science__"
-                    ? (classId ? `/dashboard/science/new?class_id=${classId}` : null)
-                    : activity.href === "__morals__"
-                      ? (classId ? `/dashboard/morals/new?class_id=${classId}` : null)
-                      : (activity.href ?? null);
-                  const isTesting = activity.status === "testing";
-                  return resolvedHref ? (
-                    <Link
-                      key={activity.label}
-                      href={resolvedHref}
-                      className={`flex flex-col rounded-2xl border bg-gradient-to-br ${activity.tone} p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${isTesting ? "border-amber-200" : "border-cyan-200"}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-2xl">{activity.emoji}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm ${isTesting ? "bg-amber-400" : "bg-cyan-500"}`}>
-                          {isTesting ? "테스트 중" : "NEW"}
-                        </span>
-                      </div>
-                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
-                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{activity.summary}</p>
-                      <div className={`mt-3 pt-2 flex justify-end ${isTesting ? "border-t border-amber-100/80" : "border-t border-cyan-100/80"}`}>
-                        <span className={`inline-flex items-center gap-1 text-white text-[11px] font-semibold px-3 py-1 rounded-full ${isTesting ? "bg-amber-400" : "bg-cyan-500"}`}>
-                          선택 →
-                        </span>
-                      </div>
-                    </Link>
-                  ) : (
-                    <div
-                      key={activity.label}
-                      className={`flex flex-col rounded-2xl border border-gray-200/80 bg-gradient-to-br ${activity.tone} p-4 opacity-55 cursor-not-allowed`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-2xl">{activity.emoji}</span>
-                        <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-500 shadow-sm">
-                          준비 중
-                        </span>
-                      </div>
-                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
-                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{activity.summary}</p>
-                      <div className="mt-3 pt-2 border-t border-gray-100/80 flex justify-end">
-                        <span className="inline-flex items-center gap-1 bg-gray-300 text-gray-500 text-[11px] font-semibold px-3 py-1 rounded-full">
-                          곧 출시 →
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>}
             </section>
           </div>
         </div>
@@ -499,10 +263,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
 
   const subjectType = draft.subject_type as SubjectType;
   const effectiveTemplate = customTemplate ?? getDefaultOutlineTemplate(subjectType);
-
-  useEffect(() => {
-    setCustomTemplate(null);
-  }, [subjectType]);
 
   async function handleAiEnhance(sectionKey: "처음" | "가운데" | "끝") {
     if (aiEnhancing) return;
@@ -623,7 +383,10 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                 name="subject_type"
                 value={type}
                 checked={draft.subject_type === type}
-                onChange={() => setDraft((prev) => ({ ...prev, subject_type: type }))}
+                onChange={() => {
+                  setDraft((prev) => ({ ...prev, subject_type: type }));
+                  setCustomTemplate(null);
+                }}
                 className="text-indigo-500 shrink-0"
               />
               <span className="text-base text-gray-700">{subjectLabel(type)}</span>
@@ -1862,14 +1625,15 @@ function HanjaWritingSetup({ classId }: { classId: string }) {
     () => Array.from(new Set(availableRecommendedWords.map((item) => item.category))),
     [availableRecommendedWords],
   );
+  const effectiveCategoryFilter = categories.includes(categoryFilter) ? categoryFilter : "all";
   const filteredRecommendedWords = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return availableRecommendedWords.filter((item) => {
-      if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
+      if (effectiveCategoryFilter !== "all" && item.category !== effectiveCategoryFilter) return false;
       if (!normalizedQuery) return true;
       return [item.word, item.category, item.note].join(" ").toLowerCase().includes(normalizedQuery);
     });
-  }, [availableRecommendedWords, categoryFilter, query]);
+  }, [availableRecommendedWords, effectiveCategoryFilter, query]);
   const visibleRecommendedWords = filteredRecommendedWords.slice(0, visibleCount);
   const selectedRecommendedWord = useMemo(
     () => recommendedWords.find((item) => item.word === draft.word) ?? null,
@@ -1893,24 +1657,6 @@ function HanjaWritingSetup({ classId }: { classId: string }) {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    setCategoryFilter("all");
-    setQuery("");
-    setVisibleCount(8);
-    setPreview(null);
-    setError("");
-  }, [recommendedGrade]);
-
-  useEffect(() => {
-    setVisibleCount(8);
-  }, [categoryFilter, query]);
-
-  useEffect(() => {
-    if (categoryFilter !== "all" && !categories.includes(categoryFilter)) {
-      setCategoryFilter("all");
-    }
-  }, [categories, categoryFilter]);
 
   async function handleGenerate() {
     const word = draft.word.trim();
@@ -2037,7 +1783,14 @@ function HanjaWritingSetup({ classId }: { classId: string }) {
             <label className="block text-sm font-semibold text-gray-700 mb-2">학년</label>
             <select
               value={draft.grade}
-              onChange={(event) => setDraft((prev) => ({ ...prev, grade: event.target.value }))}
+              onChange={(event) => {
+                setDraft((prev) => ({ ...prev, grade: event.target.value }));
+                setCategoryFilter("all");
+                setQuery("");
+                setVisibleCount(8);
+                setPreview(null);
+                setError("");
+              }}
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-300"
             >
               <option value="3">초등 3학년</option>
@@ -2050,7 +1803,10 @@ function HanjaWritingSetup({ classId }: { classId: string }) {
             <label className="block text-sm font-semibold text-gray-700 mb-2">검색</label>
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setVisibleCount(8);
+              }}
               placeholder="단어 또는 범주 검색"
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-300"
             />
@@ -2060,9 +1816,12 @@ function HanjaWritingSetup({ classId }: { classId: string }) {
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setCategoryFilter("all")}
+            onClick={() => {
+              setCategoryFilter("all");
+              setVisibleCount(8);
+            }}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-              categoryFilter === "all" ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              effectiveCategoryFilter === "all" ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             전체
@@ -2071,9 +1830,12 @@ function HanjaWritingSetup({ classId }: { classId: string }) {
             <button
               key={category}
               type="button"
-              onClick={() => setCategoryFilter(category)}
+              onClick={() => {
+                setCategoryFilter(category);
+                setVisibleCount(8);
+              }}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                categoryFilter === category ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                effectiveCategoryFilter === category ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
               {category}
@@ -2467,253 +2229,6 @@ function DurationField({
   );
 }
 
-function StepBadge({
-  children,
-  active = false,
-  done = false,
-}: {
-  children: React.ReactNode;
-  active?: boolean;
-  done?: boolean;
-}) {
-  const base = "rounded-full px-3 py-1.5 text-sm font-medium";
-  if (done) return <span className={`${base} bg-indigo-100 text-indigo-600`}>{children}</span>;
-  if (active) return <span className={`${base} bg-indigo-500 text-white`}>{children}</span>;
-  return <span className={`${base} bg-gray-100 text-gray-400`}>{children}</span>;
-}
-
-function StepDivider({ active = false }: { active?: boolean }) {
-  return <div className={`h-px flex-1 ${active ? "bg-indigo-400" : "bg-gray-300"}`} />;
-}
-
-type WordGameDraft = {
-  grade: string;
-  level: string;
-  word_count: string;
-  time_limit: string;
-  mode: "individual" | "team";
-  team_count: string;
-  team_mode: "number_alternate" | "random_balanced" | "number_block";
-  allow_hints: boolean;
-  easy_start: boolean;
-  recovery_bonus: boolean;
-  growth_bonus: boolean;
-  categories: string[];
-};
-
-function WordGameSetup({ classId }: { classId: string }) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const allCategories = useMemo(() => getVocabCategories(4), []);
-  const initialDraft = useMemo<WordGameDraft>(() => ({
-    grade: "4",
-    level: "mixed",
-    word_count: "10",
-    time_limit: "90",
-    mode: "team",
-    team_count: "2",
-    team_mode: "number_alternate",
-    allow_hints: true,
-    easy_start: true,
-    recovery_bonus: true,
-    growth_bonus: true,
-    categories: [],
-  }), []);
-  const [draft, setDraft, draftControls] = useActivityDraft<WordGameDraft>(
-    buildDraftStorageKey(classId, "word_game"),
-    initialDraft,
-  );
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    const storageKey = buildDraftStorageKey(classId, "word_game");
-    const formData = new FormData(event.currentTarget);
-    formData.set("class_id", classId);
-    formData.set("activity_type", "word_game");
-    draftControls.suspendAutosave();
-    clearActivityDraft(storageKey);
-    const result = await createRoom(formData);
-    if (result?.error) {
-      persistActivityDraft(storageKey, draft);
-      draftControls.resumeAutosave();
-      setError(result.error);
-      setSaving(false);
-    }
-  }
-
-  const categories = getVocabCategories(Number(draft.grade) as 3 | 4 | 5 | 6);
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-5 text-sm text-sky-900">
-        학년별 필수 어휘로 빠르게 맞히는 경쟁형 활동입니다. 팀전에서는 평균 점수와 성장 보너스를 함께 반영해 실력 차가 큰 반에서도 운영하기 좋게 설계합니다.
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-3xl bg-white p-6 shadow-xl">
-          <h3 className="text-lg font-bold text-gray-800">문제 설정</h3>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <SelectField label="학년" name="word_game_grade" value={draft.grade} onChange={(value) => setDraft((prev) => ({ ...prev, grade: value, categories: [] }))} options={[
-              { value: "3", label: "3학년" },
-              { value: "4", label: "4학년" },
-              { value: "5", label: "5학년" },
-              { value: "6", label: "6학년" },
-            ]} />
-            <SelectField label="난이도" name="word_game_level" value={draft.level} onChange={(value) => setDraft((prev) => ({ ...prev, level: value }))} options={[
-              { value: "mixed", label: "혼합" },
-              { value: "1", label: "1단계" },
-              { value: "2", label: "2단계" },
-              { value: "3", label: "3단계" },
-            ]} />
-            <SelectField label="문항 수" name="word_game_word_count" value={draft.word_count} onChange={(value) => setDraft((prev) => ({ ...prev, word_count: value }))} options={[
-              { value: "8", label: "8문항" },
-              { value: "10", label: "10문항" },
-              { value: "12", label: "12문항" },
-              { value: "15", label: "15문항" },
-            ]} />
-            <SelectField label="제한 시간" name="word_game_time_limit" value={draft.time_limit} onChange={(value) => setDraft((prev) => ({ ...prev, time_limit: value }))} options={[
-              { value: "60", label: "60초" },
-              { value: "90", label: "90초" },
-              { value: "120", label: "120초" },
-              { value: "180", label: "180초" },
-            ]} />
-          </div>
-
-          <div className="mt-5">
-            <p className="text-sm font-semibold text-gray-700">카테고리 선택</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {categories.length === 0 && allCategories.slice(0, 8).map((category) => (
-                <span key={category} className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500">{category}</span>
-              ))}
-              {categories.map((category) => {
-                const checked = draft.categories.includes(category);
-                return (
-                  <label key={category} className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${checked ? "bg-sky-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                    <input
-                      type="checkbox"
-                      name="word_game_categories"
-                      value={category}
-                      checked={checked}
-                      onChange={() => setDraft((prev) => ({
-                        ...prev,
-                        categories: checked
-                          ? prev.categories.filter((item) => item !== category)
-                          : [...prev.categories, category],
-                      }))}
-                      className="sr-only"
-                    />
-                    {category}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-3xl bg-white p-6 shadow-xl">
-          <h3 className="text-lg font-bold text-gray-800">진행 방식</h3>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <SelectField label="모드" name="word_game_mode" value={draft.mode} onChange={(value) => setDraft((prev) => ({ ...prev, mode: value as WordGameDraft["mode"] }))} options={[
-              { value: "team", label: "팀전" },
-              { value: "individual", label: "개인전" },
-            ]} />
-            {draft.mode === "team" && (
-              <>
-                <SelectField label="팀 수" name="word_game_team_count" value={draft.team_count} onChange={(value) => setDraft((prev) => ({ ...prev, team_count: value }))} options={[
-                  { value: "2", label: "2팀" },
-                  { value: "3", label: "3팀" },
-                  { value: "4", label: "4팀" },
-                ]} />
-                <SelectField label="팀 배정" name="word_game_team_mode" value={draft.team_mode} onChange={(value) => setDraft((prev) => ({ ...prev, team_mode: value as WordGameDraft["team_mode"] }))} options={[
-                  { value: "number_alternate", label: "번호순 교차" },
-                  { value: "random_balanced", label: "랜덤 균등" },
-                  { value: "number_block", label: "번호 구간" },
-                ]} />
-              </>
-            )}
-          </div>
-
-          <div className="mt-5 space-y-3">
-            <ToggleField label="힌트 허용" checked={draft.allow_hints} onChange={(checked) => setDraft((prev) => ({ ...prev, allow_hints: checked }))} name="word_game_allow_hints" />
-            <ToggleField label="쉬운 문제로 시작" checked={draft.easy_start} onChange={(checked) => setDraft((prev) => ({ ...prev, easy_start: checked }))} name="word_game_easy_start" />
-            <ToggleField label="회복 보너스" checked={draft.recovery_bonus} onChange={(checked) => setDraft((prev) => ({ ...prev, recovery_bonus: checked }))} name="word_game_recovery_bonus" />
-            <ToggleField label="성장 보너스" checked={draft.growth_bonus} onChange={(checked) => setDraft((prev) => ({ ...prev, growth_bonus: checked }))} name="word_game_growth_bonus" />
-          </div>
-        </div>
-      </div>
-
-      {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full rounded-2xl bg-indigo-500 py-4 text-lg font-bold text-white transition-colors hover:bg-indigo-600 disabled:opacity-50"
-      >
-        {saving ? "스피드 매치 방 만드는 중..." : "스피드 매치 시작하기"}
-      </button>
-    </form>
-  );
-}
-
-function SelectField({
-  label,
-  name,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  name: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-semibold text-gray-700">{label}</span>
-      <select
-        name={name}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function ToggleField({
-  label,
-  checked,
-  onChange,
-  name,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  name: string;
-}) {
-  return (
-    <label className="flex items-center justify-between rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700">
-      <span className="font-medium">{label}</span>
-      <input type="hidden" name={name} value="off" />
-      <input
-        type="checkbox"
-        name={name}
-        value="on"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-gray-300 text-indigo-500"
-      />
-    </label>
-  );
-}
-
 function NewRoomForm() {
   const searchParams = useSearchParams();
   const classId = searchParams.get("class_id") ?? "";
@@ -2723,14 +2238,6 @@ function NewRoomForm() {
     return <ActivitySelectionScreen classId={classId} />;
   }
 
-  if (activityType === "word_game") {
-    return (
-      <PageShell classId={classId} activityType={activityType}>
-        <WordGameSetup classId={classId} />
-      </PageShell>
-    );
-  }
-
   return (
     <PageShell classId={classId} activityType={activityType}>
       {activityType === "outline_builder" && <OutlineBuilderSetup classId={classId} />}
@@ -2738,12 +2245,6 @@ function NewRoomForm() {
       {activityType === "question_voting" && <QuestionVotingSetup classId={classId} />}
       {activityType === "one_line_share" && <OneLineShareSetup classId={classId} />}
       {activityType === "hanja_writing" && <HanjaWritingSetup classId={classId} />}
-      {false && (
-        <div className="rounded-3xl border border-dashed border-indigo-200 bg-indigo-50/50 p-10 text-center">
-          <p className="text-lg font-bold text-indigo-900">🎮 필수 단어 맞추기 게임</p>
-          <p className="mt-2 text-sm text-indigo-700">실시간 단어 맞추기 경쟁 게임 설정 화면이 곧 준비될 예정입니다.</p>
-        </div>
-      )}
     </PageShell>
   );
 }
@@ -2762,8 +2263,7 @@ function parseActivityType(value: string | null): ActivityType | null {
     value === "question_generator" ||
     value === "question_voting" ||
     value === "one_line_share" ||
-    value === "hanja_writing" ||
-    value === "word_game"
+    value === "hanja_writing"
   ) {
     return value;
   }

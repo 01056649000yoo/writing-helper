@@ -9,19 +9,42 @@ export type OutlineTemplateAnswer = {
   answer: string;
 };
 
-export type ActivityType =
-  | "outline_builder"
-  | "question_generator"
-  | "question_voting"
-  | "one_line_share"
-  | "hanja_writing"
-  | "word_game";
+export const ACTIVITY_TYPES = [
+  "outline_builder",
+  "question_generator",
+  "question_voting",
+  "one_line_share",
+  "hanja_writing",
+] as const;
+
+export type ActivityType = (typeof ACTIVITY_TYPES)[number];
+
+export function isActivityType(value: string | null | undefined): value is ActivityType {
+  return typeof value === "string" && (ACTIVITY_TYPES as readonly string[]).includes(value);
+}
 
 export type ActivityCategory =
   | "writing"
   | "questioning"
   | "discussion"
   | "reflection";
+
+/** 아지트 글쓰기에서 다시 사용할 수 있는 학생 결과의 표준 종류 */
+export type PortableResultKind =
+  | "outline"
+  | "questions"
+  | "selected_questions"
+  | "one_line"
+  | "hanja_sentences";
+
+/**
+ * 연구소 활동 결과를 아지트로 연결할 때 지켜야 하는 계약.
+ * 새 활동은 매니페스트에서 결과 종류와 스키마 버전을 반드시 선언한다.
+ */
+export type ActivityIntegrationContract = {
+  schemaVersion: 1;
+  resultKind: PortableResultKind;
+};
 
 export type ActivityConfigValidation<TConfig> =
   | { ok: true; value: TConfig }
@@ -40,6 +63,7 @@ export type ActivityDefinition<
   version: number;
   usesAi: boolean;
   supportsRoomResult: boolean;
+  integration: ActivityIntegrationContract;
   createDefaultConfig: () => TConfig;
   validateConfig: (input: unknown) => ActivityConfigValidation<TConfig>;
   emptySubmission: () => TSubmission;
@@ -261,141 +285,4 @@ export type HanjaWritingBoardEntry = {
 
 export type HanjaWritingRoomResult = {
   entries: HanjaWritingBoardEntry[];
-};
-
-export type WordGameConfig = {
-  gameMode: "speed_match";
-  mode: "individual" | "team";
-  questionMode: "definition_to_word";
-  timeLimit: number;
-  grade: 3 | 4 | 5 | 6;
-  levelFilter: 1 | 2 | 3 | "mixed";
-  categoryFilter: string[];
-  wordCount: number;
-  allowHints: boolean;
-  easyStart: boolean;
-  recoveryBonus: boolean;
-  growthBonus: boolean;
-  showLiveTeamBoard: boolean;
-  teamCount: 2 | 3 | 4;
-  teamMode: "number_alternate" | "random_balanced" | "number_block";
-  teams: WordGameTeam[];
-  questions: WordGameQuestion[];
-};
-
-export type WordGameActivityState = {
-  status: "waiting" | "in_progress";
-  startedAt: string | null;
-};
-
-export type WordGameSubmission = {
-  answers: WordGameAnswer[];
-  startedAt: string | null;
-  completedAt: string | null;
-  elapsedMs: number;
-  usedHints: number;
-  currentIndex: number;
-  totalQuestions: number;
-  teamId: string | null;
-  score: number;
-  correctCount: number;
-  wrongCount: number;
-};
-
-export type WordGameResult = {
-  score: number;
-  correctCount: number;
-  wrongCount: number;
-  timeBonus: number;
-  recoveryBonus: number;
-  growthBonus: number;
-  completionBonus: number;
-  usedHints: number;
-  elapsedMs: number;
-  teamId: string | null;
-};
-
-export type WordGameRoomResult = {
-  rankings: Array<{
-    studentNumber: number;
-    studentName: string;
-    score: number;
-    correctCount: number;
-    wrongCount: number;
-    usedHints: number;
-    currentIndex: number;
-    totalQuestions: number;
-    teamId: string | null;
-    status: "in_progress" | "done";
-  }>;
-  teams: Array<{
-    teamId: string;
-    teamName: string;
-    color: string;
-    memberCount: number;
-    activeCount: number;
-    completedCount: number;
-    averageScore: number;
-    averageGrowthBonus: number;
-    averageCorrectRate: number;
-    tugOffset: number;
-  }>;
-  progress: {
-    totalStudents: number;
-    connectedStudents: number;
-    activeStudents: number;
-    completedStudents: number;
-    averageCorrectRate: number;
-  };
-  hardWords: Array<{
-    word: string;
-    wrongCount: number;
-    correctCount: number;
-  }>;
-};
-
-export type WordGameQuestion = {
-  id: string;
-  word: string;
-  category: string;
-  level: 1 | 2 | 3;
-  prompt: string;
-  choices: string[];
-  answer: string;
-  definition: string;
-  example: string;
-};
-
-export type WordGameAnswer = {
-  questionId: string;
-  selectedChoice: string;
-  isCorrect: boolean;
-  usedHint: boolean;
-  answeredAt: string;
-  responseMs: number;
-};
-
-export type WordGameTeam = {
-  id: string;
-  name: string;
-  color: string;
-};
-
-export type WordGameTeamAssignment = {
-  teamId: string;
-  teamName: string;
-  color: string;
-};
-
-export type WordGameStudentProgress = {
-  studentNumber: number;
-  studentName: string;
-  status: "not_joined" | "in_progress" | "done";
-  score: number;
-  correctCount: number;
-  wrongCount: number;
-  usedHints: number;
-  currentIndex: number;
-  totalQuestions: number;
-  teamId: string | null;
 };

@@ -21,27 +21,27 @@ export default function HanjaWordbookPrintClient() {
   const didPrintRef = useRef(false);
 
   useEffect(() => {
-    if (!jobId) {
-      setError("인쇄 작업 정보를 찾을 수 없습니다.");
-      return;
-    }
-
-    const storageKey = `hanja-wordbook-print:${jobId}`;
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) {
-      setError("인쇄할 카드 데이터가 없습니다.");
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) {
-        setError("인쇄 데이터 형식이 올바르지 않습니다.");
+    const timer = window.setTimeout(() => {
+      if (!jobId) {
+        setError("인쇄 작업 정보를 찾을 수 없습니다.");
         return;
       }
 
-      const nextCards = parsed
-        .filter((entry): entry is PrintCard => (
+      const storageKey = `hanja-wordbook-print:${jobId}`;
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) {
+        setError("인쇄할 카드 데이터가 없습니다.");
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (!Array.isArray(parsed)) {
+          setError("인쇄 데이터 형식이 올바르지 않습니다.");
+          return;
+        }
+
+        const nextCards = parsed.filter((entry): entry is PrintCard => (
           typeof entry === "object"
           && entry !== null
           && typeof (entry as PrintCard).id === "string"
@@ -51,16 +51,19 @@ export default function HanjaWordbookPrintClient() {
           && typeof (entry as PrintCard).example === "string"
         ));
 
-      if (nextCards.length === 0) {
-        setError("인쇄할 카드가 없습니다.");
-        return;
-      }
+        if (nextCards.length === 0) {
+          setError("인쇄할 카드가 없습니다.");
+          return;
+        }
 
-      setCards(nextCards);
-      window.localStorage.removeItem(storageKey);
-    } catch {
-      setError("인쇄 데이터를 읽는 중 오류가 발생했습니다.");
-    }
+        setCards(nextCards);
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        setError("인쇄 데이터를 읽는 중 오류가 발생했습니다.");
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [jobId]);
 
   useEffect(() => {

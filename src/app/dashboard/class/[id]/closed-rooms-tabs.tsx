@@ -3,20 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { DeleteRoomButton } from "./delete-room-button";
-import { DeleteScienceRoomButton } from "./delete-science-room-button";
-import { DeleteMoralsRoomButton } from "./delete-morals-room-button";
-import { TRACK_META } from "@/types/science";
-import { MORALS_TRACK_META } from "@/types/morals";
 
 interface UnifiedRoom {
-  kind: "writing" | "science" | "morals";
+  kind: "writing";
   id: string;
   title: string;
   topic: string;
   subject_type?: string | null;
   activity_type?: string | null;
-  inquiry_track?: "basic" | "integrated" | null;
-  track?: "reflection" | "judgement";
   is_active: boolean;
   created_at: string;
   expires_at: string | null;
@@ -24,7 +18,6 @@ interface UnifiedRoom {
 
 interface ClosedRoomsTabsProps {
   closedRooms: UnifiedRoom[];
-  now: number;
 }
 
 type TabType =
@@ -33,9 +26,7 @@ type TabType =
   | "question_generator"
   | "question_voting"
   | "one_line_share"
-  | "hanja_writing"
-  | "science"
-  | "morals";
+  | "hanja_writing";
 
 const WRITING_ACTIVITY_TYPES = [
   "outline_builder",
@@ -73,8 +64,6 @@ function activityTabMeta(type: WritingActivityType): {
 export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabType>("all");
 
-  const scienceRooms = closedRooms.filter((r) => r.kind === "science");
-  const moralsRooms = closedRooms.filter((r) => r.kind === "morals");
   const writingByActivity: Record<WritingActivityType, UnifiedRoom[]> = {
     outline_builder: [],
     question_generator: [],
@@ -90,16 +79,12 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
 
   const getFilteredRooms = () => {
     if (activeTab === "all") return closedRooms;
-    if (activeTab === "science") return scienceRooms;
-    if (activeTab === "morals") return moralsRooms;
     return writingByActivity[activeTab];
   };
 
   const filtered = getFilteredRooms();
 
   function cardEmoji(room: UnifiedRoom): string {
-    if (room.kind === "science") return "🔬";
-    if (room.kind === "morals") return "🪞";
     const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
     if (type !== "outline_builder") return activityTabMeta(type).emoji;
     return subjectEmoji(room.subject_type ?? null);
@@ -125,18 +110,11 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
   }
 
   function kindLabel(room: UnifiedRoom): string {
-    if (room.kind === "writing") {
-      const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
-      return activityTabMeta(type).label;
-    }
-    if (room.kind === "science")
-      return room.inquiry_track ? `과학 · ${TRACK_META[room.inquiry_track].label}` : "과학";
-    return room.track ? `도덕 · ${MORALS_TRACK_META[room.track].label}` : "도덕";
+    const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
+    return activityTabMeta(type).label;
   }
 
   function kindChipColor(room: UnifiedRoom): string {
-    if (room.kind === "science") return "bg-cyan-50 text-cyan-700 border border-cyan-100";
-    if (room.kind === "morals") return "bg-rose-50 text-rose-700 border border-rose-100";
     const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
     switch (type) {
       case "outline_builder":
@@ -153,8 +131,6 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
   }
 
   function cardAccentBorder(room: UnifiedRoom): string {
-    if (room.kind === "science") return "border-cyan-300 hover:border-cyan-400";
-    if (room.kind === "morals") return "border-rose-300 hover:border-rose-400";
     const type = isWritingActivityType(room.activity_type) ? room.activity_type : "outline_builder";
     switch (type) {
       case "outline_builder":
@@ -171,9 +147,7 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
   }
 
   function renderDeleteBtn(room: UnifiedRoom) {
-    if (room.kind === "writing") return <DeleteRoomButton roomId={room.id} />;
-    if (room.kind === "science") return <DeleteScienceRoomButton roomId={room.id} />;
-    return <DeleteMoralsRoomButton roomId={room.id} />;
+    return <DeleteRoomButton roomId={room.id} />;
   }
 
   const inactiveTabClass = "text-gray-500 hover:text-gray-700";
@@ -186,8 +160,6 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
 
   function emptyMessage(): string {
     if (activeTab === "all") return "종료된 활동 세션이 전혀 없습니다.";
-    if (activeTab === "science") return "종료된 과학 탐구 활동 세션이 없습니다.";
-    if (activeTab === "morals") return "종료된 도덕 성찰 활동 세션이 없습니다.";
     return `종료된 ${activityTabMeta(activeTab).label} 세션이 없습니다.`;
   }
 
@@ -217,18 +189,6 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
               </button>
             );
           })}
-          <button
-            onClick={() => setActiveTab("science")}
-            className={tabClass("science", "bg-cyan-600 text-white shadow-xs")}
-          >
-            🔬 과학 ({scienceRooms.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("morals")}
-            className={tabClass("morals", "bg-rose-500 text-white shadow-xs")}
-          >
-            🪞 도덕 ({moralsRooms.length})
-          </button>
         </div>
       </div>
 
@@ -239,10 +199,7 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((room) => {
-            const href =
-              room.kind === "writing" ? `/dashboard/room/${room.id}` :
-              room.kind === "science" ? `/dashboard/science/${room.id}` :
-              `/dashboard/morals/${room.id}`;
+            const href = `/dashboard/room/${room.id}`;
 
             return (
               <div
@@ -264,7 +221,7 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
                     <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${kindChipColor(room)}`}>
                       {kindLabel(room)}
                     </span>
-                    {room.kind === "writing" && room.subject_type && (
+                    {room.subject_type && (
                       <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium">
                         {room.subject_type}
                       </span>

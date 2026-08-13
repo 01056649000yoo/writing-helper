@@ -19,6 +19,10 @@ export const hanjaWritingDefinition: ActivityDefinition<
   version: 1,
   usesAi: true,
   supportsRoomResult: true,
+  integration: {
+    schemaVersion: 1,
+    resultKind: "hanja_sentences",
+  },
   createDefaultConfig: () => ({
     promptTitle: "한자 카드를 보고 문장을 만들어 보세요",
     promptDescription: "단어 속 한자의 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 문장을 써보세요.",
