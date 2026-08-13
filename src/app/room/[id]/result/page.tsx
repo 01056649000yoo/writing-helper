@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getStudentResult, toggleHanjaWritingReaction, toggleOneLineReaction } from "@/app/actions/student-actions";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
+import { deterministicShuffle } from "@/lib/anonymous-order";
 import {
   QuestionVotingCompactList,
   QuestionVotingTopThree,
@@ -45,7 +46,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const [oneLineShareBoard, setOneLineShareBoard] = useState<OneLineShareBoardEntry[]>([]);
   const [oneLineShareClosed, setOneLineShareClosed] = useState(false);
   const [hanjaWritingConfig, setHanjaWritingConfig] = useState<HanjaWritingConfig | null>(null);
-  const [hanjaWritingEntry, setHanjaWritingEntry] = useState<{ content: string } | null>(null);
+  const [hanjaWritingEntry, setHanjaWritingEntry] = useState<{ contents: string[] } | null>(null);
   const [hanjaWritingBoard, setHanjaWritingBoard] = useState<HanjaWritingBoardEntry[]>([]);
   const [wordGameConfig, setWordGameConfig] = useState<WordGameConfig | null>(null);
   const [wordGameSubmission, setWordGameSubmission] = useState<WordGameSubmission | null>(null);
@@ -136,6 +137,22 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const peerHanjaEntries = useMemo(
     () => hanjaWritingBoard.filter((entry) => !entry.isMine),
     [hanjaWritingBoard],
+  );
+  const myHanjaEntries = useMemo(
+    () => hanjaWritingBoard.filter((entry) => entry.isMine).sort((left, right) => left.sentenceIndex - right.sentenceIndex),
+    [hanjaWritingBoard],
+  );
+  const topHanjaEntries = useMemo(
+    () => peerHanjaEntries.slice(0, 5),
+    [peerHanjaEntries],
+  );
+  const shuffledPeerHanjaEntries = useMemo(
+    () => deterministicShuffle(
+      peerHanjaEntries,
+      `${roomId}:${sessionId}:hanja-peer-order`,
+      (entry) => entry.entryId,
+    ),
+    [peerHanjaEntries, roomId, sessionId],
   );
 
   function copyCurrentText() {
@@ -405,9 +422,9 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
 
   if (activityType === "hanja_writing" && hanjaWritingConfig) {
     const card = hanjaWritingConfig.card;
-    async function handleToggleHanjaReaction(targetSessionId: string) {
-      setReactionPendingEntryId(targetSessionId);
-      const result = await toggleHanjaWritingReaction(sessionId, roomId, targetSessionId);
+    async function handleToggleHanjaReaction(targetSessionId: string, targetSentenceIndex: number, entryId: string) {
+      setReactionPendingEntryId(entryId);
+      const result = await toggleHanjaWritingReaction(sessionId, roomId, targetSessionId, targetSentenceIndex);
       if (result.entries) {
         setHanjaWritingBoard(result.entries);
       }
@@ -431,10 +448,25 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-bold text-amber-600">내가 만든 문장 ({card.word})</p>
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
-                    받은 좋아요 {hanjaWritingBoard.find((entry) => entry.isMine)?.likeCount ?? 0}
+                    받은 좋아요 합계 {myHanjaEntries.reduce((sum, entry) => sum + entry.likeCount, 0)}
                   </span>
                 </div>
-                <p className="mt-2 text-base font-medium leading-relaxed text-gray-900">{hanjaWritingEntry.content}</p>
+                <div className="mt-3 space-y-2">
+                  {hanjaWritingEntry.contents.map((content, index) => {
+                    const myEntry = myHanjaEntries.find((entry) => entry.sentenceIndex === index);
+                    return (
+                    <div key={`my-hanja-${index}`} className="rounded-2xl bg-white/80 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold text-amber-700">문장 {index + 1}</p>
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                          ❤️ {myEntry?.likeCount ?? 0}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-base font-medium leading-relaxed text-gray-900">{content}</p>
+                    </div>
+                    );
+                  })}
+                </div>
               </div>
               <Link
                 href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
@@ -446,51 +478,84 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
           )}
 
           <div className="bg-white rounded-3xl shadow-xl p-6">
+            {topHanjaEntries.length > 0 && (
+              <div className="mb-5 rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-500">Best 5</p>
+                    <p className="mt-1 text-base font-bold text-gray-800">좋아요를 많이 받은 문장</p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                    상위 {topHanjaEntries.length}문장
+                  </span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {topHanjaEntries.map((entry, index) => (
+                    <div key={`top-hanja-${entry.entryId}`} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-amber-700">#{index + 1} 인기 문장</p>
+                          <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                          ❤️ {entry.likeCount}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
                 <p className="text-sm font-bold text-gray-800">친구들이 쓴 문장</p>
                 <p className="mt-1 text-xs text-gray-500">문장을 읽고 마음에 드는 문장에 좋아요를 남겨 보세요.</p>
               </div>
               <span className="rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-semibold">
-                누른 좋아요 {hanjaReactionCount}
+                누른 좋아요 {hanjaReactionCount}/{hanjaWritingConfig.maxReactionsPerStudent}
               </span>
             </div>
             <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
               내 문장은 위에서 확인하고, 여기서는 친구들 문장만 반응할 수 있어요.
             </div>
-            {peerHanjaEntries.length === 0 ? (
+            {shuffledPeerHanjaEntries.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-6">아직 다른 친구의 문장이 없어요. 조금만 기다려 보세요.</p>
             ) : (
               <div className="space-y-3">
-                {peerHanjaEntries.map((entry) => (
-                  <div key={entry.sessionId} className="rounded-2xl bg-gray-50 p-4">
+                {shuffledPeerHanjaEntries.map((entry, index) => {
+                  const atMax = hanjaReactionCount >= hanjaWritingConfig.maxReactionsPerStudent;
+                  const disabled = reactionPendingEntryId === entry.entryId
+                    || (atMax && !entry.likedByCurrentSession);
+                  return (
+                  <div key={entry.entryId} className="rounded-2xl bg-gray-50 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold text-gray-500">{entry.studentNumber}번 {entry.studentName}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                        <p className="text-xs font-semibold text-gray-500">친구 문장 {index + 1}</p>
+                        <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleToggleHanjaReaction(entry.sessionId)}
-                        disabled={reactionPendingEntryId === entry.sessionId}
+                        onClick={() => handleToggleHanjaReaction(entry.sessionId, entry.sentenceIndex, entry.entryId)}
+                        disabled={disabled}
+                        title={atMax && !entry.likedByCurrentSession ? `좋아요는 ${hanjaWritingConfig.maxReactionsPerStudent}개까지 누를 수 있어요` : undefined}
                         className={`shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
                           entry.likedByCurrentSession
                             ? "bg-amber-500 text-white hover:bg-amber-600"
                             : "bg-white text-amber-700 ring-1 ring-amber-200 hover:bg-amber-50"
-                        } disabled:opacity-50`}
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        {reactionPendingEntryId === entry.sessionId
+                        {reactionPendingEntryId === entry.entryId
                           ? "저장 중..."
-                          : entry.likedByCurrentSession
-                            ? `좋아요 ${entry.likeCount}`
-                            : `좋아요 ${entry.likeCount}`}
+                          : `좋아요 ${entry.likeCount}`}
                       </button>
                     </div>
                     <p className="mt-3 text-[11px] text-gray-400">
                       {new Date(entry.createdAt).toLocaleString("ko-KR")}
                     </p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

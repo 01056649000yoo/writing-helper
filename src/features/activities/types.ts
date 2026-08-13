@@ -233,10 +233,12 @@ export type HanjaWritingConfig = {
   promptTitle: string;
   promptDescription: string;
   card: HanjaWordCard;
+  sentenceCount: number;
+  maxReactionsPerStudent: number;
 };
 
 export type HanjaWritingSubmission = {
-  content: string;
+  contents: string[];
 };
 
 export type HanjaWritingResult = {
@@ -245,7 +247,9 @@ export type HanjaWritingResult = {
 };
 
 export type HanjaWritingBoardEntry = {
+  entryId: string;
   sessionId: string;
+  sentenceIndex: number;
   studentNumber: number;
   studentName: string;
   content: string;
@@ -277,6 +281,11 @@ export type WordGameConfig = {
   teamMode: "number_alternate" | "random_balanced" | "number_block";
   teams: WordGameTeam[];
   questions: WordGameQuestion[];
+};
+
+export type WordGameActivityState = {
+  status: "waiting" | "in_progress";
+  startedAt: string | null;
 };
 
 export type WordGameSubmission = {

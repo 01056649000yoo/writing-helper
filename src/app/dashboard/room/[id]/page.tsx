@@ -15,6 +15,7 @@ import {
   closeRoom,
 } from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
+import { normalizeWordGameActivityState } from "@/lib/word-game";
 
 export default async function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -40,6 +41,9 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
     : [];
   const wordGameResults = room.activity_type === "word_game"
     ? await getWordGameRoomResults(id)
+    : null;
+  const wordGameActivityState = room.activity_type === "word_game"
+    ? normalizeWordGameActivityState(room.activity_state)
     : null;
 
   const headersList = await headers();
@@ -122,6 +126,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
         oneLineShareResults={oneLineShareResults}
         hanjaWritingResults={hanjaWritingResults}
         wordGameResults={wordGameResults}
+        initialWordGameActivityState={wordGameActivityState}
       />
       </div>
     </div>

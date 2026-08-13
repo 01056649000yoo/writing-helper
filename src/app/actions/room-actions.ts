@@ -18,6 +18,7 @@ import {
   buildWordGameQuestions,
   buildWordGameRoomSummary,
   createDefaultWordGameTeams,
+  normalizeWordGameActivityState,
 } from "@/lib/word-game";
 import type {
   ActivityType,
@@ -371,9 +372,9 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     if (!word) return { error: "단어가 비어 있습니다." };
 
     const promptTitle = String(formData.get("prompt_title") ?? "").trim()
-      || `[${word}] 한자 카드로 한 문장 만들기`;
+      || `[${word}] 한자 카드로 문장 만들기`;
     const promptDescription = String(formData.get("prompt_description") ?? "").trim()
-      || `단어 "${word}"의 한자 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 한 문장을 써보세요.`;
+      || `단어 "${word}"의 한자 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 문장을 써보세요.`;
 
     topic = promptTitle;
     topicDescription = promptDescription;
@@ -381,6 +382,8 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     activityConfig = {
       promptTitle,
       promptDescription,
+      sentenceCount: clampNumber(formData.get("sentence_count"), 1, 5, 1),
+      maxReactionsPerStudent: clampNumber(formData.get("max_reactions_per_student"), 1, 10, 3),
       card: {
         word,
         grade: Number(cardData.grade) || 4,
@@ -645,6 +648,41 @@ export async function closeRoom(roomId: string): Promise<{ error?: string }> {
   return {};
 }
 
+export async function startWordGame(roomId: string): Promise<{ error?: string; startedAt?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id, activity_type, activity_state, is_active")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== user.id) return { error: "권한이 없습니다." };
+  if (room.activity_type !== "word_game") return { error: "활동 종류가 맞지 않습니다." };
+  if (!room.is_active) return { error: "이미 종료된 활동입니다." };
+
+  const currentState = normalizeWordGameActivityState(room.activity_state);
+  if (currentState.status === "in_progress") {
+    return { startedAt: currentState.startedAt ?? undefined };
+  }
+
+  const startedAt = new Date().toISOString();
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .update({ activity_state: { wordGame: { status: "in_progress", startedAt } } })
+    .eq("id", roomId)
+    .eq("teacher_id", user.id);
+
+  if (error) return { error: "게임을 시작하지 못했습니다." };
+
+  revalidatePath(`/dashboard/room/${roomId}`);
+  return { startedAt };
+}
+
 export async function getRooms() {
   const user = await getCurrentUser();
   if (!user) return [];
@@ -753,6 +791,22 @@ export async function getRoomSessions(roomId: string) {
     .eq("room_id", roomId)
     .order("created_at");
   return data ?? [];
+}
+
+export async function getWordGameActivityState(roomId: string) {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id, activity_state")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room || room.teacher_id !== user.id) return null;
+  return normalizeWordGameActivityState(room.activity_state);
 }
 
 export async function getWordGameRoomResults(roomId: string): Promise<WordGameRoomResult> {
@@ -1426,11 +1480,15 @@ export async function deleteTeacherHanjaWordCard(cardId: string): Promise<{ erro
 }
 
 export type HanjaWritingRoomEntry = {
+  entryId: string;
   sessionId: string;
+  sentenceIndex: number;
   studentNumber: number;
   studentName: string;
   content: string;
   likeCount: number;
+  givenLikeCount: number;
+  maxReactionsPerStudent: number;
   createdAt: string;
 };
 
@@ -1442,11 +1500,14 @@ export async function getHanjaWritingRoomResults(roomId: string): Promise<HanjaW
   const { data: room } = await admin
     .schema("writing_helper")
     .from("rooms")
-    .select("teacher_id, activity_type")
+    .select("teacher_id, activity_type, activity_config")
     .eq("id", roomId)
     .maybeSingle();
 
   if (!room || room.teacher_id !== user.id || room.activity_type !== "hanja_writing") return [];
+
+  const config = (await import("@/lib/hanja-writing")).normalizeHanjaWritingConfig(room.activity_config);
+  const maxReactionsPerStudent = config?.maxReactionsPerStudent ?? 3;
 
   const [sessionsRes, reactionsRes] = await Promise.all([
     admin
@@ -1459,17 +1520,26 @@ export async function getHanjaWritingRoomResults(roomId: string): Promise<HanjaW
     admin
       .schema("writing_helper")
       .from("hanja_writing_reactions")
-      .select("target_session_id, session_id")
+      .select("target_session_id, target_sentence_index, session_id")
       .eq("room_id", roomId)
       .eq("reaction_type", "like"),
   ]);
 
+  const givenCountBySession = new Map<string, number>();
+  for (const reaction of reactionsRes.data ?? []) {
+    givenCountBySession.set(reaction.session_id, (givenCountBySession.get(reaction.session_id) ?? 0) + 1);
+  }
+
   return buildHanjaWritingBoard(sessionsRes.data ?? [], reactionsRes.data ?? [], null).map((entry) => ({
+    entryId: entry.entryId,
     sessionId: entry.sessionId,
+    sentenceIndex: entry.sentenceIndex,
     studentNumber: entry.studentNumber,
     studentName: entry.studentName,
     content: entry.content,
     likeCount: entry.likeCount,
+    givenLikeCount: givenCountBySession.get(entry.sessionId) ?? 0,
+    maxReactionsPerStudent,
     createdAt: entry.createdAt,
   }));
 }

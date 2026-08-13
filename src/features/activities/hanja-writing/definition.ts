@@ -20,8 +20,10 @@ export const hanjaWritingDefinition: ActivityDefinition<
   usesAi: true,
   supportsRoomResult: true,
   createDefaultConfig: () => ({
-    promptTitle: "한자 카드를 보고 한 문장을 만들어 보세요",
-    promptDescription: "단어 속 한자의 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 한 문장을 써보세요.",
+    promptTitle: "한자 카드를 보고 문장을 만들어 보세요",
+    promptDescription: "단어 속 한자의 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 문장을 써보세요.",
+    sentenceCount: 1,
+    maxReactionsPerStudent: 3,
     card: {
       word: "",
       grade: 4,
@@ -41,15 +43,30 @@ export const hanjaWritingDefinition: ActivityDefinition<
       return { ok: false, errors: ["한자 카드 단어가 비어 있습니다."] };
     }
 
+    const rawMax = typeof raw.maxReactionsPerStudent === "number"
+      ? raw.maxReactionsPerStudent
+      : Number(raw.maxReactionsPerStudent);
+    const maxReactionsPerStudent = Number.isFinite(rawMax)
+      ? Math.min(Math.max(Math.trunc(rawMax), 1), 10)
+      : 3;
+    const rawSentenceCount = typeof raw.sentenceCount === "number"
+      ? raw.sentenceCount
+      : Number(raw.sentenceCount);
+    const sentenceCount = Number.isFinite(rawSentenceCount)
+      ? Math.min(Math.max(Math.trunc(rawSentenceCount), 1), 5)
+      : 1;
+
     return {
       ok: true,
       value: {
         promptTitle: typeof raw.promptTitle === "string" && raw.promptTitle.trim()
           ? raw.promptTitle.trim()
-          : "한자 카드를 보고 한 문장을 만들어 보세요",
+          : "한자 카드를 보고 문장을 만들어 보세요",
         promptDescription: typeof raw.promptDescription === "string" && raw.promptDescription.trim()
           ? raw.promptDescription.trim()
-          : "단어 속 한자의 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 한 문장을 써보세요.",
+          : "단어 속 한자의 뜻과 관련 단어를 살펴본 뒤, 이 단어를 활용해 자연스러운 문장을 써보세요.",
+        sentenceCount,
+        maxReactionsPerStudent,
         card: {
           word,
           grade: clampGrade(rawCard.grade),
@@ -82,7 +99,7 @@ export const hanjaWritingDefinition: ActivityDefinition<
     };
   },
   emptySubmission: () => ({
-    content: "",
+    contents: [],
   }),
   emptyResult: () => ({
     submitted: false,

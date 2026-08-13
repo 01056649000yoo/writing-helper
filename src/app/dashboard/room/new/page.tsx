@@ -2322,6 +2322,37 @@ function HanjaWritingSetup({ classId }: { classId: string }) {
           />
         </div>
 
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-2">학생이 만들 문장 갯수</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              name="sentence_count"
+              min={1}
+              max={5}
+              defaultValue={1}
+              className="w-24 px-4 py-3 text-base text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+            <span className="text-sm text-gray-500">개 (1~5)</span>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">학생은 같은 한자 단어를 넣은 문장을 정한 갯수만큼 작성합니다.</p>
+        </div>
+
+        <div>
+          <label className="block text-base font-medium text-gray-700 mb-2">학생별 좋아요 누를 수 있는 갯수</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              name="max_reactions_per_student"
+              min={1}
+              max={10}
+              defaultValue={3}
+              className="w-24 px-4 py-3 text-base text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+            <span className="text-sm text-gray-500">개 (1~10)</span>
+          </div>
+        </div>
+
         {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
 
         <button

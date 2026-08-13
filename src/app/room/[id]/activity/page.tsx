@@ -14,6 +14,7 @@ import {
 import { getMatchingConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import { normalizeHanjaWritingConfig, sentenceContainsWord } from "@/lib/hanja-writing";
 import { WordGamePlayer } from "@/components/word-game-player";
+import { WordGameWaitingRoom } from "@/components/word-game-waiting-room";
 import type {
   HanjaWritingConfig,
   OneLineShareConfig,
@@ -22,6 +23,7 @@ import type {
   QuestionGeneratorConfig,
   QuestionGeneratorSubmission,
   QuestionVotingConfig,
+  WordGameActivityState,
   WordGameConfig,
   WordGameSubmission,
 } from "@/features/activities/types";
@@ -49,6 +51,7 @@ type Step =
   | "one_line_submitting"
   | "hanja_writing"
   | "hanja_submitting"
+  | "word_game_waiting"
   | "submitting";
 
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
@@ -162,7 +165,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [hanjaWritingConfig, setHanjaWritingConfig] = useState<HanjaWritingConfig | null>(null);
   const [wordGameConfig, setWordGameConfig] = useState<WordGameConfig | null>(null);
   const [wordGameSubmission, setWordGameSubmission] = useState<WordGameSubmission | null>(null);
-  const [hanjaContent, setHanjaContent] = useState("");
+  const [wordGameActivityState, setWordGameActivityState] = useState<WordGameActivityState | null>(null);
+  const [hanjaContents, setHanjaContents] = useState<string[]>([""]);
   const [step, setStep] = useState<Step | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   // outline_builder 전용 상태
@@ -324,14 +328,19 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         setOneLineContent(data.existing_one_line_submission?.content ?? "");
         setStep("one_line_share");
       } else if (type === "hanja_writing") {
-        setHanjaWritingConfig(normalizeHanjaWritingConfig(data.activity_config));
-        const existingHanja = data.existing_hanja_writing_submission as { content?: string } | null;
-        setHanjaContent(existingHanja?.content ?? "");
+        const config = normalizeHanjaWritingConfig(data.activity_config);
+        setHanjaWritingConfig(config);
+        const existingHanja = data.existing_hanja_writing_submission as { contents?: string[] } | null;
+        const nextCount = config?.sentenceCount ?? 1;
+        const nextContents = Array.from({ length: nextCount }, (_, index) => existingHanja?.contents?.[index] ?? "");
+        setHanjaContents(nextContents);
         setStep("hanja_writing");
       } else if (type === "word_game") {
         setWordGameConfig(data.activity_config as WordGameConfig);
         setWordGameSubmission((data.existing_word_game_submission as WordGameSubmission | null) ?? null);
-        setStep("submitting");
+        const activityState = (data.word_game_activity_state as WordGameActivityState | null) ?? null;
+        setWordGameActivityState(activityState);
+        setStep(activityState?.status === "in_progress" ? "submitting" : "word_game_waiting");
       } else {
         // outline_builder
         const config = data.activity_config as Record<string, unknown> | null;
@@ -387,7 +396,19 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  if (activityType === "word_game" && wordGameConfig) {
+  if (activityType === "word_game" && wordGameConfig && step === "word_game_waiting") {
+    return (
+      <WordGameWaitingRoom
+        roomId={roomId}
+        onStarted={(startedAt) => {
+          setWordGameActivityState({ status: "in_progress", startedAt });
+          setStep("submitting");
+        }}
+      />
+    );
+  }
+
+  if (activityType === "word_game" && wordGameConfig && wordGameActivityState?.status === "in_progress") {
     return (
       <WordGamePlayer
         roomId={roomId}
@@ -395,6 +416,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         topic={topic}
         config={wordGameConfig}
         existingSubmission={wordGameSubmission}
+        serverStartedAt={wordGameActivityState.startedAt ?? new Date().toISOString()}
       />
     );
   }
@@ -1337,21 +1359,35 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
   if (activityType === "hanja_writing" && hanjaWritingConfig) {
     const card = hanjaWritingConfig.card;
-    const trimmedSentence = hanjaContent.trim();
-    const includesWord = card.word ? sentenceContainsWord(trimmedSentence, card.word) : true;
+    const sentenceCount = hanjaWritingConfig.sentenceCount;
+    const normalizedContents = Array.from({ length: sentenceCount }, (_, index) => hanjaContents[index] ?? "");
+    const trimmedContents = normalizedContents.map((content) => content.trim());
+    const allFilled = trimmedContents.every(Boolean);
+    const missingWordIndexes = trimmedContents.flatMap((content, index) => (
+      content && card.word && !sentenceContainsWord(content, card.word) ? [index] : []
+    ));
+    const allIncludeWord = missingWordIndexes.length === 0;
+
+    function updateHanjaContent(index: number, value: string) {
+      setHanjaContents((prev) => {
+        const next = Array.from({ length: sentenceCount }, (_, idx) => prev[idx] ?? "");
+        next[index] = value;
+        return next;
+      });
+    }
 
     async function handleHanjaSubmit() {
-      if (!trimmedSentence) {
-        setError("한 문장을 적어주세요.");
+      if (!allFilled) {
+        setError(`문장 ${sentenceCount}개를 모두 적어주세요.`);
         return;
       }
-      if (!includesWord) {
-        setError(`문장에 "${card.word}" 단어가 들어가야 해요.`);
+      if (!allIncludeWord) {
+        setError(`모든 문장에 "${card.word}" 단어가 들어가야 해요.`);
         return;
       }
       setError("");
       setStep("hanja_submitting");
-      const result = await submitHanjaWriting(sessionId, roomId, trimmedSentence);
+      const result = await submitHanjaWriting(sessionId, roomId, trimmedContents);
       if (result.error) {
         setError(result.error);
         setStep("hanja_writing");
@@ -1381,6 +1417,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             <p className="text-gray-500 text-sm leading-relaxed mt-2">
               {hanjaWritingConfig.promptDescription}
             </p>
+            <div className="mt-4 inline-flex rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">
+              오늘은 {sentenceCount}문장을 완성해요
+            </div>
           </div>
 
           <div className="bg-white rounded-3xl shadow-xl p-6 border-2 border-amber-200">
@@ -1435,27 +1474,45 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           </div>
 
           <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                "<span className="text-amber-600">{card.word}</span>" 단어로 한 문장 만들기
-              </label>
-              <textarea
-                value={hanjaContent}
-                onChange={(event) => setHanjaContent(event.target.value)}
-                rows={4}
-                placeholder={`예) ${card.example || `${card.word}을(를) 활용한 자연스러운 문장을 써보세요.`}`}
-                className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none"
-              />
+            <div className="space-y-4">
+              {normalizedContents.map((content, index) => {
+                const trimmedContent = trimmedContents[index];
+                const includesWord = card.word ? sentenceContainsWord(trimmedContent, card.word) : true;
+
+                return (
+                  <div key={`hanja-sentence-${index}`} className="rounded-3xl border border-amber-100 bg-amber-50/40 p-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      {index + 1}번째 문장
+                    </label>
+                    <textarea
+                      value={content}
+                      onChange={(event) => updateHanjaContent(index, event.target.value)}
+                      rows={3}
+                      placeholder={`예) ${card.example || `${card.word}을(를) 활용한 자연스러운 문장을 써보세요.`}`}
+                      className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none"
+                    />
+                    <p className={`mt-3 rounded-2xl px-4 py-3 text-sm ${
+                      includesWord && trimmedContent ? "bg-emerald-50 text-emerald-700" : "bg-white text-amber-700"
+                    }`}>
+                      {!trimmedContent
+                        ? `"${card.word}" 단어가 들어간 문장을 적어주세요.`
+                        : includesWord
+                          ? `좋아요! ${index + 1}번째 문장에 "${card.word}" 단어가 들어 있어요.`
+                          : `아직 ${index + 1}번째 문장에 "${card.word}" 단어가 빠졌어요.`}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
             <div className={`rounded-2xl px-4 py-3 text-sm ${
-              includesWord && trimmedSentence ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+              allFilled && allIncludeWord ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
             }`}>
-              {!trimmedSentence
-                ? `"${card.word}" 단어가 들어간 한 문장을 적어주세요.`
-                : includesWord
-                  ? `좋아요! "${card.word}" 단어가 문장에 들어 있어요.`
-                  : `아직 "${card.word}" 단어가 빠졌어요. 단어를 꼭 넣어 주세요.`}
+              {!allFilled
+                ? `총 ${sentenceCount}문장을 모두 채워주세요.`
+                : allIncludeWord
+                  ? `좋아요! ${sentenceCount}문장이 모두 준비됐어요.`
+                  : `${missingWordIndexes.map((index) => `${index + 1}번`).join(", ")} 문장에 "${card.word}" 단어를 꼭 넣어 주세요.`}
             </div>
 
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -1463,13 +1520,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             <button
               type="button"
               onClick={handleHanjaSubmit}
-              disabled={!trimmedSentence || !includesWord}
+              disabled={!allFilled || !allIncludeWord}
               className="w-full py-4 bg-amber-500 text-white rounded-2xl font-bold text-lg hover:bg-amber-600 disabled:opacity-50 transition-colors"
             >
-              {!trimmedSentence
-                ? "한 문장을 먼저 적어주세요"
-                : !includesWord
-                  ? `"${card.word}" 단어를 넣어주세요`
+              {!allFilled
+                ? `${sentenceCount}문장을 모두 적어주세요`
+                : !allIncludeWord
+                  ? `모든 문장에 "${card.word}" 단어를 넣어주세요`
                   : "문장 제출하고 친구 문장 보러 가기"}
             </button>
           </div>

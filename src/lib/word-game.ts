@@ -5,6 +5,7 @@ import {
   type VocabularyLevel,
 } from "@/lib/vocabulary";
 import type {
+  WordGameActivityState,
   WordGameAnswer,
   WordGameConfig,
   WordGameQuestion,
@@ -215,6 +216,19 @@ export function buildWordGameRoomSummary(
     },
     hardWords: [],
   };
+}
+
+export function normalizeWordGameActivityState(value: unknown): WordGameActivityState {
+  const raw = isRecord(value) ? value : {};
+  const wordGame = isRecord(raw.wordGame) ? raw.wordGame : {};
+  return {
+    status: wordGame.status === "in_progress" ? "in_progress" : "waiting",
+    startedAt: typeof wordGame.startedAt === "string" ? wordGame.startedAt : null,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function shuffleDeterministically<T>(items: T[], seed: string) {

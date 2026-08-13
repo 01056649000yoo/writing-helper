@@ -11,6 +11,7 @@ type WordGamePlayerProps = {
   topic: string;
   config: WordGameConfig;
   existingSubmission: WordGameSubmission | null;
+  serverStartedAt: string;
 };
 
 export function WordGamePlayer({
@@ -19,6 +20,7 @@ export function WordGamePlayer({
   topic,
   config,
   existingSubmission,
+  serverStartedAt,
 }: WordGamePlayerProps) {
   const router = useRouter();
   const questions = config.questions;
@@ -28,7 +30,10 @@ export function WordGamePlayer({
   const [score, setScore] = useState(existingSubmission?.score ?? 0);
   const [correctCount, setCorrectCount] = useState(existingSubmission?.correctCount ?? 0);
   const [wrongCount, setWrongCount] = useState(existingSubmission?.wrongCount ?? 0);
-  const [startedAt] = useState(existingSubmission?.startedAt ?? getNowIso());
+  const startedAt = serverStartedAt;
+  const [alreadyExpired] = useState(
+    () => getNowMs() - new Date(serverStartedAt).getTime() >= config.timeLimit * 1000
+  );
   const [remainingSeconds, setRemainingSeconds] = useState(config.timeLimit);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [revealedChoices, setRevealedChoices] = useState<string[] | null>(null);
@@ -45,10 +50,16 @@ export function WordGamePlayer({
   }, [config.mode, currentIndex]);
 
   useEffect(() => {
-    const now = getNowMs();
-    startTimeRef.current = now - (existingSubmission?.elapsedMs ?? 0);
-    questionStartRef.current = now;
-  }, [existingSubmission?.elapsedMs]);
+    startTimeRef.current = new Date(serverStartedAt).getTime();
+    questionStartRef.current = getNowMs();
+  }, [serverStartedAt]);
+
+  useEffect(() => {
+    if (alreadyExpired) {
+      void handleFinish(config.timeLimit * 1000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alreadyExpired]);
 
   async function handleFinish(forcedElapsedMs?: number, cachedSubmission?: WordGameSubmission) {
     if (finishedRef.current) return;
@@ -178,6 +189,18 @@ export function WordGamePlayer({
     const visible = currentQuestion.choices.filter((choice) => choice === currentQuestion.answer || choice === firstIncorrect);
     setRevealedChoices(visible.length >= 2 ? visible : currentQuestion.choices.slice(0, 2));
     setUsedHints((prev) => prev + 1);
+  }
+
+  if (alreadyExpired) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="rounded-3xl bg-white p-8 shadow-xl text-center">
+          <div className="text-4xl mb-3">⏰</div>
+          <p className="text-base font-bold text-gray-700">게임이 이미 종료되었습니다</p>
+          <p className="mt-2 text-sm text-gray-500">결과 화면으로 이동할게요.</p>
+        </div>
+      </div>
+    );
   }
 
   if (!currentQuestion) {

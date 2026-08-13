@@ -12,10 +12,13 @@ import {
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
   getRoomSessions,
+  getWordGameActivityState,
   getWordGameRoomResults,
+  startWordGame,
   updateQuestionGeneratorSelection,
   type SpellingCorrectionCandidate,
 } from "@/app/actions/room-actions";
+import type { WordGameActivityState } from "@/features/activities/types";
 import {
   QuestionVotingCompactList,
   QuestionVotingTopThree,
@@ -62,11 +65,15 @@ type OneLineShareResults = Array<{
   updatedAt: string;
 }>;
 type HanjaWritingResults = Array<{
+  entryId: string;
   sessionId: string;
+  sentenceIndex: number;
   studentNumber: number;
   studentName: string;
   content: string;
   likeCount: number;
+  givenLikeCount: number;
+  maxReactionsPerStudent: number;
   createdAt: string;
 }>;
 type WordGameResults = {
@@ -742,6 +749,8 @@ function HanjaWritingResultsModal({
   entries: HanjaWritingResults;
   onClose: () => void;
 }) {
+  const topEntries = entries.slice(0, 5);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -775,21 +784,69 @@ function HanjaWritingResultsModal({
               <p className="mt-2 text-sm text-amber-700">학생들이 문장을 제출하면 여기에 모입니다.</p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {entries.map((entry) => (
-                <div key={entry.sessionId} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
-                      좋아요 {entry.likeCount}
-                    </span>
+            <div className="space-y-5">
+              <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-500">Best 5</p>
+                    <h4 className="mt-1 text-xl font-bold text-gray-800">좋아요 상위 문장 먼저 보기</h4>
+                    <p className="mt-1 text-sm text-gray-500">가장 많은 공감을 받은 학생 문장을 위에서 바로 확인할 수 있어요.</p>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
-                  <p className="mt-3 text-[11px] text-gray-400">
-                    {new Date(entry.createdAt).toLocaleString("ko-KR")}
-                  </p>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                    상위 {topEntries.length}문장
+                  </span>
                 </div>
-              ))}
+                <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                  {topEntries.map((entry, index) => (
+                    <div key={`top-${entry.entryId}`} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-amber-700">#{index + 1} · {entry.studentNumber}번 {entry.studentName}</p>
+                          <p className="mt-1 text-[11px] font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                          <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                          ❤️ {entry.likeCount}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-800">전체 문장 목록</h4>
+                    <p className="mt-1 text-sm text-gray-500">좋아요 순으로 정렬된 학급 전체 결과입니다.</p>
+                  </div>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                    전체 {entries.length}명
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {entries.map((entry) => (
+                    <div key={entry.entryId} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
+                            받은 ❤️ {entry.likeCount}
+                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-600">
+                            누른 ❤️ {entry.givenLikeCount}/{entry.maxReactionsPerStudent}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-1 text-[11px] font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
+                      <p className="mt-3 text-[11px] text-gray-400">
+                        {new Date(entry.createdAt).toLocaleString("ko-KR")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
         </div>
@@ -808,6 +865,7 @@ export default function LiveStudentPanel({
   oneLineShareResults: initialOneLineShareResults,
   hanjaWritingResults: initialHanjaWritingResults,
   wordGameResults: initialWordGameResults,
+  initialWordGameActivityState,
 }: {
   roomId: string;
   students: Student[];
@@ -818,6 +876,7 @@ export default function LiveStudentPanel({
   oneLineShareResults: OneLineShareResults;
   hanjaWritingResults: HanjaWritingResults;
   wordGameResults: WordGameResults | null;
+  initialWordGameActivityState: WordGameActivityState | null;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
@@ -830,6 +889,8 @@ export default function LiveStudentPanel({
   const [oneLineShareResults, setOneLineShareResults] = useState<OneLineShareResults>(initialOneLineShareResults);
   const [hanjaWritingResults, setHanjaWritingResults] = useState<HanjaWritingResults>(initialHanjaWritingResults);
   const [wordGameResults, setWordGameResults] = useState<WordGameResults | null>(initialWordGameResults);
+  const [wordGameActivityState, setWordGameActivityState] = useState<WordGameActivityState | null>(initialWordGameActivityState);
+  const [isStartingWordGame, setIsStartingWordGame] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -859,6 +920,9 @@ export default function LiveStudentPanel({
         const wordGameData = await getWordGameRoomResults(roomId);
         if (cancelled) return;
         setWordGameResults(wordGameData);
+        const activityState = await getWordGameActivityState(roomId);
+        if (cancelled) return;
+        if (activityState) setWordGameActivityState(activityState);
       }
     };
 
@@ -891,6 +955,19 @@ export default function LiveStudentPanel({
     () => (wordGameResults?.rankings ?? []).filter((entry) => entry.status === "in_progress").slice(0, 4),
     [wordGameResults],
   );
+  const runningPlayers = useMemo(
+    () => (wordGameResults?.rankings ?? []).filter((entry) => entry.status === "in_progress"),
+    [wordGameResults],
+  );
+
+  async function handleStartWordGame() {
+    setIsStartingWordGame(true);
+    const result = await startWordGame(roomId);
+    setIsStartingWordGame(false);
+    if (result.startedAt) {
+      setWordGameActivityState({ status: "in_progress", startedAt: result.startedAt });
+    }
+  }
 
   return (
     <>
@@ -1011,6 +1088,22 @@ export default function LiveStudentPanel({
         {/* 접속 중 */}
         {activityType === "word_game" && wordGameResults && (
           <div className="space-y-4">
+            {isActive && wordGameActivityState?.status === "waiting" && (
+              <div className="flex items-center justify-between gap-3 rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
+                <div>
+                  <p className="text-sm font-bold text-emerald-800">학생들이 대기실에서 기다리고 있어요</p>
+                  <p className="mt-1 text-xs text-emerald-600">현재 {sessions.length}명 참여 중 · 준비가 되면 게임을 시작하세요.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleStartWordGame}
+                  disabled={isStartingWordGame}
+                  className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {isStartingWordGame ? "시작하는 중..." : `게임 시작 (${sessions.length}명 참여 중)`}
+                </button>
+              </div>
+            )}
             <div className="rounded-3xl border border-indigo-100 bg-[radial-gradient(circle_at_top,#eef2ff,transparent_55%),linear-gradient(135deg,#f8fbff,#eef2ff)] p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -1025,6 +1118,39 @@ export default function LiveStudentPanel({
                   <MiniMetric label="정답률" value={`${wordGameResults!.progress.averageCorrectRate}%`} tone="violet" />
                 </div>
               </div>
+
+              {wordGameActivityState?.status === "in_progress" && (
+                <div className="mt-5 rounded-3xl bg-white/90 p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-slate-800">실시간 순위 트랙</p>
+                    <span className="text-xs text-slate-400">문제 진행률 기준</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {runningPlayers.length === 0 ? (
+                      <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">현재 진행 중인 학생이 없어요.</p>
+                    ) : (
+                      runningPlayers.map((runner) => {
+                        const percent = Math.round((runner.currentIndex / Math.max(runner.totalQuestions, 1)) * 100);
+                        return (
+                          <div key={`runner-${runner.studentNumber}`} className="relative h-9 rounded-full bg-slate-100">
+                            <div
+                              className="absolute inset-y-0 flex items-center transition-all duration-700 ease-out"
+                              style={{ left: `${Math.min(Math.max(percent, 0), 92)}%` }}
+                            >
+                              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg shadow ring-2 ring-indigo-200">
+                                🏃
+                              </span>
+                            </div>
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-500">
+                              {runner.studentNumber}번 {runner.studentName} · {runner.currentIndex}/{runner.totalQuestions}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-3xl bg-white/90 p-4 shadow-sm">
