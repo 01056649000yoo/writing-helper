@@ -38,29 +38,15 @@ jobs:
       - name: Verify source
         run: npm run lint && npm test
 
-      - name: Build docker image
-        run: docker compose --env-file "$RUNTIME_ENV_FILE" build
-
+      # 2026-08-17: 독립 실행판(writing-helper-app, :3000) 배포 단계를 제거했다.
+      # 통합(2026-07-24) 뒤 옛 주소 helper.끄적끄적아지트.site 는 /lab 으로 301 보내므로
+      # 아무도 그 컨테이너로 오지 않는데, 계속 떠 있으면 옛 DB(supabase-db)에 쓰는 경로가
+      # 남아 통합 운영 DB와 갈라진다. 이미지 빌드 정의(docker-compose.yml)는 롤백용으로 남겼다.
       - name: Build integrated lab image
         run: docker compose --env-file "$INTEGRATED_ENV_FILE" -f docker-compose.lab.yml build
 
-      - name: Restart docker stack
-        run: docker compose --env-file "$RUNTIME_ENV_FILE" up -d --remove-orphans
-
       - name: Restart integrated lab stack
         run: docker compose --env-file "$INTEGRATED_ENV_FILE" -f docker-compose.lab.yml up -d --remove-orphans
-
-      - name: Verify deployment
-        run: |
-          docker ps --filter "name=writing-helper-app" --format "{{.Status}}"
-          docker exec writing-helper-app sh -c 'env | grep NEXT_PUBLIC_BUILD_VERSION'
-          for attempt in {1..12}; do
-            if curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3000/login >/dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 1
 
       - name: Verify integrated lab deployment
         run: |
