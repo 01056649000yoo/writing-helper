@@ -11,6 +11,8 @@ import {
   getQuestionGeneratorSourceRooms,
   saveTeacherHanjaWordCard,
   type QuestionGeneratorSourceRoomSummary,
+  getQuestionVotingSourceRooms,
+  type QuestionVotingSourceRoomSummary,
   type SavedHanjaWordCard,
 } from "@/app/actions/room-actions";
 import { getQuestionCardSettings } from "@/app/actions/settings-actions";
@@ -248,6 +250,22 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [aiEnhancing, setAiEnhancing] = useState<string | null>(null);
   const [customTemplate, setCustomTemplate] = useState<OutlineTemplate | null>(null);
+  // `좋은 질문 고르기`에서 학생들이 뽑은 질문을 개요 항목으로 가져온다.
+  // 질문 만들기 → 좋은 질문 고르기가 쓰는 원본 방 고르기와 같은 짜임이다.
+  const [votingRooms, setVotingRooms] = useState<QuestionVotingSourceRoomSummary[]>([]);
+  const [votingRoomId, setVotingRoomId] = useState("");
+  const [pickedQuestions, setPickedQuestions] = useState<Record<string, "처음" | "가운데" | "끝">>({});
+  const [questionPanelOpen, setQuestionPanelOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getQuestionVotingSourceRooms(classId).then((rooms) => {
+      if (!active) return;
+      setVotingRooms(rooms);
+      setVotingRoomId((prev) => prev || rooms[0]?.roomId || "");
+    });
+    return () => { active = false; };
+  }, [classId]);
 
   const initialDraft = useMemo<OutlineBuilderDraft>(() => ({
     topic: "",
@@ -329,6 +347,37 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
         ),
       };
     });
+  }
+
+  const selectedVotingRoom = votingRooms.find((room) => room.roomId === votingRoomId) ?? null;
+  const pickedCount = Object.keys(pickedQuestions).length;
+
+  /** 고른 질문을 개요 항목으로 넣는다. 질문 자체가 학생이 답할 물음이므로 `label` 이 된다. */
+  function addPickedQuestions() {
+    if (!selectedVotingRoom || pickedCount === 0) return;
+    const byQuestionId = new Map(selectedVotingRoom.questions.map((question) => [question.id, question] as const));
+
+    setCustomTemplate((prev) => {
+      const base = prev ?? getDefaultOutlineTemplate(subjectType);
+      return {
+        sections: base.sections.map((section) => {
+          const added = Object.entries(pickedQuestions)
+            .filter(([, sectionKey]) => sectionKey === section.key)
+            .map(([questionId], index) => {
+              const question = byQuestionId.get(questionId);
+              return {
+                id: `voted-${questionId.replace(/[^a-zA-Z0-9]/g, "").slice(-12)}-${index}`,
+                label: question?.text ?? "",
+                placeholder: "친구들이 고른 질문이에요. 내 생각을 자유롭게 적어 보세요.",
+              };
+            })
+            .filter((item) => item.label.trim().length > 0);
+          return added.length > 0 ? { ...section, items: [...section.items, ...added] } : section;
+        }),
+      };
+    });
+    setPickedQuestions({});
+    setQuestionPanelOpen(false);
   }
 
   async function handleCreateRoom() {
@@ -435,6 +484,92 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
             </button>
           )}
         </div>
+
+        {/* 좋은 질문 고르기에서 학생들이 뽑은 질문을 개요 항목으로 가져온다.
+            활동이 하나도 없으면 이 칸 자체를 그리지 않는다 — 빈 안내는 화면만 늘린다. */}
+        {votingRooms.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-bold text-amber-700">💬 친구들이 고른 좋은 질문 가져오기</p>
+                <p className="mt-0.5 text-xs text-amber-700/80">
+                  `좋은 질문 고르기`에서 표를 받은 질문을 개요 항목으로 넣을 수 있어요.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuestionPanelOpen((open) => !open)}
+                className="lab-button lab-button--quiet text-xs"
+              >
+                {questionPanelOpen ? "닫기" : "질문 고르기"}
+              </button>
+            </div>
+
+            {questionPanelOpen && (
+              <div className="mt-3 space-y-3">
+                <select
+                  value={votingRoomId}
+                  onChange={(event) => { setVotingRoomId(event.target.value); setPickedQuestions({}); }}
+                  className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-900"
+                >
+                  {votingRooms.map((room) => (
+                    <option key={room.roomId} value={room.roomId}>
+                      {room.title} · {room.voterCount}명 참여
+                    </option>
+                  ))}
+                </select>
+
+                <div className="space-y-1.5">
+                  {selectedVotingRoom?.questions.map((question) => {
+                    const picked = pickedQuestions[question.id];
+                    return (
+                      <div key={question.id} className="flex items-start gap-2 rounded-lg bg-white px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(picked)}
+                          onChange={(event) => setPickedQuestions((prev) => {
+                            const next = { ...prev };
+                            if (event.target.checked) next[question.id] = "가운데";
+                            else delete next[question.id];
+                            return next;
+                          })}
+                          className="mt-1"
+                        />
+                        <span className="min-w-[2.6rem] rounded-full bg-amber-100 px-2 py-0.5 text-center text-xs font-bold text-amber-700">
+                          {question.votes}표
+                        </span>
+                        <span className="flex-1 text-sm text-gray-800">{question.text}</span>
+                        {picked && (
+                          <select
+                            value={picked}
+                            onChange={(event) => setPickedQuestions((prev) => ({
+                              ...prev,
+                              [question.id]: event.target.value as "처음" | "가운데" | "끝",
+                            }))}
+                            className="rounded-lg border border-amber-200 bg-white px-2 py-1 text-xs text-gray-900"
+                          >
+                            <option value="처음">처음</option>
+                            <option value="가운데">가운데</option>
+                            <option value="끝">끝</option>
+                          </select>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addPickedQuestions}
+                  disabled={pickedCount === 0}
+                  className="lab-button w-full text-sm disabled:opacity-50"
+                >
+                  {pickedCount > 0 ? `${pickedCount}개를 개요 틀에 넣기` : "질문을 골라 주세요"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {effectiveTemplate.sections.map(({ key, items }) => (
           <div key={key} className="space-y-2">

@@ -707,6 +707,21 @@ export type QuestionGeneratorSourceRoomSummary = {
   }>;
 };
 
+/** 개요 짜기 방을 만들 때 고르는 `좋은 질문 고르기` 활동. 질문은 **득표 많은 순**으로 담는다. */
+export type QuestionVotingSourceRoomSummary = {
+  roomId: string;
+  title: string;
+  topic: string;
+  createdAt: string;
+  /** 표를 낸 학생 수. 몇 명이 고른 결과인지 알아야 표 수를 읽을 수 있다. */
+  voterCount: number;
+  questions: Array<{
+    id: string;
+    text: string;
+    votes: number;
+  }>;
+};
+
 export async function getQuestionGeneratorRoomResults(roomId: string): Promise<QuestionGeneratorRoomResultSummary[]> {
   const user = await getCurrentUser();
   if (!user) return [];
@@ -979,6 +994,78 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
       createdAt: room.created_at,
       questionCount: questions.length,
       questions,
+    }];
+  });
+}
+
+/**
+ * 개요 짜기 방을 만들 때 고를 수 있는 `좋은 질문 고르기` 활동 목록.
+ *
+ * `질문 만들기 → 좋은 질문 고르기` 가 쓰는 getQuestionGeneratorSourceRooms 와 같은 짜임이다.
+ * 다른 점은 **표를 세어 순서를 매긴다**는 것뿐이라, 집계는 이미 있는
+ * buildQuestionVotingRanking 을 그대로 쓴다.
+ *
+ * 표를 하나도 못 받은 질문은 담지 않는다. `선별된 좋은 질문`이라는 말의 뜻이 흐려진다.
+ */
+export async function getQuestionVotingSourceRooms(classId?: string): Promise<QuestionVotingSourceRoomSummary[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  let query = admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("id, title, topic, created_at, activity_config")
+    .eq("teacher_id", user.id)
+    .eq("activity_type", "question_voting")
+    .order("created_at", { ascending: false });
+
+  if (classId) {
+    query = query.eq(isIntegratedLab() ? "agit_class_id" : "class_id", classId);
+  }
+
+  const { data: rooms } = await query;
+  if (!rooms || rooms.length === 0) return [];
+
+  const roomIds = rooms.map((room) => room.id);
+  const { data: sessions } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("room_id, submission")
+    .in("room_id", roomIds)
+    .eq("status", "done");
+
+  const submissionsByRoom = new Map<string, ReturnType<typeof normalizeQuestionVotingSubmission>[]>();
+  for (const session of sessions ?? []) {
+    const submission = normalizeQuestionVotingSubmission(session.submission);
+    if (!submission) continue;
+    const current = submissionsByRoom.get(session.room_id) ?? [];
+    current.push(submission);
+    submissionsByRoom.set(session.room_id, current);
+  }
+
+  return rooms.flatMap((room) => {
+    const config = normalizeQuestionVotingConfig(room.activity_config);
+    if (!config?.sourceQuestions?.length) return [];
+
+    const submissions = (submissionsByRoom.get(room.id) ?? [])
+      .filter((submission): submission is NonNullable<typeof submission> => Boolean(submission));
+    if (submissions.length === 0) return [];
+
+    const ranking = buildQuestionVotingRanking(config, submissions).filter((entry) => entry.votes > 0);
+    if (ranking.length === 0) return [];
+
+    return [{
+      roomId: room.id,
+      title: room.title ?? room.topic ?? "좋은 질문 고르기 활동",
+      topic: room.topic ?? room.title ?? "",
+      createdAt: room.created_at,
+      voterCount: submissions.length,
+      questions: ranking.map((entry) => ({
+        id: entry.questionId,
+        text: entry.text,
+        votes: entry.votes,
+      })),
     }];
   });
 }
