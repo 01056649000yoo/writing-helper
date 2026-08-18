@@ -110,7 +110,7 @@ const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary
   one_line_share: {
     emoji: "💬",
     tone: "from-rose-50 via-white to-pink-50",
-    summary: "핵심단어를 이용한 문장 만들기로 수업을 마무리하는 활동",
+    summary: "핵심단어를 이용한 문장 만들기 활동",
   },
   hanja_writing: {
     emoji: "📜",
@@ -1664,7 +1664,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
   const [saving, setSaving] = useState(false);
   const initialDraft = useMemo<OneLineShareDraft>(() => ({
     topic: "오늘 수업 한 줄 정리",
-    topic_description: "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.",
+    topic_description: "핵심단어를 이용해 멋진 한 문장을 완성해 보세요.",
     core_keywords: "",
     auxiliary_keywords: "",
     max_reactions_per_student: "3",
@@ -1697,7 +1697,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
   return (
     <>
       <div className="rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 mb-6 text-sm text-rose-800">
-        학생이 핵심단어를 이용해 문장을 만들며 수업을 마무리하고, 친구 문장에는 좋아요로 반응하는 활동입니다.
+        학생이 핵심단어를 이용해 문장을 만들고, 친구 문장에는 좋아요로 반응하는 활동입니다.
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1710,8 +1710,8 @@ function OneLineShareSetup({ classId }: { classId: string }) {
             topic_description: draft.topic_description,
           }}
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          hint="학생에게 보일 활동 제목과 설명입니다. 핵심단어를 이용해 수업을 마무리하는 문장을 쓰도록 안내해 주세요."
-          placeholder="예) 오늘 배운 증발과 물의 순환을 떠올리며, 핵심단어를 이용해 수업을 마무리하는 한 문장을 써 봅니다."
+          hint="학생에게 보일 활동 제목과 설명입니다. 핵심단어를 이용해 문장을 쓰도록 안내해 주세요."
+          placeholder="예) 오늘 배운 증발과 물의 순환을 떠올리며, 핵심단어를 이용해 한 문장을 써 봅니다."
           savedAt={draftControls.savedAt}
         />
 

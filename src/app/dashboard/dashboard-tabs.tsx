@@ -257,7 +257,7 @@ export function DashboardTabs({ classes, integratedRoster = false }: DashboardTa
                   <h4 className="text-lg font-bold text-gray-800">한줄모아 (One Line Share)</h4>
                 </div>
                 <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                  교과 차시 정리와 피드백에 활용하는 공유 보드입니다. 교사가 정한 핵심 단어를 한 문장에 자연스럽게 넣고, 친구 문장에 하트를 보내며 함께 생각을 나눕니다.
+                  핵심단어를 활용한 문장 만들기 활동입니다. 교사가 정한 핵심 단어를 한 문장에 자연스럽게 넣고, 친구 문장에 하트를 보내며 함께 생각을 나눕니다.
                 </p>
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-xs">
                   <div className="flex justify-between">

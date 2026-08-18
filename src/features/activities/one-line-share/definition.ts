@@ -14,7 +14,7 @@ export const oneLineShareDefinition: ActivityDefinition<
 > = {
   id: "one_line_share",
   label: "한줄모아",
-  description: "핵심단어를 이용해 문장을 만들고 수업을 마무리하는 글쓰기 활동입니다.",
+  description: "핵심단어를 이용한 문장 만들기 활동입니다.",
   category: "reflection",
   version: 1,
   usesAi: false,
@@ -41,7 +41,7 @@ export const oneLineShareDefinition: ActivityDefinition<
   },
   createDefaultConfig: () => ({
     promptTitle: "오늘 수업 한 줄 정리",
-    promptDescription: "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.",
+    promptDescription: "핵심단어를 이용해 멋진 한 문장을 완성해 보세요.",
     coreKeywords: [],
     auxiliaryKeywords: [],
     maxReactionsPerStudent: 3,
@@ -53,7 +53,7 @@ export const oneLineShareDefinition: ActivityDefinition<
       : "오늘 수업 한 줄 정리";
     const promptDescription = typeof raw.promptDescription === "string" && raw.promptDescription.trim()
       ? raw.promptDescription.trim()
-      : "핵심단어를 이용해 오늘 수업을 마무리하는 한 문장을 써보세요.";
+      : "핵심단어를 이용해 멋진 한 문장을 완성해 보세요.";
     const coreFromNew = normalizeKeywords(raw.coreKeywords);
     const legacy = normalizeKeywords(raw.keywords);
     const coreKeywords = coreFromNew.length > 0 ? coreFromNew : legacy;
