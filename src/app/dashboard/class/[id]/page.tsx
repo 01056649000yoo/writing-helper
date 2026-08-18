@@ -6,6 +6,7 @@ import { DeleteRoomButton } from "./delete-room-button";
 import { EditRoomButton } from "./edit-room-button";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
 import { ClosedRoomsTabs } from "./closed-rooms-tabs";
+import { ActiveRoomsTabs } from "./active-rooms-tabs";
 
 type UnifiedRoom = { kind: "writing"; id: string; title: string; topic: string; topic_description: string; subject_type: string | null; activity_type: string | null; is_active: boolean; created_at: string };
 
@@ -62,24 +63,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
         <div className="space-y-7">
           <DraftSessionsPanel classId={id} />
 
-          <div>
-            <h2 className="text-lg font-bold text-gray-800 mb-4">🟢 진행 중인 활동 세션 ({activeRooms.length})</h2>
-            {activeRooms.length === 0 ? (
-              <div className="lab-panel lab-empty">
-                <p className="text-base text-gray-400">진행 중인 활동 세션이 없습니다.</p>
-                <Link href={`/dashboard/room/new?class_id=${id}`}
-                  className="inline-block mt-3 text-indigo-500 text-base hover:underline">
-                  새 활동 시작하기 →
-                </Link>
-              </div>
-            ) : (
-                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {activeRooms.map((room) => (
-                  <ActivityCard key={room.id} room={room} status="active" />
-                ))}
-              </div>
-            )}
-          </div>
+          <ActiveRoomsTabs activeRooms={activeRooms} classId={id} />
 
           {closedRooms.length > 0 && (
             <ClosedRoomsTabs closedRooms={closedRooms} />
