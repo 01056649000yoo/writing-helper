@@ -11,7 +11,7 @@ export function DetailSection({ title, hint, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4">
+    <section className="rounded-xl border border-gray-200/90 bg-white p-3.5 shadow-2xs">
       <div className="mb-2.5">
         <h3 className="text-sm font-bold text-gray-800">{title}</h3>
         {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}

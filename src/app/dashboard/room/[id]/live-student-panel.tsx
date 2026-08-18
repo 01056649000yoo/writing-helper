@@ -1180,42 +1180,31 @@ export default function LiveStudentPanel({
         />
       )}
 
-      <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
-        {/* 헤더 & 활동 모아보기 버튼 */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black text-gray-800">학생 활동 현황</h2>
-              {isActive && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  실시간 자동 반영
-                </span>
-              )}
-            </div>
-            {activityType === "question_generator" && (
-              <p className="mt-1 text-sm text-gray-500">학생들이 만든 질문을 모달에서 한 번에 모아볼 수 있어요.</p>
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-md p-4 sm:p-5 space-y-3.5">
+        {/* 상단 액션 바 (실시간 상태 + 결과 모아보기 버튼) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            {isActive && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                실시간 갱신 중
+              </span>
             )}
-            {activityType === "question_voting" && (
-              <p className="mt-1 text-sm text-gray-500">학생들이 고른 좋은 질문 결과를 득표순으로 바로 확인할 수 있어요.</p>
-            )}
-            {activityType === "one_line_share" && (
-              <p className="mt-1 text-sm text-gray-500">학생들이 쓴 한 줄과 좋아요 수를 실시간으로 모아볼 수 있어요.</p>
-            )}
-            {activityType === "hanja_writing" && (
-              <p className="mt-1 text-sm text-gray-500">학생들이 만든 한자 문장을 실시간으로 모아보고 학급 전체 결과를 함께 볼 수 있어요.</p>
-            )}
-            {activityType === "outline_builder" && (
-              <p className="mt-1 text-sm text-gray-500">학생들의 개요 작성 현황을 확인하고 완성된 개요를 바로 열람할 수 있어요.</p>
-            )}
+            <span className="text-xs text-gray-500">
+              {activityType === "question_generator" && "학생 질문 모아보기 가능"}
+              {activityType === "question_voting" && "좋은 질문 득표수 실시간 집계"}
+              {activityType === "one_line_share" && "한 줄 및 좋아요 수 집계"}
+              {activityType === "hanja_writing" && "한자 문장 및 반응 집계"}
+              {activityType === "outline_builder" && "개요 완성 즉시 팝업 열람 가능"}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {activityType === "question_generator" && (
               <button
                 type="button"
                 onClick={() => setIsQuestionResultsOpen(true)}
-                className="rounded-2xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-sky-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-sky-200"
+                className="rounded-xl bg-sky-500 hover:bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-sky-200"
                 disabled={questionResults.length === 0}
               >
                 📊 질문 결과 모아보기
@@ -1225,7 +1214,7 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsQuestionVotingResultsOpen(true)}
-                className="rounded-2xl bg-violet-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-violet-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-violet-200"
+                className="rounded-xl bg-violet-500 hover:bg-violet-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-violet-200"
                 disabled={questionVotingResults.length === 0}
               >
                 📊 좋은 질문 결과 보기
@@ -1235,7 +1224,7 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsOneLineShareResultsOpen(true)}
-                className="rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-rose-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-rose-200"
+                className="rounded-xl bg-rose-500 hover:bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-rose-200"
                 disabled={oneLineShareResults.length === 0}
               >
                 💬 한줄모아 결과 보기
@@ -1245,7 +1234,7 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsHanjaWritingResultsOpen(true)}
-                className="rounded-2xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-amber-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-amber-200"
+                className="rounded-xl bg-amber-500 hover:bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-amber-200"
                 disabled={hanjaWritingResults.length === 0}
               >
                 📜 한자 문장 결과 보기
@@ -1254,7 +1243,7 @@ export default function LiveStudentPanel({
           </div>
         </div>
 
-        {/* 📊 상단 핵심 현황 대시보드 (20명 기준 시각화) */}
+        {/* 📊 슬림 현황 대시보드 (20명 기준) */}
         {(() => {
           const totalCount = students.length || (doneSessions.length + activeSessions.length);
           const donePct = totalCount > 0 ? Math.round((doneSessions.length / totalCount) * 100) : 0;
@@ -1262,14 +1251,14 @@ export default function LiveStudentPanel({
           const notConnectedPct = totalCount > 0 ? Math.max(0, 100 - donePct - activePct) : 0;
 
           return (
-            <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-4 sm:p-5 space-y-3.5">
-              <div className="flex items-center justify-between text-xs font-bold text-gray-500">
+            <div className="rounded-xl bg-slate-50/80 border border-slate-200/70 p-3 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold text-gray-500">
                 <span>학급 전체 진척도 (총 {totalCount}명)</span>
-                <span className="text-emerald-700 font-extrabold">{donePct}% 완료</span>
+                <span className="text-emerald-700 font-extrabold">{donePct}% 완료 ({doneSessions.length}명)</span>
               </div>
 
               {/* 3단 프로그레스 바 */}
-              <div className="h-3.5 w-full rounded-full bg-gray-200 overflow-hidden flex shadow-inner">
+              <div className="h-2.5 w-full rounded-full bg-gray-200 overflow-hidden flex shadow-inner">
                 <div
                   style={{ width: `${donePct}%` }}
                   className="bg-emerald-500 transition-all duration-500"
@@ -1287,64 +1276,52 @@ export default function LiveStudentPanel({
                 />
               </div>
 
-              {/* 3개 지표 카드 */}
-              <div className="grid grid-cols-3 gap-2.5 sm:gap-3 text-center pt-1">
-                <div className="rounded-xl bg-white p-3 border border-emerald-200 shadow-sm">
-                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-emerald-700">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    제출 완료
-                  </div>
-                  <div className="mt-1 flex items-baseline justify-center gap-1">
-                    <span className="text-2xl sm:text-3xl font-black text-emerald-800">{doneSessions.length}</span>
-                    <span className="text-xs font-semibold text-gray-400">/{totalCount}명</span>
-                  </div>
+              {/* 3개 지표 인라인 카드 */}
+              <div className="grid grid-cols-3 gap-2 text-center pt-0.5">
+                <div className="rounded-lg bg-white px-2 py-1.5 border border-emerald-200 shadow-2xs">
+                  <span className="text-[11px] font-bold text-emerald-700 block">🟢 완료</span>
+                  <span className="text-lg font-black text-emerald-800 leading-tight block mt-0.5">
+                    {doneSessions.length}<span className="text-[10px] font-normal text-gray-400">/{totalCount}</span>
+                  </span>
                 </div>
 
-                <div className="rounded-xl bg-white p-3 border border-sky-200 shadow-sm">
-                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-sky-700">
-                    <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                    작성 중
-                  </div>
-                  <div className="mt-1 flex items-baseline justify-center gap-1">
-                    <span className="text-2xl sm:text-3xl font-black text-sky-800">{activeSessions.length}</span>
-                    <span className="text-xs font-semibold text-gray-400">명</span>
-                  </div>
+                <div className="rounded-lg bg-white px-2 py-1.5 border border-sky-200 shadow-2xs">
+                  <span className="text-[11px] font-bold text-sky-700 block">🔵 작성 중</span>
+                  <span className="text-lg font-black text-sky-800 leading-tight block mt-0.5">
+                    {activeSessions.length}<span className="text-[10px] font-normal text-gray-400">명</span>
+                  </span>
                 </div>
 
-                <div className="rounded-xl bg-white p-3 border border-gray-200 shadow-sm">
-                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-gray-500">
-                    <span className="w-2 h-2 rounded-full bg-gray-300" />
-                    시작 전
-                  </div>
-                  <div className="mt-1 flex items-baseline justify-center gap-1">
-                    <span className="text-2xl sm:text-3xl font-black text-gray-700">{notConnected.length}</span>
-                    <span className="text-xs font-semibold text-gray-400">명</span>
-                  </div>
+                <div className="rounded-lg bg-white px-2 py-1.5 border border-gray-200 shadow-2xs">
+                  <span className="text-[11px] font-bold text-gray-500 block">⚪ 시작 전</span>
+                  <span className="text-lg font-black text-gray-700 leading-tight block mt-0.5">
+                    {notConnected.length}<span className="text-[10px] font-normal text-gray-400">명</span>
+                  </span>
                 </div>
               </div>
             </div>
           );
         })()}
 
-        {/* 1. 작성 중인 학생 목록 */}
+        {/* 1. 작성 중인 학생 목록 (컴팩트 칩 그리드) */}
         {activeSessions.length > 0 && (
-          <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 sm:p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-sky-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+          <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-sky-800 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
                 ✏️ 작성 중인 학생 ({activeSessions.length}명)
               </p>
-              <span className="text-xs text-sky-600 font-medium">활동 진행 중</span>
+              <span className="text-[11px] text-sky-600 font-medium">실시간 작성 진행</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
               {activeSessions.map((s) => (
-                <div key={s.id} className="rounded-xl border border-sky-200 bg-white px-3 py-2.5 shadow-sm flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-xs font-bold text-sky-700 font-mono">
+                <div key={s.id} className="rounded-lg border border-sky-200 bg-white px-2 py-1.5 shadow-2xs flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sky-100 text-[11px] font-bold text-sky-700 font-mono">
                     {s.student_number}
                   </span>
-                  <span className="text-sm font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
+                  <span className="text-xs font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
                   {s.level && (
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full shrink-0 ${levelStyle(s.level)}`}>
+                    <span className={`text-[10px] px-1 rounded shrink-0 ${levelStyle(s.level)}`}>
                       {levelLabel(s.level)}
                     </span>
                   )}
@@ -1354,15 +1331,15 @@ export default function LiveStudentPanel({
           </div>
         )}
 
-        {/* 2. 제출 완료 학생 목록 */}
+        {/* 2. 제출 완료 학생 목록 (컴팩트 카드 그리드) */}
         {doneSessions.length > 0 && (
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 sm:p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-emerald-800 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 ✅ 제출 완료 ({doneSessions.length}명)
               </p>
-              <p className="text-xs text-emerald-700 font-medium">
+              <p className="text-[11px] text-emerald-700 font-medium">
                 {activityType === "question_generator"
                   ? "보기 → 학생 질문 상세"
                   : activityType === "question_voting"
@@ -1376,24 +1353,24 @@ export default function LiveStudentPanel({
                       : "보기 → 학생 개요 상세"}
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
               {doneSessions.map((s) => (
                 <div
                   key={s.id}
-                  className="flex items-center justify-between gap-2 bg-white border border-emerald-200 rounded-xl px-3.5 py-2.5 shadow-sm hover:border-emerald-300 transition-colors"
+                  className="flex items-center justify-between gap-1.5 bg-white border border-emerald-200 rounded-lg px-2.5 py-1.5 shadow-2xs hover:border-emerald-300 transition-colors"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-700 font-mono">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-100 text-[11px] font-bold text-emerald-700 font-mono">
                       {s.student_number}
                     </span>
-                    <span className="text-sm font-bold text-gray-800 truncate">{s.student_name}</span>
+                    <span className="text-xs font-bold text-gray-800 truncate">{s.student_name}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     {activityType === "outline_builder" && showResultQr ? (
                       <button
                         type="button"
                         onClick={() => setQrTarget(s)}
-                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-lg font-medium transition-colors"
+                        className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded font-medium transition-colors"
                         title="개인 결과 QR 보기"
                       >
                         QR
@@ -1402,7 +1379,7 @@ export default function LiveStudentPanel({
                     <button
                       type="button"
                       onClick={() => setActiveSessionResult(s)}
-                      className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg shadow-sm transition-all active:scale-95"
+                      className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-2xs transition-all active:scale-95"
                     >
                       보기 →
                     </button>
@@ -1413,18 +1390,18 @@ export default function LiveStudentPanel({
           </div>
         )}
 
-        {/* 3. 시작 전 학생 목록 */}
+        {/* 3. 시작 전 학생 목록 (컴팩트 칩 그리드) */}
         {notConnected.length > 0 && (
-          <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-gray-600">⬜ 시작 전 ({notConnected.length}명)</p>
-              <span className="text-xs text-gray-400">아직 활동을 시작하지 않은 학생입니다</span>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-gray-600">⬜ 시작 전 ({notConnected.length}명)</p>
+              <span className="text-[11px] text-gray-400">미참여 학생</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-1">
               {notConnected.map((s) => (
-                <div key={s.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-2.5 py-2 shadow-2xs">
-                  <span className="text-xs text-gray-400 font-mono w-4 shrink-0">{s.student_number}</span>
-                  <span className="text-sm text-gray-600 font-medium truncate">{s.student_name}</span>
+                <div key={s.id} className="flex items-center gap-1 bg-white border border-gray-200 rounded px-1.5 py-1 text-xs shadow-2xs">
+                  <span className="text-[10px] text-gray-400 font-mono w-3.5 shrink-0">{s.student_number}</span>
+                  <span className="text-[11px] text-gray-600 font-medium truncate">{s.student_name}</span>
                 </div>
               ))}
             </div>
@@ -1432,11 +1409,11 @@ export default function LiveStudentPanel({
         )}
 
         {sessions.length === 0 && students.length === 0 && (
-          <p className="text-center text-gray-400 text-sm py-4">학생 명단이 없습니다.</p>
+          <p className="text-center text-gray-400 text-xs py-3">학생 명단이 없습니다.</p>
         )}
 
         {sessions.length === 0 && students.length > 0 && (
-          <p className="text-center text-gray-400 text-sm py-2 animate-pulse">
+          <p className="text-center text-gray-400 text-xs py-2 animate-pulse">
             학생이 활동에 입장하면 여기에 표시돼요
           </p>
         )}
