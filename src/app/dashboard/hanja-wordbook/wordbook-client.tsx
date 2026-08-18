@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { deleteTeacherHanjaWordCard, type SavedHanjaWordCard } from "@/app/actions/room-actions";
+import {
+  deleteTeacherHanjaWordCard,
+  getOrGenerateHanjaCard,
+  saveTeacherHanjaWordCard,
+  type SavedHanjaWordCard,
+} from "@/app/actions/room-actions";
 
 type GradeFilter = "all" | "3" | "4" | "5" | "6";
 type PageSize = 12 | 24 | 48;
@@ -22,6 +27,42 @@ export function HanjaWordbookClient({
   const [pageSize, setPageSize] = useState<PageSize>(12);
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // 카드 만들기는 원래 `한자 활용 문장 만들기` 활동 설정 화면에만 있었다. 그 활동을 접으면서
+  // 단어집이 스스로 카드를 만들 수 있어야 정선을 이어갈 수 있어 이곳으로 옮겼다(2026-08-19).
+  const [newWord, setNewWord] = useState("");
+  const [newGrade, setNewGrade] = useState("4");
+  const [creating, setCreating] = useState(false);
+  const [createNotice, setCreateNotice] = useState("");
+
+  async function handleCreateCard() {
+    const word = newWord.trim();
+    if (!word || creating) return;
+    if (cards.some((card) => card.word === word && String(card.grade) === newGrade)) {
+      setCreateNotice("이미 단어집에 있는 단어예요.");
+      return;
+    }
+    setCreating(true);
+    setCreateNotice("");
+    setError("");
+
+    const generated = await getOrGenerateHanjaCard(word, Number(newGrade) || 4);
+    if (generated.error || !generated.card) {
+      setCreating(false);
+      setError(generated.error ?? "한자 카드를 만들지 못했습니다.");
+      return;
+    }
+
+    const saved = await saveTeacherHanjaWordCard(generated.card, null);
+    setCreating(false);
+    if (saved.error || !saved.card) {
+      setError(saved.error ?? "카드를 단어집에 저장하지 못했습니다.");
+      return;
+    }
+
+    setCards((prev) => [saved.card!, ...prev.filter((card) => card.id !== saved.card!.id)]);
+    setNewWord("");
+    setCreateNotice(`'${saved.card.word}' 카드를 단어집에 넣었어요.`);
+  }
 
   const filteredCards = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -138,6 +179,40 @@ export function HanjaWordbookClient({
 
   return (
     <div className="space-y-6">
+      <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-5 shadow-sm print:hidden">
+        <p className="text-sm font-bold text-amber-800">새 한자 카드 만들기</p>
+        <p className="mt-0.5 text-xs text-amber-700/80">
+          단어를 넣으면 한자 낱자·뜻·예문·관련 낱말을 갖춘 카드를 만들어 단어집에 넣습니다.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            value={newWord}
+            onChange={(event) => setNewWord(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") void handleCreateCard(); }}
+            placeholder="예) 관계"
+            className="min-w-[10rem] flex-1 rounded-xl border border-amber-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-300"
+          />
+          <select
+            value={newGrade}
+            onChange={(event) => setNewGrade(event.target.value)}
+            className="rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm text-gray-900"
+          >
+            {["3", "4", "5", "6"].map((grade) => (
+              <option key={grade} value={grade}>초등 {grade}학년</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void handleCreateCard()}
+            disabled={creating || newWord.trim().length === 0}
+            className="rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {creating ? "만드는 중..." : "카드 만들기"}
+          </button>
+        </div>
+        {createNotice && <p className="mt-2 text-xs font-semibold text-amber-700">{createNotice}</p>}
+      </div>
+
       <div className="grid gap-4 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm print:hidden xl:grid-cols-[minmax(0,1fr)_160px_140px_auto]">
         <label className="block">
           <span className="mb-2 block text-sm font-semibold text-gray-700">검색</span>
