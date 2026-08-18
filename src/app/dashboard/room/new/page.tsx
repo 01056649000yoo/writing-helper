@@ -43,13 +43,11 @@ type OutlineBuilderDraft = {
   topic_description: string;
   subject_type: string;
   grade_level: string;
-  duration_hours: string;
 };
 
 type QuestionGeneratorDraft = {
   topic: string;
   topic_description: string;
-  duration_hours: string;
   max_selections: string;
   guidance: string;
   selectedCardSetIds: string[];
@@ -72,7 +70,6 @@ type VotingQuestionDraft = {
 };
 
 type QuestionVotingDraft = {
-  duration_hours: string;
   max_selections: string;
   evaluation_criteria: string;
   source_room_id: string;
@@ -87,7 +84,6 @@ type OneLineShareDraft = {
   core_keywords: string;
   auxiliary_keywords: string;
   max_reactions_per_student: string;
-  duration_hours: string;
 };
 
 const ACTIVITY_META: Record<ActivityType, { emoji: string; tone: string; summary: string }> = {
@@ -274,8 +270,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     topic_description: "",
     subject_type: "생활문",
     grade_level: "중학년",
-    duration_hours: "4",
-  }), []);
+      }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<OutlineBuilderDraft>(
     buildDraftStorageKey(classId, "outline_builder"),
     initialDraft
@@ -395,7 +390,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("topic_description", draft.topic_description);
     fd.set("subject_type", draft.subject_type);
     fd.set("grade_level", draft.grade_level);
-    fd.set("duration_hours", draft.duration_hours);
     if (customTemplate) {
       fd.set("outline_template_json", JSON.stringify(customTemplate));
     }
@@ -467,11 +461,6 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
           ))}
         </div>
       </div>
-
-      <DurationField
-        value={draft.duration_hours}
-        onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
-      />
 
       <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">
@@ -660,8 +649,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
     topic: "",
     topic_description: "",
-    duration_hours: "4",
-    max_selections: "1",
+        max_selections: "1",
     guidance: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
     selectedCardSetIds: [],
   }), []);
@@ -1184,13 +1172,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-3">활동 운영 시간</label>
-            <DurationField
-              value={draft.duration_hours}
-              onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
-            />
-          </div>
         </div>
 
         <div>
@@ -1248,8 +1229,7 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
   const [sourceRooms, setSourceRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
   const [loadingSourceRooms, setLoadingSourceRooms] = useState(true);
   const initialDraft = useMemo<QuestionVotingDraft>(() => ({
-    duration_hours: "4",
-    max_selections: "1",
+        max_selections: "1",
     evaluation_criteria: "생각이 더 이어지는 질문\n친구가 더 이야기하고 싶어지는 질문",
     source_room_id: "",
     source_room_title: "",
@@ -1546,13 +1526,6 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-3">활동 운영 시간</label>
-            <DurationField
-              value={draft.duration_hours}
-              onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
-            />
-          </div>
         </div>
 
         {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
@@ -1578,8 +1551,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
     core_keywords: "",
     auxiliary_keywords: "",
     max_reactions_per_student: "3",
-    duration_hours: "4",
-  }), []);
+      }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<OneLineShareDraft>(
     buildDraftStorageKey(classId, "one_line_share"),
     initialDraft,
@@ -1686,13 +1658,6 @@ function OneLineShareSetup({ classId }: { classId: string }) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-3">활동 운영 시간</label>
-            <DurationField
-              value={draft.duration_hours}
-              onChange={(durationHours) => setDraft((prev) => ({ ...prev, duration_hours: durationHours }))}
-            />
-          </div>
         </div>
 
         {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
