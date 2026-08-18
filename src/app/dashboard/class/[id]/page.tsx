@@ -96,7 +96,7 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
 
   if (status === "closed") {
     return (
-      <div className={`relative bg-white/60 rounded-2xl hover:bg-white transition-colors opacity-70 hover:opacity-100 border-l-4 ${cardAccentBorder(room)}`}>
+      <div className={`relative bg-white rounded-2xl border border-gray-200 shadow-2xs hover:shadow-md transition-all border-l-4 ${cardAccentBorder(room)}`}>
         <Link href={href} className="block p-5">
           <div className="flex items-start gap-2 pr-16">
             <span className="text-2xl shrink-0">{cardEmoji(room)}</span>
@@ -113,7 +113,7 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
           </div>
           <p className="mt-2 text-xs text-gray-400">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
         </Link>
-        <div className="absolute top-2 right-2"><DeleteRoomButton roomId={room.id} /></div>
+        <div className="absolute top-2.5 right-2.5 z-10"><DeleteRoomButton roomId={room.id} /></div>
       </div>
     );
   }

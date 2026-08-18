@@ -26,10 +26,10 @@ export function DeleteRoomButton({ roomId }: { roomId: string }) {
     <button
       onClick={handleDelete}
       disabled={pending}
-      className="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+      className="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 hover:text-rose-700 border border-rose-200/80 px-2.5 py-1 rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-2xs flex items-center gap-1"
       title="활동 세션 삭제"
     >
-      {pending ? "삭제 중..." : "🗑 삭제"}
+      {pending ? "삭제 중..." : "🗑️ 삭제"}
     </button>
   );
 }

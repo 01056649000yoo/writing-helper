@@ -205,11 +205,11 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
             return (
               <div
                 key={`${room.kind}-${room.id}`}
-                className={`relative bg-white/60 rounded-2xl hover:bg-white transition-all duration-200 opacity-80 hover:opacity-100 border-l-4 ${cardAccentBorder(room)} hover:shadow-xs group`}
+                className={`relative bg-white rounded-2xl border border-gray-200 shadow-2xs hover:shadow-md transition-all duration-200 border-l-4 ${cardAccentBorder(room)} group`}
               >
                 {/* 5열이라 폭이 좁다. 진행 중 카드와 같은 크기로 맞춘다. */}
                 <Link href={href} className="block p-5">
-                  <div className="flex items-start gap-2 pr-12">
+                  <div className="flex items-start gap-2 pr-16">
                     <span className="text-2xl shrink-0 group-hover:scale-110 transition-transform duration-200">
                       {cardEmoji(room)}
                     </span>
@@ -233,7 +233,7 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
                     {new Date(room.created_at).toLocaleDateString("ko-KR")} 개설
                   </p>
                 </Link>
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2.5 right-2.5 z-10">
                   {renderDeleteBtn(room)}
                 </div>
               </div>
