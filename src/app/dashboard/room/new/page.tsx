@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -1852,47 +1852,6 @@ function TopicFields({
             : "입력하면 자동 저장됩니다."}
         </p>
       </div>
-    </div>
-  );
-}
-
-function DurationField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (durationHours: string) => void;
-}) {
-  return (
-    <div>
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        {[
-          { value: "4", label: "4시간", desc: "오전/오후" },
-          { value: "8", label: "8시간", desc: "하루 수업" },
-          { value: "24", label: "1일", desc: "하루 동안" },
-          { value: "48", label: "2일", desc: "이틀 동안" },
-          { value: "168", label: "1주일", desc: "한 주 동안" },
-        ].map((opt) => (
-          <label
-            key={opt.value}
-            className="flex min-h-[112px] flex-col items-center justify-between border border-gray-200 rounded-xl px-3 py-4 cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50 text-center"
-          >
-            <input
-              type="radio"
-              name="duration_hours"
-              value={opt.value}
-              checked={value === opt.value}
-              onChange={() => onChange(opt.value)}
-              className="text-indigo-500 shrink-0"
-            />
-            <div className="flex flex-col items-center">
-              <span className="text-base font-semibold text-gray-700 leading-none">{opt.label}</span>
-              <span className="mt-2 text-xs text-gray-400">{opt.desc}</span>
-            </div>
-          </label>
-        ))}
-      </div>
-      <p className="text-xs text-gray-400 mt-2">⏰ 시간이 지나면 새 학생 접속이 차단됩니다. 교사가 직접 종료도 가능해요.</p>
     </div>
   );
 }

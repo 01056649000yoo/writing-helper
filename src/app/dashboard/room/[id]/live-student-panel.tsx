@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import QRCode from "qrcode";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import {

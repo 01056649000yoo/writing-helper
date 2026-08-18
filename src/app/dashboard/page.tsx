@@ -25,6 +25,11 @@ export default async function DashboardPage({
     redirect(`/dashboard/class/${requestedClassId}`);
   }
 
+  // 교사의 학급이 1개인 경우 전체 학급 목록을 거치지 않고 바로 해당 학급으로 이동
+  if (classes.length === 1) {
+    redirect(`/dashboard/class/${classes[0].id}`);
+  }
+
   return (
     <main className="lab-page">
       <div className="lab-page__content">
