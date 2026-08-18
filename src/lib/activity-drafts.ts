@@ -1,6 +1,6 @@
 import type { ActivityType } from "@/features/activities/types";
 
-export const DRAFT_STORAGE_PREFIX = "writing-helper:activity-draft:v1";
+export const DRAFT_STORAGE_PREFIX = "writing-helper:activity-draft:v2";
 
 type StoredDraft<T> = {
   data: T;
@@ -53,6 +53,22 @@ export function persistActivityDraft<T>(storageKey: string, draft: T) {
   window.localStorage.setItem(storageKey, JSON.stringify(payload));
 }
 
+function sanitizeLegacyDraft<T>(storageKey: string, draft: T, initialState: T): T {
+  if (!isRecord(draft)) return draft;
+  const result = { ...initialState, ...draft } as Record<string, unknown>;
+
+  if (storageKey.includes("one_line_share")) {
+    if (typeof result.topic === "string" && result.topic.includes("오늘 수업 한 줄 정리")) {
+      result.topic = (initialState as Record<string, unknown>).topic ?? "핵심단어 문장 만들기";
+    }
+    if (typeof result.topic_description === "string" && (result.topic_description.includes("수업을 마무리") || result.topic_description.includes("수업 마무리"))) {
+      result.topic_description = (initialState as Record<string, unknown>).topic_description ?? "제시된 핵심단어를 포함하여 자유롭게 멋진 문장을 작성해 보세요.";
+    }
+  }
+
+  return result as T;
+}
+
 export function readActivityDraft<T>(storageKey: string, initialState: T): { draft: T; savedAt: number | null } {
   if (typeof window === "undefined") {
     return { draft: initialState, savedAt: null };
@@ -67,14 +83,14 @@ export function readActivityDraft<T>(storageKey: string, initialState: T): { dra
     const parsed = JSON.parse(raw) as unknown;
     if (isStoredDraft<T>(parsed)) {
       return {
-        draft: { ...initialState, ...parsed.data },
+        draft: sanitizeLegacyDraft(storageKey, parsed.data, initialState),
         savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : null,
       };
     }
 
     if (isRecord(parsed)) {
       return {
-        draft: { ...initialState, ...parsed },
+        draft: sanitizeLegacyDraft(storageKey, parsed as T, initialState),
         savedAt: null,
       };
     }
