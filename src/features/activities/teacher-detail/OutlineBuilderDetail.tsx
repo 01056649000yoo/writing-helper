@@ -17,27 +17,25 @@ export function OutlineBuilderDetail({ config, room }: ActivityTeacherDetailProp
   const hasSavedTemplate = Boolean(saved && Array.isArray(saved.sections) && saved.sections.length > 0);
   const legacyQuestions = collectLegacyQuestions(raw.questionSets);
 
-  if (!hasSavedTemplate) {
+  // 틀을 따로 만들지 않은 방(운영 16개 중 13개)에서도 **학생은 글 종류 기본 틀을 본다**
+  // (`room/[id]/activity/page.tsx`: `data.outline_template ?? getDefaultOutlineTemplate(subjectType)`).
+  // 그러니 교사에게도 그 기본 틀을 보여 주는 것이 맞다. 다만 교사가 만든 것과 헷갈리지 않게
+  // `글 종류 기본 틀` 이라고 밝힌다.
+  // 예외는 v1 시절 방이다 — 그때는 틀이 아니라 문항 목록으로 물었으므로 그것을 보여 준다.
+  if (!hasSavedTemplate && legacyQuestions.length > 0) {
     return (
       <>
-        <DetailSection
-          title="개요 틀"
-          hint={legacyQuestions.length > 0 ? "예전 방식으로 만든 활동입니다" : undefined}
-        >
-          {legacyQuestions.length > 0 ? (
-            <ol className="space-y-1.5">
-              {legacyQuestions.map((question, index) => (
-                <li key={`${index}-${question}`} className="flex gap-2 text-sm text-gray-700">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[0.68rem] font-bold text-gray-500">
-                    {index + 1}
-                  </span>
-                  <span className="min-w-0 flex-1 leading-relaxed">{question}</span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <EmptyLine>이 활동에는 저장된 개요 틀이 없습니다. 학생 화면에서는 글 종류 기본 틀이 쓰입니다.</EmptyLine>
-          )}
+        <DetailSection title="학생이 답한 문항" hint="예전 방식으로 만든 활동입니다">
+          <ol className="space-y-1.5">
+            {legacyQuestions.map((question, index) => (
+              <li key={`${index}-${question}`} className="flex gap-2 text-sm text-gray-700">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[0.68rem] font-bold text-gray-500">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1 leading-relaxed">{question}</span>
+              </li>
+            ))}
+          </ol>
         </DetailSection>
 
         <DetailSection title="설정">
@@ -55,7 +53,12 @@ export function OutlineBuilderDetail({ config, room }: ActivityTeacherDetailProp
 
   return (
     <>
-      <DetailSection title="개요 틀" hint={`학생이 채울 칸 ${itemCount}개`}>
+      <DetailSection
+        title="개요 틀"
+        hint={hasSavedTemplate
+          ? `학생이 채울 칸 ${itemCount}개`
+          : `글 종류 기본 틀 · 학생이 채울 칸 ${itemCount}개`}
+      >
         {template.sections.length === 0 ? (
           <EmptyLine>개요 틀이 비어 있습니다.</EmptyLine>
         ) : (

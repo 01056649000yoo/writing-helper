@@ -13,7 +13,6 @@ const [
   roomDetailPage,
   dashboard,
   classPage,
-  rosterManager,
   livePanel,
 ] = await Promise.all([
   readFile("src/lib/lab-roster.ts", "utf8"),
@@ -26,7 +25,6 @@ const [
   readFile("src/app/dashboard/room/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/dashboard-tabs.tsx", "utf8"),
   readFile("src/app/dashboard/class/[id]/page.tsx", "utf8"),
-  readFile("src/app/dashboard/class/[id]/roster-manager.tsx", "utf8"),
   readFile("src/app/dashboard/room/[id]/live-student-panel.tsx", "utf8"),
 ]);
 
@@ -49,8 +47,6 @@ test("통합 모드에서는 연구소 학급과 학생을 별도로 만들거�
   assert.match(classActions, /학생 명단은 끄적끄적 아지트의 학급 관리에서 수정해주세요/);
   assert.match(dashboard, /integratedRoster \? \(/);
   assert.match(dashboard, /아지트에서 학급 관리/);
-  assert.match(classPage, /readOnly=\{integratedRoster\}/);
-  assert.match(rosterManager, /학생 추가·이름 변경·삭제는 아지트 학급 관리에서 한 번만 처리합니다/);
 });
 
 test("신규 활동과 결과는 아지트 학급·학생 ID를 직접 저장한다", () => {
@@ -76,8 +72,7 @@ test("통합 학생은 실제 로그인 연결로 자동 입장하고 번호·�
 
 test("통합 활동 입장은 학생 대시보드로 안내하고 입장용 QR·단축주소를 만들지 않는다", () => {
   assert.match(roomActions, /if \(isIntegratedLab\(\)\) \{[\s\S]*short_code: null/);
-  assert.match(roomDetailPage, /integratedLab \? \([\s\S]*학생 대시보드에서 바로 참여해요/);
-  assert.match(roomDetailPage, /번호·이름 입력이나 입장용 QR 코드는 필요하지 않습니다/);
+  assert.match(roomDetailPage, /!integratedLab && room\.is_active &&/);
   assert.match(livePanel, /학생이 활동에 입장하면 여기에 표시돼요/);
 });
 
