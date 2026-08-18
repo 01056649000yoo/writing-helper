@@ -2,20 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClassWorkspace } from "@/app/actions/class-actions";
 import { isActivityType } from "@/features/activities/types";
-import { DeleteClassButton } from "./delete-button";
 import { DeleteRoomButton } from "./delete-room-button";
-import { RosterManager } from "./roster-manager";
+import { EditRoomButton } from "./edit-room-button";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
 import { ClosedRoomsTabs } from "./closed-rooms-tabs";
 
-type UnifiedRoom = { kind: "writing"; id: string; title: string; topic: string; subject_type: string | null; activity_type: string | null; is_active: boolean; created_at: string; expires_at: string | null };
+type UnifiedRoom = { kind: "writing"; id: string; title: string; topic: string; topic_description: string; subject_type: string | null; activity_type: string | null; is_active: boolean; created_at: string };
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const integratedRoster = process.env.LAB_SSO_ENABLED === "true";
   const workspace = await getClassWorkspace(id);
   if (!workspace) notFound();
-  const { class: cls, students, rooms } = workspace;
+  const { class: cls, rooms } = workspace;
 
   const unified: UnifiedRoom[] = [
     ...rooms
@@ -29,7 +28,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
       activity_type: r.activity_type ?? null,
       is_active: r.is_active,
       created_at: r.created_at,
-      expires_at: r.expires_at ?? null,
+      topic_description: r.topic_description ?? "",
     })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -57,24 +56,10 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-7">
-        <div className="lg:col-span-1">
-          <div className="space-y-4">
-            <RosterManager
-              classId={id}
-              students={students}
-              rosterLocked={activeRooms.length > 0}
-              readOnly={integratedRoster}
-            />
-            {!integratedRoster && (
-              <div className="lab-panel p-7">
-                <DeleteClassButton classId={id} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 space-y-7">
+        {/* 학생 명단 칸을 없앴다(2026-08-19). 학생은 아지트에서 바로 들어오므로 QR·번호 입장을
+            쓰지 않고, 명단은 아지트 학급이 원본이라 여기서 관리할 일이 없다.
+            활동 목록이 화면 전체를 쓴다. */}
+        <div className="space-y-7">
           <DraftSessionsPanel classId={id} />
 
           <div>
@@ -99,7 +84,6 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
           {closedRooms.length > 0 && (
             <ClosedRoomsTabs closedRooms={closedRooms} />
           )}
-        </div>
         </div>
       </div>
     </main>
@@ -135,8 +119,18 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
   }
 
   return (
-    <Link href={href}
-      className={`bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border-l-4 ${cardAccentBorder(room)}`}>
+    <div className={`relative bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border-l-4 ${cardAccentBorder(room)}`}>
+      {/* 이름·주제 수정은 카드 위에 겹쳐 둔다. 카드가 통째로 링크라 그 안에 버튼을 넣으면
+          링크 안의 링크가 되어 눌림이 엉킨다. */}
+      <div className="absolute top-3 right-3 z-10 flex gap-1">
+        <EditRoomButton
+          roomId={room.id}
+          title={room.title}
+          topic={room.topic}
+          topicDescription={room.topic_description}
+        />
+      </div>
+      <Link href={href} className="block p-6">
       <div className="flex items-start justify-between mb-3">
         <span className="text-2xl">{cardEmoji(room)}</span>
         {isActive ? (
@@ -157,22 +151,14 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
         {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
           <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
         )}
-        {isActive && room.expires_at && (
-          <ExpiryBadge expiresAt={room.expires_at} />
-        )}
       </div>
       <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
-    </Link>
+      </Link>
+    </div>
   );
 }
 
-function ExpiryBadge({ expiresAt }: { expiresAt: string }) {
-  return (
-    <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">
-      ⏰ {new Date(expiresAt).toLocaleString("ko-KR")}까지
-    </span>
-  );
-}
+// 기한 표시(ExpiryBadge)는 없앴다 — 활동은 교사가 종료할 때까지 열려 있다.
 
 function kindLabel(room: UnifiedRoom): string {
   return writingActivityMeta(room.activity_type).label;

@@ -13,7 +13,8 @@ interface UnifiedRoom {
   activity_type?: string | null;
   is_active: boolean;
   created_at: string;
-  expires_at: string | null;
+  // 기한(expires_at)은 2026-08-19에 없앴다. 활동은 교사가 종료할 때까지 열려 있다.
+  topic_description?: string;
 }
 
 interface ClosedRoomsTabsProps {

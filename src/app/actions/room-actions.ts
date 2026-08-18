@@ -138,7 +138,6 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
   const subjectType = String(formData.get("subject_type")) as SubjectType;
   const gradeLevel = String(formData.get("grade_level")) as GradeLevel;
   const outlineDepth = (String(formData.get("outline_depth")) || "simple") as OutlineDepth;
-  const durationHours = Math.min(Math.max(Number(formData.get("duration_hours") ?? 4), 4), 168);
 
   if (!classId) return { error: "학급을 선택해주세요." };
 
@@ -158,7 +157,8 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     if (!classRow) return { error: "학급을 찾을 수 없습니다." };
   }
 
-  const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
+  // 활동에는 기한을 두지 않는다(2026-08-19). 교사가 `종료`를 누를 때까지 열려 있다.
+  // 전에는 4~168시간 뒤 자동으로 닫혀, 다음 시간에 이어서 하려면 방을 새로 만들어야 했다.
   const baseRoomPayload = {
     teacher_id: user.id,
     ...(integratedLab
@@ -172,7 +172,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     outline_depth: outlineDepth,
     question_sets: null as null,
     questions_generated_at: null as null,
-    expires_at: expiresAt,
+    expires_at: null as null,
     is_active: true,
   };
 
@@ -378,7 +378,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       activity_type: activityType,
       activity_config: activityConfig,
       activity_state: {},
-      expires_at: expiresAt,
+      expires_at: null,
       is_active: true,
     })
     .select("id")
@@ -410,7 +410,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     }
   }
 
-  await ensureShortLinkForRoom(room.id, user.id, expiresAt);
+  await ensureShortLinkForRoom(room.id, user.id, null);
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/class/${classId}`);
@@ -525,6 +525,55 @@ export async function deleteRoom(roomId: string): Promise<{ error?: string }> {
   const dashboardClassId = "agit_class_id" in room && room.agit_class_id
     ? String(room.agit_class_id)
     : room.class_id;
+  if (dashboardClassId) revalidatePath(`/dashboard/class/${dashboardClassId}`);
+  return {};
+}
+
+/**
+ * 활동의 제목과 주제를 고친다.
+ *
+ * **내용(개요 틀·질문 목록 등)은 고치지 않는다.** 학생이 이미 낸 답은 항목 id 로 붙어 있어서,
+ * 항목을 지우거나 바꾸면 그 답이 어디에도 안 붙는 기록이 된다. 제목·주제는 답과 짝이 지어지지
+ * 않으므로 언제 고쳐도 안전하다.
+ *
+ * 활동을 끝내는 것은 `closeRoom`(종료)이고 지우는 것은 `deleteRoom` 이다. 여기서는 둘 다 하지 않는다.
+ */
+export async function updateRoomBasics(
+  roomId: string,
+  input: { title: string; topic: string; topicDescription: string },
+): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const title = input.title.trim();
+  const topic = input.topic.trim();
+  const topicDescription = input.topicDescription.trim();
+  if (!title) return { error: "활동 이름을 입력해 주세요." };
+  if (title.length > 120) return { error: "활동 이름이 너무 깁니다." };
+  if (topic.length > 200) return { error: "주제가 너무 깁니다." };
+  if (topicDescription.length > 1000) return { error: "설명이 너무 깁니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id, class_id, agit_class_id")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  if (!room) return { error: "활동을 찾을 수 없습니다." };
+  if (room.teacher_id !== user.id) return { error: "권한이 없습니다." };
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .update({ title, topic, topic_description: topicDescription })
+    .eq("id", roomId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  const dashboardClassId = room.agit_class_id ?? room.class_id;
   if (dashboardClassId) revalidatePath(`/dashboard/class/${dashboardClassId}`);
   return {};
 }

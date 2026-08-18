@@ -50,15 +50,14 @@ export async function verifyStudent(
   const { data: room } = await admin
     .schema("writing_helper")
     .from("rooms")
-    .select("id, is_active, expires_at, class_id")
+    .select("id, is_active, class_id")
     .eq("id", roomId)
     .maybeSingle();
 
   if (!room) return { error: "방을 찾을 수 없습니다." };
+  // 기한으로 닫지 않는다(2026-08-19). 교사가 `종료`를 눌러야만 닫힌다.
+  // 예전에 만든 방에는 `expires_at` 이 남아 있지만 더는 보지 않는다.
   if (!room.is_active) return { error: "이미 종료된 활동입니다." };
-  if (room.expires_at && new Date(room.expires_at) < new Date()) {
-    return { error: "활동 시간이 만료됐습니다." };
-  }
 
   let studentId: string | null = null;
   if (room.class_id) {
