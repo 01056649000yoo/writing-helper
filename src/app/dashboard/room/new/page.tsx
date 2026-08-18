@@ -169,23 +169,24 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 <span className="shrink-0 text-[11px] font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">바로 사용</span>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {WRITING_BUNDLE_DEFINITIONS.map((activity) => {
                   const meta = ACTIVITY_META[activity.id];
                   return (
                     <Link
                       key={activity.id}
                       href={`/dashboard/room/new?class_id=${classId}&activity_type=${activity.id}`}
-                      className={`flex flex-col rounded-2xl border border-gray-200 bg-gradient-to-br ${meta.tone} p-4 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-200`}
+                      className={`flex flex-col rounded-2xl border border-gray-200/90 bg-gradient-to-br ${meta.tone} p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-300 group`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-2xl">{meta.emoji}</span>
                       </div>
-                      <h3 className="mt-3 text-sm font-bold text-gray-800">{activity.label}</h3>
-                      <p className="mt-1 text-[11px] leading-4 text-gray-500 flex-1 line-clamp-3">{meta.summary}</p>
-                      <div className="mt-3 pt-2 border-t border-gray-100/80 flex justify-end">
-                        <span className="inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
-                          선택 →
+                      <h3 className="mt-3 text-base font-bold text-gray-800 group-hover:text-indigo-700 transition-colors">{activity.label}</h3>
+                      <p className="mt-1.5 text-xs leading-relaxed text-gray-600 flex-1">{meta.summary}</p>
+                      <div className="mt-4 pt-3 border-t border-gray-200/60 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-400">활동 개설</span>
+                        <span className="inline-flex items-center gap-1 bg-indigo-600 group-hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-2xs transition-all">
+                          선택하기 →
                         </span>
                       </div>
                     </Link>
