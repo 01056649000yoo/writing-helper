@@ -11,10 +11,10 @@ interface AiGenerationModalProps {
 }
 
 const LOADING_STEPS = [
-  "💡 주제에 어울리는 새로운 연구원 정체성을 고민하고 있어요...",
-  "🃏 질문 카드에 들어갈 매력적인 힌트를 구상하는 중이에요...",
+  "💡 주제에 어울리는 핵심 질문 카테고리를 분석하고 있어요...",
+  "🃏 질문 카드에 들어갈 매력적인 질문 힌트를 구상하는 중이에요...",
   "🎨 학생들이 재미있게 질문을 완성할 수 있도록 쉬운 단어로 조율하고 있어요...",
-  "✨ 마지막으로 이모지와 힌트 문장들을 정교하게 가다듬고 있어요...",
+  "✨ 마지막으로 이모지와 질문 문장들을 정교하게 가다듬고 있어요...",
 ];
 
 export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGenerationModalProps) {
@@ -142,9 +142,9 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
         <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-indigo-50/50 via-white to-sky-50/30">
           <div>
             <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
-              <span>✨</span> AI 연구원 역할 & 질문 생성기
+              <span>✨</span> AI 질문 카드 묶음 생성기
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">교과 수업 주제에 딱 맞는 맞춤형 질문 카드를 빠르게 구성합니다.</p>
+            <p className="text-xs text-gray-500 mt-0.5">오늘 수업 주제에 딱 맞는 질문 카드 묶음과 질문 힌트를 AI로 빠르게 생성합니다.</p>
           </div>
           {step !== "generating" && step !== "saving" && (
             <button
@@ -207,7 +207,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                 {/* Role Count Selection */}
                 <div className="space-y-3">
                   <label className="block text-sm font-bold text-gray-700">
-                    3. 추천 역할 개수
+                    3. 생성할 질문 카드 묶음 개수
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {([2, 3, 4] as const).map((count) => (
@@ -411,7 +411,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
               </div>
               <div className="text-center space-y-2">
                 <h3 className="text-base font-bold text-gray-800">데이터베이스에 일괄 저장 중입니다</h3>
-                <p className="text-sm text-gray-400">연구원 정보와 질문 카드를 서버에 올바르게 기록하고 있어요...</p>
+                <p className="text-sm text-gray-400">질문 카드 묶음과 질문 힌트를 보관함에 저장하고 있어요...</p>
               </div>
             </div>
           )}
