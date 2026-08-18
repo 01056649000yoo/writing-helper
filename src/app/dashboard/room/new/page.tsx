@@ -1663,8 +1663,8 @@ function OneLineShareSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const initialDraft = useMemo<OneLineShareDraft>(() => ({
-    topic: "오늘 수업 한 줄 정리",
-    topic_description: "핵심단어를 이용해 멋진 한 문장을 완성해 보세요.",
+    topic: "핵심단어 문장 만들기",
+    topic_description: "제시된 핵심단어를 포함하여 자유롭게 멋진 문장을 작성해 보세요.",
     core_keywords: "",
     auxiliary_keywords: "",
     max_reactions_per_student: "3",
@@ -1696,8 +1696,8 @@ function OneLineShareSetup({ classId }: { classId: string }) {
 
   return (
     <>
-      <div className="rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 mb-6 text-sm text-rose-800">
-        학생이 핵심단어를 이용해 문장을 만들고, 친구 문장에는 좋아요로 반응하는 활동입니다.
+      <div className="rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 mb-6 text-sm text-rose-800 leading-relaxed">
+        선생님이 제시한 핵심단어를 포함하여 문장을 작성하고, 친구들의 문장에 좋아요(하트)를 보내며 생각을 나누는 활동입니다. 꼭 한 줄이 아니어도 여러 문장으로 자유롭게 작성할 수 있습니다.
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1710,8 +1710,8 @@ function OneLineShareSetup({ classId }: { classId: string }) {
             topic_description: draft.topic_description,
           }}
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          hint="학생에게 보일 활동 제목과 설명입니다. 핵심단어를 이용해 문장을 쓰도록 안내해 주세요."
-          placeholder="예) 오늘 배운 증발과 물의 순환을 떠올리며, 핵심단어를 이용해 한 문장을 써 봅니다."
+          hint="학생에게 보일 활동 제목과 설명입니다. 제시된 핵심단어를 포함하여 자유롭게 문장을 쓰도록 안내해 주세요."
+          placeholder="예) 제시된 핵심단어를 모두 넣어 알맞은 문장을 자유롭게 써 보세요."
           savedAt={draftControls.savedAt}
         />
 

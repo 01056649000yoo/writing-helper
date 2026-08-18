@@ -1201,7 +1201,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
     async function handleOneLineShareSubmit() {
       if (!normalizedContent) {
-        setError("한 줄 문장을 적어주세요.");
+        setError("문장을 적어주세요.");
         return;
       }
 
@@ -1306,7 +1306,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
           <div className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">내 한 줄</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">내가 작성한 문장</label>
               <StudentSpellingTextarea
                 value={oneLineContent}
                 onValueChange={setOneLineContent}
