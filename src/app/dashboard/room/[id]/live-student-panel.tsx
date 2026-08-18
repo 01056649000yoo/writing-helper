@@ -29,6 +29,9 @@ type Session = {
   student_name: string;
   level: string | null;
   status: string;
+  answers?: unknown;
+  submission?: unknown;
+  result?: unknown;
 };
 type QuestionResult = {
   sessionId: string;
@@ -657,6 +660,241 @@ function QuestionVotingResultsModal({
   );
 }
 
+
+function StudentSessionResultModal({
+  session,
+  activityType,
+  questionResults,
+  questionVotingResults,
+  oneLineShareResults,
+  onClose,
+}: {
+  session: Session;
+  activityType: ActivityType;
+  questionResults: QuestionResult[];
+  questionVotingResults: QuestionVotingRanking;
+  oneLineShareResults: OneLineShareResults;
+  onClose: () => void;
+}) {
+  const currentQuestionResult = questionResults.find((r) => r.sessionId === session.id);
+  const currentOneLine = oneLineShareResults.find((e) => e.sessionId === session.id);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 모달 헤더 */}
+        <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-6 py-5 shrink-0 bg-gray-50/50">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 text-sm font-bold text-green-700">
+              {session.student_number}
+            </span>
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">
+                {session.student_name} 학생의 완성 결과
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {activityType === "question_generator"
+                  ? "질문 만들기"
+                  : activityType === "question_voting"
+                    ? "좋은 질문 고르기"
+                    : activityType === "one_line_share"
+                      ? "한줄모아"
+                      : activityType === "hanja_writing"
+                        ? "한자 활용 문장"
+                        : "글 개요짜기"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-gray-100 px-3.5 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            닫기
+          </button>
+        </div>
+
+        {/* 모달 본문 */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* 개요 짜기 */}
+          {activityType === "outline_builder" && (
+            <OutlineAnswersView answers={session.answers} />
+          )}
+
+          {/* 질문 만들기 */}
+          {activityType === "question_generator" && (
+            <div className="space-y-3">
+              {currentQuestionResult && currentQuestionResult.selections.length > 0 ? (
+                currentQuestionResult.selections.map((selection, idx) => (
+                  <div key={selection.id || idx} className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-xs font-bold text-sky-600">질문 {idx + 1}</span>
+                      <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded-full border border-sky-100">
+                        {selection.method === "direct" ? "직접 작성" : selection.cardSetLabel}
+                      </span>
+                    </div>
+                    {selection.originalPrompt && (
+                      <p className="text-xs text-gray-500 mb-1.5 bg-white/70 p-2 rounded-lg">
+                        💡 {selection.originalPrompt}
+                      </p>
+                    )}
+                    <p className="text-sm font-semibold text-sky-950 whitespace-pre-line">
+                      {selection.remixedQuestion}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-6">제출된 질문이 없습니다.</p>
+              )}
+            </div>
+          )}
+
+          {/* 좋은 질문 고르기 */}
+          {activityType === "question_voting" && (
+            <div className="space-y-3">
+              {(() => {
+                const sub = typeof session.submission === "object" && session.submission !== null ? session.submission as Record<string, unknown> : {};
+                const selectedIds = Array.isArray(sub.selectedQuestionIds) ? sub.selectedQuestionIds : [];
+                if (selectedIds.length === 0) {
+                  return <p className="text-sm text-gray-500 text-center py-6">선택한 질문이 없습니다.</p>;
+                }
+                return selectedIds.map((qId, idx) => {
+                  const match = questionVotingResults.find((r) => r.questionId === qId);
+                  return (
+                    <div key={String(qId)} className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4 flex items-start gap-3">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-200 text-xs font-bold text-violet-800">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-violet-950">
+                          {match ? match.text : String(qId)}
+                        </p>
+                        {match && (
+                          <span className="inline-block mt-2 text-xs font-bold text-violet-700 bg-white px-2.5 py-0.5 rounded-full border border-violet-100">
+                            🗳️ 학급 전체 {match.votes}표 득표
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
+
+          {/* 한줄모아 */}
+          {activityType === "one_line_share" && (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-5">
+                <p className="text-xs font-bold text-rose-500 mb-2">내가 작성한 한 줄</p>
+                <p className="text-base font-semibold text-rose-950 leading-relaxed bg-white p-4 rounded-xl shadow-sm">
+                  💬 &ldquo;{currentOneLine?.content || (typeof session.submission === "object" && session.submission !== null && "content" in session.submission ? String((session.submission as Record<string, unknown>).content) : "작성된 문장이 없습니다.")}&rdquo;
+                </p>
+                {currentOneLine && (
+                  <div className="mt-3 flex items-center justify-between text-xs text-rose-700">
+                    <span>❤️ 받은 좋아요: {currentOneLine.likeCount}개</span>
+                    <span>{new Date(currentOneLine.createdAt).toLocaleTimeString("ko-KR")}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 한자 문장 */}
+          {activityType === "hanja_writing" && (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
+                <p className="text-xs font-bold text-amber-600 mb-2">작성한 문장</p>
+                <p className="text-base font-semibold text-gray-900 leading-relaxed bg-white p-4 rounded-xl shadow-sm">
+                  {typeof session.submission === "object" && session.submission !== null && "content" in session.submission
+                    ? String((session.submission as Record<string, unknown>).content)
+                    : "작성된 문장이 없습니다."}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 모달 푸터 */}
+        <div className="border-t border-gray-100 px-6 py-4 bg-gray-50/50 flex justify-end shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-gray-800 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gray-900"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OutlineAnswersView({ answers }: { answers: unknown }) {
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return <p className="text-sm text-gray-500 text-center py-6">제출된 개요 내용이 없습니다.</p>;
+  }
+
+  const normalized = answers
+    .filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null)
+    .map((a) => ({
+      section: (a.section === "처음" || a.section === "가운데" || a.section === "끝") ? a.section : null,
+      label: typeof a.label === "string" ? a.label : (typeof a.question === "string" ? a.question : ""),
+      answer: typeof a.answer === "string" ? a.answer : "",
+    }))
+    .filter((a) => a.label || a.answer);
+
+  const sectionOrder = ["처음", "가운데", "끝"];
+  const grouped = sectionOrder
+    .map((section) => ({
+      section,
+      items: normalized.filter((a) => a.section === section),
+    }))
+    .filter((group) => group.items.length > 0);
+  const ungrouped = normalized.filter((a) => a.section === null);
+
+  return (
+    <div className="space-y-4">
+      {grouped.map(({ section, items }) => (
+        <div key={section} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+          <p className="text-xs font-bold text-indigo-600 mb-2.5">{section}</p>
+          <div className="space-y-2">
+            {items.map((item, i) => (
+              <div key={i} className="bg-white rounded-xl px-4 py-3 shadow-sm">
+                <p className="text-xs text-gray-500 mb-1 font-medium">{item.label}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-line font-medium leading-relaxed">
+                  {item.answer || "(비어 있음)"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {ungrouped.length > 0 && (
+        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+          <p className="text-xs font-bold text-gray-500 mb-2.5">기타</p>
+          <div className="space-y-2">
+            {ungrouped.map((item, i) => (
+              <div key={i} className="bg-white rounded-xl px-4 py-3 shadow-sm">
+                <p className="text-xs text-gray-500 mb-1 font-medium">{item.label}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-line font-medium leading-relaxed">
+                  {item.answer || "(비어 있음)"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OneLineShareResultsModal({
   entries,
   onClose,
@@ -837,6 +1075,7 @@ export default function LiveStudentPanel({
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
+  const [activeSessionResult, setActiveSessionResult] = useState<Session | null>(null);
   const [isQuestionResultsOpen, setIsQuestionResultsOpen] = useState(false);
   const [isQuestionVotingResultsOpen, setIsQuestionVotingResultsOpen] = useState(false);
   const [isOneLineShareResultsOpen, setIsOneLineShareResultsOpen] = useState(false);
@@ -922,6 +1161,16 @@ export default function LiveStudentPanel({
         <OneLineShareResultsModal
           entries={oneLineShareResults}
           onClose={() => setIsOneLineShareResultsOpen(false)}
+        />
+      )}
+      {activeSessionResult && (
+        <StudentSessionResultModal
+          session={activeSessionResult}
+          activityType={activityType}
+          questionResults={questionResults}
+          questionVotingResults={questionVotingResults}
+          oneLineShareResults={oneLineShareResults}
+          onClose={() => setActiveSessionResult(null)}
         />
       )}
       {isHanjaWritingResultsOpen && (
@@ -1078,12 +1327,13 @@ export default function LiveStudentPanel({
                     </button>
                   ) : null}
                   {/* 결과 보기 링크 */}
-                  <Link
-                    href={`/dashboard/room/${roomId}/result/${s.id}`}
-                    className="text-xs text-green-500 hover:text-green-700 shrink-0"
+                  <button
+                    type="button"
+                    onClick={() => setActiveSessionResult(s)}
+                    className="text-xs font-bold bg-green-100 hover:bg-green-200 text-green-700 px-2.5 py-1 rounded-lg transition-colors shrink-0"
                   >
                     보기 →
-                  </Link>
+                  </button>
                 </div>
               ))}
             </div>
