@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import os from "os";
 import QRCodeSection from "./qr-section";
+import { RoomWorkspace } from "./room-workspace";
 import LiveStudentPanel from "./live-student-panel";
 import {
   getHanjaWritingRoomResults,
@@ -58,13 +59,11 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
     sessionJoinUrl = `${protocol}://${host}${withBasePath(`/room/${id}`)}`;
     shortUrl = room.short_code ? `${protocol}://${host}${withBasePath(`/s/${room.short_code}`)}` : null;
   }
-  // eslint-disable-next-line react-hooks/purity
-  const renderNow = Date.now();
   const dashboardClassId = room.agit_class_id ?? room.class_id;
 
   return (
     <main className="lab-page">
-      <div className="lab-page__content lab-page__content--medium space-y-6">
+      <div className="lab-page__content space-y-4">
         <div className="flex items-center justify-between">
           <Link href={dashboardClassId ? `/dashboard/class/${dashboardClassId}` : "/dashboard"} className="lab-breadcrumb mb-0">
             ← {dashboardClassId ? "학급으로" : "대시보드로"}
@@ -78,103 +77,64 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
           )}
         </div>
 
-        {/* 활동 세션 정보 */}
-        <div className="lab-panel lab-panel--raised p-6 sm:p-10">
-          <div className="flex items-start justify-between mb-5">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-sm px-3 py-1.5 rounded-full font-medium ${room.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                  {room.is_active ? "진행 중" : "종료됨"}
+        <RoomWorkspace
+          room={{
+            id,
+            title: room.title,
+            topic: room.topic,
+            topicDescription: room.topic_description ?? "",
+            subjectType: room.subject_type ?? null,
+            gradeLevel: room.grade_level ?? null,
+            activityType: room.activity_type ?? null,
+            activityConfig: room.activity_config,
+          }}
+          statusSlot={
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${room.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+              {room.is_active ? "진행 중" : "종료됨"}
+            </span>
+          }
+          chipsSlot={
+            <>
+              {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
+                <span className="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full font-medium">
+                  {room.subject_type}
                 </span>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-800">{room.title}</h1>
-              <p className="text-base text-gray-500 mt-1">주제: {room.topic}</p>
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
-                  <span className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg font-medium">
-                    {room.subject_type}
-                  </span>
-                )}
-                {room.grade_level && String(room.grade_level) !== "null" && String(room.grade_level).trim() !== "" && (
-                  <span className="text-sm bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg font-medium">
-                    {gradeLabel(room.grade_level)}
-                  </span>
-                )}
-                {room.expires_at && room.is_active && (
-                  <ExpiryBadge expiresAt={room.expires_at} now={renderNow} />
-                )}
-                {room.expires_at && !room.is_active && (
-                  <span className="text-sm bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg font-medium">
-                    종료됨
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {room.is_active && (
-            integratedLab ? (
-              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4">
-                <p className="font-bold text-indigo-900">학생 대시보드에서 바로 참여해요</p>
-                <p className="mt-1 text-sm leading-relaxed text-indigo-700">
-                  학생이 끄적끄적 아지트의 <strong>글쓰기 연구소</strong> 메뉴를 열면 이 활동이 자동으로 표시됩니다.
-                  번호·이름 입력이나 입장용 QR 코드는 필요하지 않습니다.
-                </p>
-              </div>
-            ) : (
-              <QRCodeSection roomUrl={sessionJoinUrl} shortUrl={shortUrl} />
-            )
-          )}
-        </div>
-
-        {/* 실시간 학생 현황 */}
-        <LiveStudentPanel
-          roomId={id}
-          students={students}
-          isActive={room.is_active}
-          activityType={room.activity_type}
-          questionResults={questionResults}
-          questionVotingResults={questionVotingResults}
-          oneLineShareResults={oneLineShareResults}
-          hanjaWritingResults={hanjaWritingResults}
-          showResultQr={!integratedLab}
+              )}
+              {room.grade_level && String(room.grade_level) !== "null" && String(room.grade_level).trim() !== "" && (
+                <span className="text-xs bg-purple-50 text-purple-600 px-2.5 py-1 rounded-full font-medium">
+                  {gradeLabel(room.grade_level)}
+                </span>
+              )}
+            </>
+          }
+          participationSlot={
+            <>
+              {/* 통합 모드에서는 학생이 아지트에서 바로 들어오므로 입장 QR 이 필요 없다.
+                  독립 실행판에서만 QR 을 참여 현황 위에 둔다. */}
+              {!integratedLab && room.is_active && (
+                <QRCodeSection roomUrl={sessionJoinUrl} shortUrl={shortUrl} />
+              )}
+              <LiveStudentPanel
+                roomId={id}
+                students={students}
+                isActive={room.is_active}
+                activityType={room.activity_type}
+                questionResults={questionResults}
+                questionVotingResults={questionVotingResults}
+                oneLineShareResults={oneLineShareResults}
+                hanjaWritingResults={hanjaWritingResults}
+                showResultQr={!integratedLab}
+              />
+            </>
+          }
         />
       </div>
     </main>
   );
 }
 
-function ExpiryBadge({ expiresAt, now }: { expiresAt: string; now: number }) {
-  const exp = new Date(expiresAt).getTime();
-  const diffMs = exp - now;
+// 기한 표시(ExpiryBadge)는 없앴다 — 활동은 교사가 종료할 때까지 열려 있다.
 
-  if (diffMs <= 0) {
-    return (
-      <span className="text-sm bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-medium">
-        ⛔ 시간 만료 (학생 접속 차단)
-      </span>
-    );
-  }
-
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMin / 60);
-  const remainMin = diffMin % 60;
-
-  let label = "";
-  if (diffHour > 0) {
-    label = remainMin > 0 ? `${diffHour}시간 ${remainMin}분 남음` : `${diffHour}시간 남음`;
-  } else {
-    label = `${diffMin}분 남음`;
-  }
-
-  const isWarning = diffMin <= 30;
-
-  return (
-    <span className={`text-sm px-3 py-1.5 rounded-lg font-medium ${isWarning ? "bg-amber-100 text-amber-700" : "bg-teal-50 text-teal-700"}`}>
-      ⏰ {label}
-    </span>
-  );
-}
 
 function getLocalNetworkIp(): string | null {
   const interfaces = os.networkInterfaces();
