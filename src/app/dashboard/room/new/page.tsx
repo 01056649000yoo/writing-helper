@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import {
   createRoom,
   enhanceOutlineTemplateWithAI,
+  generateQuestionsWithAI,
   getQuestionGeneratorSourceRooms,
   type QuestionGeneratorSourceRoomSummary,
   getQuestionVotingSourceRooms,
@@ -45,12 +46,16 @@ type OutlineBuilderDraft = {
   grade_level: string;
 };
 
+type QuestionGeneratorMode = "direct" | "card_remix" | "ai_custom";
+
 type QuestionGeneratorDraft = {
   topic: string;
   topic_description: string;
+  mode: QuestionGeneratorMode;
   max_selections: string;
   guidance: string;
   selectedCardSetIds: string[];
+  customAiQuestions: Array<{ id: string; text: string; included: boolean }>;
 };
 
 type CardOriginFilter = "all" | "default" | "custom";
@@ -640,565 +645,532 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
 function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [aiGenError, setAiGenError] = useState("");
+  const [showAllCardSets, setShowAllCardSets] = useState(false);
   const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
-  const [availableRoles, setAvailableRoles] = useState<QuestionCardRole[]>([]);
   const [loadingCardSets, setLoadingCardSets] = useState(true);
-  const [previewCardSet, setPreviewCardSet] = useState<QuestionCardSet | null>(null);
-  const [cardSearch, setCardSearch] = useState("");
-  const [originFilter, setOriginFilter] = useState<CardOriginFilter>("all");
-  const [activeRoleFilterId, setActiveRoleFilterId] = useState<string>("all");
+
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
     topic: "",
     topic_description: "",
-        max_selections: "1",
-    guidance: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
+    mode: "direct",
+    max_selections: "3",
+    guidance: "오늘 주제에 대해 궁금한 점이나 더 알고 싶은 내용을 질문으로 만들어 봅시다.",
     selectedCardSetIds: [],
+    customAiQuestions: [],
   }), []);
+
   const [draft, setDraft, draftControls] = useActivityDraft<QuestionGeneratorDraft>(
     buildDraftStorageKey(classId, "question_generator"),
     initialDraft
   );
-  const deferredCardSearch = useDeferredValue(cardSearch);
 
   useEffect(() => {
     let active = true;
-
     getQuestionCardSettings().then((cardResult) => {
       if (!active) return;
       if (cardResult.error) setError(cardResult.error);
       else {
         setAvailableCardSets(cardResult.cardSets);
-        setAvailableRoles(cardResult.roles);
-        setDraft((prev) => {
-          const allCardSetIds = new Set(cardResult.cardSets.map((cs) => cs.id));
-          const wasAutoSelectedDefault =
-            prev.selectedCardSetIds.length === cardResult.cardSets.length &&
-            prev.selectedCardSetIds.every((id) => allCardSetIds.has(id)) &&
-            !prev.topic.trim() &&
-            !prev.topic_description.trim();
-          return {
-            ...prev,
-            selectedCardSetIds: wasAutoSelectedDefault ? [] : prev.selectedCardSetIds,
-          };
-        });
+        if (draft.selectedCardSetIds.length === 0) {
+          // 기본 추천 2~3개 세트 미리 선택
+          const defaultIds = cardResult.cardSets.slice(0, 3).map((cs) => cs.id);
+          setDraft((prev) => ({ ...prev, selectedCardSetIds: defaultIds }));
+        }
       }
       setLoadingCardSets(false);
     });
+    return () => { active = false; };
+  }, [classId, setDraft, draft.selectedCardSetIds.length]);
 
-    return () => {
-      active = false;
-    };
-  }, [setDraft]);
+  // AI 질문 예시 생성 핸들러
+  async function handleGenerateAiQuestions() {
+    if (!draft.topic.trim()) {
+      setAiGenError("활동 주제를 먼저 입력해주세요.");
+      return;
+    }
+    setAiGenError("");
+    setGeneratingAi(true);
+    const res = await generateQuestionsWithAI(draft.topic, draft.topic_description, 5);
+    setGeneratingAi(false);
 
-  function toggleCardSet(cardSetId: string) {
+    if (res.error) {
+      setAiGenError(res.error);
+      return;
+    }
+
+    if (res.questions && res.questions.length > 0) {
+      const newItems = res.questions.map((q, i) => ({
+        id: `ai-q-${Date.now()}-${i}`,
+        text: q,
+        included: true,
+      }));
+      setDraft((prev) => ({
+        ...prev,
+        customAiQuestions: [...prev.customAiQuestions, ...newItems],
+      }));
+    }
+  }
+
+  // AI 질문 직접 추가
+  function handleAddCustomQuestion() {
+    const newId = `custom-q-${Date.now()}`;
     setDraft((prev) => ({
       ...prev,
-      selectedCardSetIds: prev.selectedCardSetIds.includes(cardSetId)
-        ? prev.selectedCardSetIds.filter((id) => id !== cardSetId)
-        : [...prev.selectedCardSetIds, cardSetId],
+      customAiQuestions: [
+        ...prev.customAiQuestions,
+        { id: newId, text: "새로운 질문 예시를 입력하세요.", included: true },
+      ],
     }));
   }
 
-  function toggleRoleAllCards(groupCardSetIds: string[], shouldDeselect: boolean) {
-    setDraft((prev) => {
-      if (shouldDeselect) {
-        const removeSet = new Set(groupCardSetIds);
-        return {
-          ...prev,
-          selectedCardSetIds: prev.selectedCardSetIds.filter((id) => !removeSet.has(id)),
-        };
+  // 폼 제출
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft.topic.trim()) {
+      setError("활동 주제를 입력해주세요.");
+      return;
+    }
+
+    if (draft.mode === "ai_custom") {
+      const activeAiQuestions = draft.customAiQuestions.filter((q) => q.included && q.text.trim());
+      if (activeAiQuestions.length === 0) {
+        setError("학생들에게 제공할 질문 예시를 최소 1개 이상 선택하거나 생성해주세요.");
+        return;
       }
-      const merged = new Set(prev.selectedCardSetIds);
-      groupCardSetIds.forEach((id) => merged.add(id));
-      return { ...prev, selectedCardSetIds: Array.from(merged) };
-    });
-  }
-
-  const roleGroups = useMemo(() => {
-    const groups: Array<{ role: QuestionCardRole; cardSets: QuestionCardSet[] }> = [];
-    for (const role of availableRoles) {
-      const cards = availableCardSets.filter((cs) => cs.roleId === role.id);
-      if (cards.length > 0) groups.push({ role, cardSets: cards });
-    }
-    const knownIds = new Set(availableRoles.map((r) => r.id));
-    const orphans = availableCardSets.filter((cs) => !cs.roleId || !knownIds.has(cs.roleId));
-    if (orphans.length > 0) {
-      groups.push({
-        role: {
-          id: "__orphan__",
-          label: "기타",
-          subtitle: "역할 미지정",
-          description: "",
-          icon: "🃏",
-          cardSetIds: [],
-        },
-        cardSets: orphans,
-      });
-    }
-    return groups;
-  }, [availableRoles, availableCardSets]);
-
-  const originFilteredRoleGroups = useMemo(() => (
-    roleGroups
-      .map(({ role, cardSets }) => ({
-        role,
-        cardSets: cardSets.filter((cardSet) => matchesCardOrigin(cardSet, originFilter)),
-      }))
-      .filter(({ cardSets }) => cardSets.length > 0)
-  ), [originFilter, roleGroups]);
-
-  const roleOptions = useMemo(() => (
-    originFilteredRoleGroups.map(({ role, cardSets }) => ({
-      id: role.id,
-      label: role.label,
-      icon: role.icon || "🃏",
-      count: cardSets.length,
-      selectedCount: cardSets.filter((cardSet) => draft.selectedCardSetIds.includes(cardSet.id)).length,
-    }))
-  ), [draft.selectedCardSetIds, originFilteredRoleGroups]);
-
-  const filteredCardSets = useMemo(() => {
-    if (originFilter !== "all" && activeRoleFilterId === "all") {
-      return [];
     }
 
-    const normalizedSearch = deferredCardSearch.trim().toLowerCase();
-
-    return availableCardSets.filter((cardSet) => {
-      if (!matchesCardOrigin(cardSet, originFilter)) return false;
-
-      const matchesRole = activeRoleFilterId === "all" ? true : cardSet.roleId === activeRoleFilterId;
-      if (!matchesRole) return false;
-
-      if (!normalizedSearch) return true;
-
-      const roleLabel = availableRoles.find((role) => role.id === cardSet.roleId)?.label ?? "";
-      const haystack = [
-        cardSet.label,
-        cardSet.description,
-        roleLabel,
-        ...cardSet.prompts.slice(0, 3),
-      ].join(" ").toLowerCase();
-      return haystack.includes(normalizedSearch);
-    });
-  }, [activeRoleFilterId, availableCardSets, availableRoles, deferredCardSearch, originFilter]);
-
-  const defaultCardCount = useMemo(
-    () => availableCardSets.filter((cardSet) => cardSet.isDefault).length,
-    [availableCardSets],
-  );
-  const customCardCount = useMemo(
-    () => availableCardSets.filter((cardSet) => !cardSet.isDefault).length,
-    [availableCardSets],
-  );
-
-  const roleById = useMemo(
-    () => new Map(availableRoles.map((role) => [role.id, role] as const)),
-    [availableRoles],
-  );
-  const waitingForRoleSelection = originFilter !== "all" && activeRoleFilterId === "all";
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    if (draft.selectedCardSetIds.length === 0) {
-      setError("질문 카드 묶음을 1개 이상 선택해주세요.");
-      return;
-    }
-
-    setSaving(true);
     setError("");
-    const storageKey = buildDraftStorageKey(classId, "question_generator");
-    const fd = new FormData(e.currentTarget);
-    fd.set("class_id", classId);
+    setSaving(true);
+
+    const fd = new FormData();
     fd.set("activity_type", "question_generator");
-    draft.selectedCardSetIds.forEach((id) => fd.append("enabled_card_set_ids", id));
-    draftControls.suspendAutosave();
-    clearActivityDraft(storageKey);
+    fd.set("title", draft.topic.trim());
+    fd.set("topic", draft.topic.trim());
+    fd.set("topic_description", draft.topic_description.trim());
+    if (classId) fd.set("class_id", classId);
+
+    // activity_config 구성
+    let finalCardSets = availableCardSets;
+    let enabledIds = draft.selectedCardSetIds;
+
+    if (draft.mode === "ai_custom") {
+      const activeQuestions = draft.customAiQuestions.filter((q) => q.included && q.text.trim());
+      const customSet: QuestionCardSet = {
+        id: "ai-custom-card-set",
+        label: "선생님 추천 질문",
+        description: "선생님이 준비한 질문 예시 카드",
+        prompts: activeQuestions.map((q) => q.text.trim()),
+      };
+      finalCardSets = [customSet];
+      enabledIds = [customSet.id];
+    } else if (draft.mode === "direct") {
+      enabledIds = [];
+    }
+
+    fd.set(
+      "activity_config",
+      JSON.stringify({
+        mode: draft.mode,
+        cardSets: finalCardSets,
+        enabledCardSetIds: enabledIds,
+        maxSelections: Number(draft.max_selections) || 3,
+        guidance: draft.guidance.trim(),
+        customAiQuestions: draft.mode === "ai_custom" ? draft.customAiQuestions : [],
+      })
+    );
+
     const result = await createRoom(fd);
-    if (result?.error) {
-      persistActivityDraft(storageKey, draft);
-      draftControls.resumeAutosave();
+    setSaving(false);
+    if (result.error) {
       setError(result.error);
-      setSaving(false);
-      return;
+    } else {
+      try {
+        localStorage.removeItem(buildDraftStorageKey(classId, "question_generator"));
+      } catch {}
     }
   }
 
   return (
-    <>
-      <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 mb-6 text-sm text-emerald-800">
-        학생이 먼저 직접 질문을 만들지, 질문 카드를 참고해 바꿔볼지 스스로 고른 뒤 자기 수준에 맞게 참여하는 활동입니다.
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <input type="hidden" name="class_id" value={classId} />
-        <input type="hidden" name="activity_type" value="question_generator" />
-
-        <TopicFields
-          values={{
-            topic: draft.topic,
-            topic_description: draft.topic_description,
-          }}
-          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          hint="어떤 글이나 그림, 이야기와 연결해 질문을 만들지 적어두면 학생들이 주제와 더 잘 연결할 수 있습니다."
-          placeholder="예) 오늘 읽은 이야기 속 주인공과 장면을 떠올리며, 직접 질문을 만들거나 질문 카드를 주제에 맞게 바꿔 봅니다."
-          savedAt={draftControls.savedAt}
-          descriptionRequired
-        />
-
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="block text-base font-medium text-gray-700">질문 카드 선택</label>
-            <Link
-              href="/dashboard/settings"
-              className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
-            >
-              질문 카드 설정 →
-            </Link>
-          </div>
-
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50/40 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-emerald-900">
-                총 카드 {availableCardSets.length}개 중 <span className="font-bold">{draft.selectedCardSetIds.length}개 선택</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  { value: "all", label: `전체 ${availableCardSets.length}` },
-                  { value: "default", label: `기본 제공 ${defaultCardCount}` },
-                  { value: "custom", label: `내 카드 ${customCardCount}` },
-                ] as const).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      setOriginFilter(option.value);
-                      setActiveRoleFilterId("all");
-                    }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      originFilter === option.value
-                        ? "bg-emerald-600 text-white"
-                        : "bg-white text-gray-600 hover:bg-emerald-100"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-              <input
-                type="search"
-                value={cardSearch}
-                onChange={(event) => setCardSearch(event.target.value)}
-                placeholder="카드 이름, 설명, 역할, 예시 질문으로 검색"
-                className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setCardSearch("");
-                  setOriginFilter("all");
-                  setActiveRoleFilterId("all");
-                }}
-                className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
-              >
-                필터 초기화
-              </button>
-            </div>
-
-            {roleOptions.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveRoleFilterId("all")}
-                  className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
-                    activeRoleFilterId === "all"
-                      ? "bg-gray-900 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-100"
-                  }`}
-                >
-                  전체 역할
-                </button>
-                {roleOptions.map((role) => (
-                  <button
-                    key={role.id}
-                    type="button"
-                    onClick={() => setActiveRoleFilterId(role.id)}
-                    className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
-                      activeRoleFilterId === role.id
-                        ? "bg-emerald-600 text-white"
-                        : "bg-white text-gray-700 hover:bg-emerald-100"
-                    }`}
-                  >
-                    {role.icon} {role.label} {role.selectedCount > 0 ? `· ${role.selectedCount}/${role.count}` : `· ${role.count}`}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {originFilteredRoleGroups.length > 0 && (
-              <div className="mt-4 border-t border-emerald-100 pt-4">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-emerald-800">역할별 빠른 선택</p>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {originFilteredRoleGroups.map(({ role, cardSets: groupCards }) => {
-                    const groupIds = groupCards.map((cardSet) => cardSet.id);
-                    const selectedCount = groupIds.filter((id) => draft.selectedCardSetIds.includes(id)).length;
-                    const allSelected = selectedCount === groupIds.length && groupIds.length > 0;
-
-                    return (
-                      <div
-                        key={role.id}
-                        className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-3 ${
-                          selectedCount > 0 ? "border-emerald-200 bg-white" : "border-white bg-white/70"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setActiveRoleFilterId(role.id)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <span className="block truncate text-sm font-bold text-gray-800">
-                            {role.icon || "🃏"} {role.label}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-gray-500">
-                            {selectedCount}/{groupIds.length}개 선택
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleRoleAllCards(groupIds, allSelected)}
-                          className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
-                            allSelected
-                              ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                              : "bg-emerald-600 text-white hover:bg-emerald-700"
-                          }`}
-                        >
-                          {allSelected ? "전체 해제" : "전체 선택"}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {activeRoleFilterId !== "all" && (
-            <div className="mt-3 flex justify-end">
-              {(() => {
-                const currentRole = originFilteredRoleGroups.find(({ role }) => role.id === activeRoleFilterId);
-                if (!currentRole) return null;
-                const groupIds = currentRole.cardSets.map((cardSet) => cardSet.id);
-                const selectedCount = groupIds.filter((id) => draft.selectedCardSetIds.includes(id)).length;
-                const allSelected = selectedCount === groupIds.length && groupIds.length > 0;
-
-                return (
-                  <button
-                    type="button"
-                    onClick={() => toggleRoleAllCards(groupIds, allSelected)}
-                    className="rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
-                  >
-                    {allSelected ? "이 역할 카드 모두 해제" : "이 역할 카드 모두 선택"}
-                  </button>
-                );
-              })()}
-            </div>
-          )}
-
-          {!waitingForRoleSelection && (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {filteredCardSets.map((cardSet) => {
-                const selected = draft.selectedCardSetIds.includes(cardSet.id);
-                const role = cardSet.roleId ? roleById.get(cardSet.roleId) ?? null : null;
-                const meta = getCardMeta(cardSet.label);
-                const theme = getCardTheme(cardSet.label);
-
-                return (
-	                  <div
-	                    key={cardSet.id}
-	                    className={`relative overflow-hidden rounded-2xl border-2 p-4 text-left transition-all ${theme.accentBorder} ${
-	                      selected
-	                        ? "border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-100"
-	                        : `border-gray-200 bg-white hover:bg-emerald-50/30`
-	                    }`}
-	                  >
-	                    {selected && <div className="absolute inset-y-0 left-0 w-1.5 bg-emerald-500" />}
-	                    <div className="flex items-start justify-between gap-3">
-	                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-bold ${theme.chip}`}>
-                            <span>{meta.emoji}</span>
-                            <span>{cardSet.label}</span>
-                          </span>
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getRecommendedGradeChipClass(meta.recommendedGrades)}`}>
-                            {getRecommendedGradeLabel(meta.recommendedGrades)}
-                          </span>
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            cardSet.isDefault
-                              ? "bg-slate-100 text-slate-600"
-                              : "bg-amber-100 text-amber-700"
-                          }`}>
-                            {cardSet.isDefault ? "기본 제공" : "내 카드"}
-                          </span>
-                          {role && (
-                            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                              {role.icon || "🃏"} {role.label}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-sm text-gray-500">{cardSet.description}</p>
-                      </div>
-	                      <span
-	                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
-	                          selected ? "bg-emerald-600 text-white shadow-sm" : "bg-gray-100 text-gray-500"
-	                        }`}
-	                      >
-	                        {selected ? "✓ 선택됨" : "미선택"}
-	                      </span>
-                    </div>
-                    <p className="mt-3 text-xs text-gray-400 leading-5">
-                      예시: {cardSet.prompts[0]}
-                    </p>
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewCardSet(cardSet)}
-                        className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
-                      >
-                        질문 미리보기
-                      </button>
-	                      <button
-	                        type="button"
-	                        onClick={() => toggleCardSet(cardSet.id)}
-	                        aria-pressed={selected}
-	                        className={`min-w-28 rounded-xl border px-4 py-2 text-sm font-bold transition-colors ${
-	                          selected
-	                            ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
-	                            : "border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-	                        }`}
-	                      >
-	                        {selected ? "✓ 선택 완료" : "선택하기"}
-	                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {!loadingCardSets && availableCardSets.length === 0 && (
-            <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
-              <p className="text-sm text-gray-500">저장된 질문 카드 묶음이 없어요.</p>
-              <Link href="/dashboard/settings" className="mt-2 inline-block text-sm font-semibold text-emerald-600 hover:underline">
-                설정에서 질문 카드 묶음 만들기 →
-              </Link>
-            </div>
-          )}
-
-          {!loadingCardSets && availableCardSets.length > 0 && !waitingForRoleSelection && filteredCardSets.length === 0 && (
-            <div className="mt-4 rounded-2xl border border-dashed border-emerald-200 bg-white px-4 py-8 text-center">
-              <p className="text-sm font-semibold text-gray-700">조건에 맞는 카드가 없어요.</p>
-              <p className="mt-1 text-xs text-gray-500">검색어나 필터를 조금 넓혀보세요.</p>
-            </div>
-          )}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* 1. 기본 정보 */}
+      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7 space-y-4">
+        <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+          <span className="text-xl">📌</span>
+          <h2 className="text-base font-bold text-gray-800">활동 기본 정보</h2>
         </div>
 
-        {previewCardSet && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
-            <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-2xl max-h-[85vh] overflow-hidden">
-              <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
-                <div>
-                  <p className="text-sm font-semibold text-emerald-600">질문 카드 미리보기</p>
-                  <h3 className="mt-1 text-2xl font-bold text-gray-800">[{previewCardSet.label}] 카드</h3>
-                  <p className="mt-2 text-sm text-gray-500">{previewCardSet.description}</p>
-                </div>
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">
+            활동 주제 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            placeholder="예) 우리 동네의 소중한 장소들, 미래의 인공지능과 우리 삶"
+            value={draft.topic}
+            onChange={(e) => setDraft((p) => ({ ...p, topic: e.target.value }))}
+            className="w-full px-4 py-3 text-base text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-1.5">
+            주제 부연 설명 <span className="text-xs text-gray-400 font-normal">(선택)</span>
+          </label>
+          <textarea
+            rows={2}
+            placeholder="학생들이 활동을 시작할 때 참고할 추가 설명이나 배경을 적어주세요."
+            value={draft.topic_description}
+            onChange={(e) => setDraft((p) => ({ ...p, topic_description: e.target.value }))}
+            className="w-full px-4 py-2.5 text-sm text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none"
+          />
+        </div>
+      </div>
+
+      {/* 2. 질문 작성 방식 선택 (3대 모드) */}
+      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7 space-y-5">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🎯</span>
+            <div>
+              <h2 className="text-base font-bold text-gray-800">질문 작성 방식 선택</h2>
+              <p className="text-xs text-gray-500 mt-0.5">학생들에게 어떤 방식으로 질문을 만들게 할지 선택하세요.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 3대 선택 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {/* 모드 1: 직접 만들기 */}
+          <label
+            className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+              draft.mode === "direct"
+                ? "border-sky-500 bg-sky-50/70 shadow-sm"
+                : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">✍️</span>
+                <input
+                  type="radio"
+                  name="generator_mode"
+                  value="direct"
+                  checked={draft.mode === "direct"}
+                  onChange={() => setDraft((p) => ({ ...p, mode: "direct" }))}
+                  className="text-sky-500"
+                />
+              </div>
+              <h3 className="mt-2.5 text-base font-bold text-gray-800">1. 직접 만들기</h3>
+              <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                카드 힌트 없이 학생이 스스로 생각해서 질문을 작성합니다.
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold text-sky-700 bg-white px-2.5 py-1 rounded-lg border border-sky-100 text-center">
+              자율 질문 창작
+            </span>
+          </label>
+
+          {/* 모드 2: 질문 카드 활용 */}
+          <label
+            className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+              draft.mode === "card_remix"
+                ? "border-violet-500 bg-violet-50/70 shadow-sm"
+                : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">🃏</span>
+                <input
+                  type="radio"
+                  name="generator_mode"
+                  value="card_remix"
+                  checked={draft.mode === "card_remix"}
+                  onChange={() => setDraft((p) => ({ ...p, mode: "card_remix" }))}
+                  className="text-violet-500"
+                />
+              </div>
+              <h3 className="mt-2.5 text-base font-bold text-gray-800">2. 질문 카드 활용</h3>
+              <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                생각을 넓혀주는 질문 카드 묶음을 제공해 골라서 수정합니다.
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold text-violet-700 bg-white px-2.5 py-1 rounded-lg border border-violet-100 text-center">
+              비계(Scaffolding) 카드 제공
+            </span>
+          </label>
+
+          {/* 모드 3: AI 질문 예시 제공 */}
+          <label
+            className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+              draft.mode === "ai_custom"
+                ? "border-emerald-500 bg-emerald-50/70 shadow-sm"
+                : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">✨</span>
+                <input
+                  type="radio"
+                  name="generator_mode"
+                  value="ai_custom"
+                  checked={draft.mode === "ai_custom"}
+                  onChange={() => setDraft((p) => ({ ...p, mode: "ai_custom" }))}
+                  className="text-emerald-500"
+                />
+              </div>
+              <h3 className="mt-2.5 text-base font-bold text-gray-800">3. AI 질문 예시 제공</h3>
+              <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                오늘 주제 맞춤 AI 질문 중 좋은 질문을 골라 학생에게 제공합니다.
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-100 text-center">
+              주제 맞춤 질문 풀(Pool)
+            </span>
+          </label>
+        </div>
+
+        {/* ── 선택된 모드별 전용 서브 패널 ── */}
+
+        {/* 모드 1: 직접 만들기 상세 설정 */}
+        {draft.mode === "direct" && (
+          <div className="rounded-2xl bg-sky-50/60 border border-sky-100 p-4 space-y-2.5">
+            <label className="block text-xs font-bold text-sky-800">
+              ✍️ 학생에게 전달할 질문 작성 가이드
+            </label>
+            <textarea
+              rows={3}
+              value={draft.guidance}
+              onChange={(e) => setDraft((p) => ({ ...p, guidance: e.target.value }))}
+              placeholder="예) 오늘 배운 내용에서 가장 신기했던 점이나 더 알아보고 싶은 내용을 질문으로 만들어 보세요."
+              className="w-full px-3.5 py-2.5 text-sm text-gray-800 bg-white border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+            <p className="text-[11px] text-sky-600">
+              학생들은 카드 힌트 없이 입력창에서 바로 자신만의 질문을 작성하게 됩니다.
+            </p>
+          </div>
+        )}
+
+        {/* 모드 2: 질문 카드 활용 상세 설정 */}
+        {draft.mode === "card_remix" && (
+          <div className="rounded-2xl bg-violet-50/60 border border-violet-100 p-4 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-violet-800">🃏 제공할 질문 카드 묶음 선택</p>
+                <p className="text-[11px] text-violet-600 mt-0.5">
+                  총 {availableCardSets.length}개 묶음 중 {draft.selectedCardSetIds.length}개 선택됨
+                </p>
+              </div>
+              <div className="flex gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setPreviewCardSet(null)}
-                  className="rounded-full bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-200"
+                  onClick={() => setDraft((p) => ({ ...p, selectedCardSetIds: availableCardSets.map((c) => c.id) }))}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-violet-200 text-violet-700 hover:bg-violet-100"
                 >
-                  닫기
+                  전체 선택
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft((p) => ({ ...p, selectedCardSetIds: [] }))}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
+                >
+                  선택 해제
                 </button>
               </div>
+            </div>
 
-              <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
-                <div className="space-y-3">
-                  {previewCardSet.prompts.map((prompt, index) => (
-                    <div key={`${previewCardSet.id}-${index}`} className="rounded-2xl bg-emerald-50/70 px-4 py-4">
-                      <p className="text-xs font-semibold text-emerald-700">질문 카드 {index + 1}</p>
-                      <p className="mt-2 text-sm leading-6 text-gray-800">{prompt}</p>
+            {/* 카드 묶음 칩 그리드 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {availableCardSets.map((cs) => {
+                const checked = draft.selectedCardSetIds.includes(cs.id);
+                return (
+                  <label
+                    key={cs.id}
+                    className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                      checked
+                        ? "bg-white border-violet-400 font-bold text-violet-900 shadow-2xs"
+                        : "bg-white/60 border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...draft.selectedCardSetIds, cs.id]
+                          : draft.selectedCardSetIds.filter((id) => id !== cs.id);
+                        setDraft((p) => ({ ...p, selectedCardSetIds: next }));
+                      }}
+                      className="text-violet-600 rounded"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{cs.label}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{cs.prompts.length}개 질문 힌트</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-t border-gray-100 px-6 py-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setPreviewCardSet(null)}
-                  className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
-                >
-                  확인했어요
-                </button>
-              </div>
+                  </label>
+                );
+              })}
             </div>
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-3">학생당 고를 카드 수</label>
-            <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-              {[1, 2, 3, 4].map((count) => (
-                <label
-                  key={count}
-                  className="flex items-center justify-center gap-2 border border-gray-200 rounded-xl px-3 py-3 cursor-pointer has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50"
+        {/* 모드 3: AI 질문 예시 제공 상세 설정 */}
+        {draft.mode === "ai_custom" && (
+          <div className="rounded-2xl bg-emerald-50/60 border border-emerald-100 p-4 space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold text-emerald-800">✨ AI 추천 질문 풀(Pool) 선별</p>
+                <p className="text-[11px] text-emerald-600 mt-0.5">
+                  선택된 질문들이 학생에게 질문 카드로 제공됩니다.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateAiQuestions}
+                  disabled={generatingAi}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all active:scale-95 disabled:opacity-50"
                 >
-                  <input
-                    type="radio"
-                    name="max_selections"
-                    value={count}
-                    checked={draft.max_selections === String(count)}
-                    onChange={() => setDraft((prev) => ({ ...prev, max_selections: String(count) }))}
-                    className="text-emerald-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">{count}개</span>
-                </label>
-              ))}
+                  {generatingAi ? "🧠 AI 생성 중..." : "✨ AI 질문 5개 추천받기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddCustomQuestion}
+                  className="rounded-xl bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-3 py-1.5 text-xs font-semibold transition-colors"
+                >
+                  + 직접 추가
+                </button>
+              </div>
             </div>
+
+            {aiGenError && (
+              <p className="text-xs font-semibold text-red-600 bg-red-50 p-2 rounded-lg">{aiGenError}</p>
+            )}
+
+            {/* AI 질문 목록 */}
+            {draft.customAiQuestions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-emerald-200 bg-white/70 p-6 text-center">
+                <p className="text-sm font-semibold text-emerald-800">아직 추천된 질문이 없습니다.</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  위의 <strong>[✨ AI 질문 5개 추천받기]</strong> 버튼을 누르면 오늘 주제에 딱 맞는 질문 예시가 생성됩니다.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {draft.customAiQuestions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all ${
+                      q.included
+                        ? "bg-white border-emerald-300 shadow-2xs"
+                        : "bg-gray-50 border-gray-200 opacity-60"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={q.included}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setDraft((p) => ({
+                          ...p,
+                          customAiQuestions: p.customAiQuestions.map((item) =>
+                            item.id === q.id ? { ...item, included: checked } : item
+                          ),
+                        }));
+                      }}
+                      className="mt-1 text-emerald-600 rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-bold text-emerald-700">질문 예시 {idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraft((p) => ({
+                              ...p,
+                              customAiQuestions: p.customAiQuestions.filter((item) => item.id !== q.id),
+                            }));
+                          }}
+                          className="text-[10px] text-gray-400 hover:text-red-500"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={q.text}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setDraft((p) => ({
+                            ...p,
+                            customAiQuestions: p.customAiQuestions.map((item) =>
+                              item.id === q.id ? { ...item, text: val } : item
+                            ),
+                          }));
+                        }}
+                        className="w-full text-xs text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 3. 공통 설정 (질문 개수) */}
+      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <label className="block text-sm font-bold text-gray-800">
+              학생당 완성할 질문 수
+            </label>
+            <p className="text-xs text-gray-500 mt-0.5">학생 한 명이 최종 제출해야 하는 질문 개수입니다.</p>
           </div>
 
+          <div className="flex gap-2">
+            {[1, 2, 3, 4].map((count) => (
+              <label
+                key={count}
+                className={`px-4 py-2 rounded-xl border-2 text-sm font-bold cursor-pointer transition-all ${
+                  draft.max_selections === String(count)
+                    ? "border-sky-500 bg-sky-50 text-sky-700 shadow-2xs"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="max_selections"
+                  value={count}
+                  checked={draft.max_selections === String(count)}
+                  onChange={() => setDraft((p) => ({ ...p, max_selections: String(count) }))}
+                  className="sr-only"
+                />
+                {count}개
+              </label>
+            ))}
+          </div>
         </div>
+      </div>
 
-        <div>
-          <label className="block text-base font-medium text-gray-700 mb-2">질문 바꾸기 안내</label>
-          <textarea
-            name="guidance"
-            rows={4}
-            value={draft.guidance}
-            onChange={(event) => setDraft((prev) => ({ ...prev, guidance: event.target.value }))}
-            className="w-full px-5 py-4 text-base text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
-          />
-        </div>
+      {error && <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl font-medium">{error}</p>}
 
-        {error && <p className="text-red-500 text-base bg-red-50 p-4 rounded-xl">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={saving || loadingCardSets || availableCardSets.length === 0}
-          className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
-        >
-          {loadingCardSets ? "질문 카드 불러오는 중..." : saving ? "시작 중..." : "🚀 질문 카드 활동 시작"}
-        </button>
-      </form>
-    </>
+      <button
+        type="submit"
+        disabled={saving}
+        className="w-full py-4 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl font-bold text-lg shadow-md transition-all active:scale-[0.99] disabled:opacity-50"
+      >
+        {saving ? "활동 생성 중..." : "🚀 질문 만들기 활동 시작"}
+      </button>
+    </form>
   );
 }
+
 
 function mergeVotingQuestions(
   prev: VotingQuestionDraft[],

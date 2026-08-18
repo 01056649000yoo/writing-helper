@@ -1649,3 +1649,73 @@ function isMissingShortLinksTableError(error: { code?: string; message: string }
     /could not find the table .*short_links.*schema cache/i.test(error.message)
   );
 }
+
+
+/** 교사용: 질문 만들기 활동을 위한 AI 추천 질문 예시 목록 생성 (아지트 AI 브릿지 활용) */
+export async function generateQuestionsWithAI(
+  topic: string,
+  topicDescription: string,
+  count: number = 5,
+): Promise<{ questions?: string[]; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  if (!topic || !topic.trim()) {
+    return { error: "주제를 먼저 입력해주세요." };
+  }
+
+  const prompt = `초등학교 글쓰기 수업 전 "질문 만들기(생각 열기)" 활동입니다.
+
+[활동 주제]
+${topic.trim()}
+
+[주제 부연설명]
+${topicDescription ? topicDescription.trim() : "(없음)"}
+
+위 주제를 바탕으로 초등학생들이 생각을 넓히고 자신만의 질문으로 발전시킬 수 있는 흥미롭고 구체적인 질문 예시 ${count}개를 만들어주세요.
+- 학생의 호기심과 상상력, 구체적 경험, 감정을 자극하는 열린 질문이어야 합니다.
+- 초등학생 눈높이에 맞는 친근하고 명확한 문장으로 작성해주세요.
+- 예: "~하면 어떤 기분이 들까?", "내가 만약 ~라면 무엇을 먼저 하고 싶을까?", "가장 기억에 남는 ~는 무엇인가요?"
+
+JSON 형식으로만 응답:
+{
+  "questions": [
+    "질문 1 문장",
+    "질문 2 문장",
+    "질문 3 문장",
+    "질문 4 문장",
+    "질문 5 문장"
+  ]
+}`;
+
+  try {
+    const rawAiText = await callAgitAi(user.id, prompt);
+    const parsed = parseAiJsonObject(rawAiText) as { questions?: unknown };
+    if (!Array.isArray(parsed.questions)) {
+      return {
+        questions: [
+          `${topic}에서 가장 인상 깊거나 신기했던 점은 무엇인가요?`,
+          `만약 내가 ${topic}의 주인공이 된다면 어떤 결정을 내릴까요?`,
+          `${topic}을(를) 처음 접했을 때 어떤 생각이나 감정이 들었나요?`,
+          `${topic}에서 친구들과 함께 나누고 싶은 가장 큰 질문은 무엇인가요?`,
+          `${topic}을(를) 통해 내가 새롭게 알게 된 사실이나 달라진 생각은 무엇인가요?`,
+        ],
+      };
+    }
+    const questions = parsed.questions
+      .filter((q): q is string => typeof q === "string" && q.trim().length > 0)
+      .map((q) => q.trim());
+    return { questions: questions.length > 0 ? questions : undefined };
+  } catch {
+    // 연결 실패 시에도 주제 맞춤 폴백 제공
+    return {
+      questions: [
+        `${topic}에서 가장 인상 깊거나 신기했던 점은 무엇인가요?`,
+        `만약 내가 ${topic}의 주인공이 된다면 어떤 결정을 내릴까요?`,
+        `${topic}을(를) 처음 접했을 때 어떤 생각이나 감정이 들었나요?`,
+        `${topic}에서 친구들과 함께 나누고 싶은 가장 큰 질문은 무엇인가요?`,
+        `${topic}을(를) 통해 내가 새롭게 알게 된 사실이나 달라진 생각은 무엇인가요?`,
+      ],
+    };
+  }
+}
