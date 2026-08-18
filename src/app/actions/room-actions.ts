@@ -530,6 +530,34 @@ export async function deleteRoom(roomId: string): Promise<{ error?: string }> {
 }
 
 /**
+ * 이 활동에 이미 답한 학생 수.
+ *
+ * 수정 창에서 "왜 내용은 못 고치는지"를 숫자로 보여 주려고 쓴다. 목록 조회에는 없는 값이라
+ * 창을 열 때만 한 번 부른다(카드마다 미리 세면 목록이 느려진다).
+ */
+export async function getRoomAnswerCount(roomId: string): Promise<number> {
+  const user = await getCurrentUser();
+  if (!user) return 0;
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("teacher_id")
+    .eq("id", roomId)
+    .maybeSingle();
+  if (!room || room.teacher_id !== user.id) return 0;
+
+  const { count } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("room_id", roomId);
+
+  return count ?? 0;
+}
+
+/**
  * 활동의 제목과 주제를 고친다.
  *
  * **내용(개요 틀·질문 목록 등)은 고치지 않는다.** 학생이 이미 낸 답은 항목 id 로 붙어 있어서,
