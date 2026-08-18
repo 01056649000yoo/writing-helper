@@ -1241,7 +1241,7 @@ export default function LiveStudentPanel({
             )}
             <div className="flex gap-3 text-sm">
               <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
-                접속 중 {activeSessions.length}명
+                작성 중 {activeSessions.length}명
               </span>
               <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full font-medium">
                 완료 {doneSessions.length}명
@@ -1261,7 +1261,7 @@ export default function LiveStudentPanel({
 
         {activeSessions.length > 0 && (
           <div>
-            <p className="text-sm font-semibold text-blue-600 mb-2">✏️ 지금 활동 중</p>
+            <p className="text-sm font-semibold text-blue-600 mb-2">✏️ 작성 중 (미제출)</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {activeSessions.map((s) => (
                   <div key={s.id} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5">
@@ -1343,7 +1343,7 @@ export default function LiveStudentPanel({
         {/* 미접속 */}
         {notConnected.length > 0 && (
           <div>
-            <p className="text-sm font-semibold text-gray-400 mb-2">⬜ 미접속 ({notConnected.length}명)</p>
+            <p className="text-sm font-semibold text-gray-400 mb-2">⬜ 시작 전 ({notConnected.length}명)</p>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
               {notConnected.map(s => (
                 <div key={s.id}
