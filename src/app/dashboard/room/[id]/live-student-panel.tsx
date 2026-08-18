@@ -1303,35 +1303,7 @@ export default function LiveStudentPanel({
           );
         })()}
 
-        {/* 1. 작성 중인 학생 목록 (컴팩트 칩 그리드) */}
-        {activeSessions.length > 0 && (
-          <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold text-sky-800 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
-                ✏️ 작성 중인 학생 ({activeSessions.length}명)
-              </p>
-              <span className="text-[11px] text-sky-600 font-medium">실시간 작성 진행</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
-              {activeSessions.map((s) => (
-                <div key={s.id} className="rounded-lg border border-sky-200 bg-white px-2 py-1.5 shadow-2xs flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sky-100 text-[11px] font-bold text-sky-700 font-mono">
-                    {s.student_number}
-                  </span>
-                  <span className="text-xs font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
-                  {s.level && (
-                    <span className={`text-[10px] px-1 rounded shrink-0 ${levelStyle(s.level)}`}>
-                      {levelLabel(s.level)}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 2. 제출 완료 학생 목록 (컴팩트 카드 그리드) */}
+        {/* 1. 제출 완료 학생 목록 (최상단 배치: 결과 조회 및 피드백 우선) */}
         {doneSessions.length > 0 && (
           <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
             <div className="flex items-center justify-between mb-2">
@@ -1384,6 +1356,34 @@ export default function LiveStudentPanel({
                       보기 →
                     </button>
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 2. 작성 중인 학생 목록 (중간 배치) */}
+        {activeSessions.length > 0 && (
+          <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-sky-800 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+                ✏️ 작성 중인 학생 ({activeSessions.length}명)
+              </p>
+              <span className="text-[11px] text-sky-600 font-medium">실시간 작성 진행</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
+              {activeSessions.map((s) => (
+                <div key={s.id} className="rounded-lg border border-sky-200 bg-white px-2 py-1.5 shadow-2xs flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sky-100 text-[11px] font-bold text-sky-700 font-mono">
+                    {s.student_number}
+                  </span>
+                  <span className="text-xs font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
+                  {s.level && (
+                    <span className={`text-[10px] px-1 rounded shrink-0 ${levelStyle(s.level)}`}>
+                      {levelLabel(s.level)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
