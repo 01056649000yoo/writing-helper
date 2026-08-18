@@ -642,6 +642,31 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   );
 }
 
+
+function getCardBadge(label: string): string {
+  const match = ["상상", "반전", "마음", "가치", "감각", "관찰", "이유", "해결", "연결", "비유", "관점", "시간"]
+    .find((k) => label.includes(k));
+  return match ?? label.slice(0, 4);
+}
+
+function getCardBadgeStyle(badge: string): string {
+  switch (badge) {
+    case "상상":
+    case "반전": return "bg-indigo-50 text-indigo-700 border-indigo-200";
+    case "마음":
+    case "가치": return "bg-rose-50 text-rose-700 border-rose-200";
+    case "감각":
+    case "관찰": return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "이유":
+    case "해결": return "bg-amber-50 text-amber-700 border-amber-200";
+    case "연결":
+    case "비유": return "bg-teal-50 text-teal-700 border-teal-200";
+    case "관점":
+    case "시간": return "bg-violet-50 text-violet-700 border-violet-200";
+    default: return "bg-gray-100 text-gray-700 border-gray-200";
+  }
+}
+
 function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1021,10 +1046,15 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                           className="text-violet-600 rounded shrink-0"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className={`truncate font-semibold ${checked ? "text-violet-950" : "text-gray-700"}`}>
-                            {cs.label}
-                          </p>
-                          <p className="text-[10px] text-gray-400 truncate">{cs.prompts.length}개 질문 힌트</p>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${getCardBadgeStyle(getCardBadge(cs.label))}`}>
+                              {getCardBadge(cs.label)}
+                            </span>
+                            <p className={`truncate font-bold text-xs ${checked ? "text-violet-950" : "text-gray-800"}`}>
+                              {cs.label}
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-gray-500 truncate">{cs.description || `${cs.prompts.length}개 질문 힌트`}</p>
                         </div>
                       </label>
 

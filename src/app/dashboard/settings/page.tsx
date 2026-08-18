@@ -20,35 +20,41 @@ type EditableQuestionCardSet = {
   expanded?: boolean;
 };
 
-// 핵심 질문 키워드 분류 정의
+// 12개 질문 카드 세트를 6대 핵심 질문 영역으로 완벽하게 분류
 const KEYWORD_TAGS = [
   { id: "all", label: "전체", emoji: "🃏" },
-  { id: "상상", label: "상상·가정", emoji: "💡" },
-  { id: "마음", label: "마음·감정", emoji: "❤️" },
-  { id: "감각", label: "감각·장면", emoji: "👁️" },
-  { id: "이유", label: "이유·원인", emoji: "❓" },
-  { id: "비교", label: "비교·선택", emoji: "⚖️" },
-  { id: "변화", label: "변화·미래", emoji: "🌱" },
+  { id: "상상·반전", label: "상상·반전", emoji: "💡" },
+  { id: "마음·가치", label: "마음·가치", emoji: "❤️" },
+  { id: "감각·관찰", label: "감각·관찰", emoji: "👁️" },
+  { id: "이유·해결", label: "이유·해결", emoji: "❓" },
+  { id: "연결·비유", label: "연결·비유", emoji: "🌱" },
+  { id: "관점·시간", label: "관점·시간", emoji: "⏳" },
 ] as const;
 
-function getCardKeyword(label: string): string {
-  if (label.includes("상상") || label.includes("가정")) return "상상";
-  if (label.includes("마음") || label.includes("감정") || label.includes("기분")) return "마음";
-  if (label.includes("감각") || label.includes("소리") || label.includes("풍경")) return "감각";
-  if (label.includes("이유") || label.includes("원인") || label.includes("까닭")) return "이유";
-  if (label.includes("비교") || label.includes("판단") || label.includes("선택")) return "비교";
-  if (label.includes("변화") || label.includes("미래") || label.includes("다짐")) return "변화";
+function getCardCategory(label: string): string {
+  if (label.includes("상상") || label.includes("반전") || label.includes("가정")) return "상상·반전";
+  if (label.includes("마음") || label.includes("가치") || label.includes("감정") || label.includes("의미")) return "마음·가치";
+  if (label.includes("감각") || label.includes("관찰") || label.includes("오감") || label.includes("단서")) return "감각·관찰";
+  if (label.includes("이유") || label.includes("해결") || label.includes("원인") || label.includes("위기")) return "이유·해결";
+  if (label.includes("연결") || label.includes("비유") || label.includes("삶") || label.includes("경험")) return "연결·비유";
+  if (label.includes("관점") || label.includes("시간") || label.includes("입장") || label.includes("미래")) return "관점·시간";
   return "기타";
 }
 
-function getKeywordColor(keyword: string): { bg: string; text: string; border: string } {
-  switch (keyword) {
-    case "상상": return { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" };
-    case "마음": return { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" };
-    case "감각": return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" };
-    case "이유": return { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" };
-    case "비교": return { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" };
-    case "변화": return { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" };
+function getCardBadge(label: string): string {
+  const match = ["상상", "반전", "마음", "가치", "감각", "관찰", "이유", "해결", "연결", "비유", "관점", "시간"]
+    .find((k) => label.includes(k));
+  return match ?? label.slice(0, 4);
+}
+
+function getKeywordColor(category: string): { bg: string; text: string; border: string } {
+  switch (category) {
+    case "상상·반전": return { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" };
+    case "마음·가치": return { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" };
+    case "감각·관찰": return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" };
+    case "이유·해결": return { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" };
+    case "연결·비유": return { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" };
+    case "관점·시간": return { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" };
     default: return { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-200" };
   }
 }
@@ -181,8 +187,8 @@ export default function SettingsPage() {
   // 필터링된 카드 목록
   const filteredCardSets = useMemo(() => {
     return cardSets.filter((card) => {
-      const keyword = getCardKeyword(card.label);
-      const matchesTag = activeTag === "all" || keyword === activeTag;
+      const category = getCardCategory(card.label);
+      const matchesTag = activeTag === "all" || category === activeTag;
       const matchesSearch =
         !searchQuery.trim() ||
         card.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -304,8 +310,9 @@ export default function SettingsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredCardSets.map((card, index) => {
-                const keyword = getCardKeyword(card.label);
-                const color = getKeywordColor(keyword);
+                const category = getCardCategory(card.label);
+                const badge = getCardBadge(card.label);
+                const color = getKeywordColor(category);
                 const prompts = card.promptsText.split("\n").map((p) => p.trim()).filter(Boolean);
 
                 return (
@@ -319,7 +326,7 @@ export default function SettingsPage() {
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${color.bg} ${color.text} ${color.border}`}>
-                          {keyword}
+                          {badge}
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
