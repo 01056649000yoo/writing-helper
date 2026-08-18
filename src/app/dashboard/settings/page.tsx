@@ -2,21 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  deleteQuestionCardRole,
   deleteQuestionCardSetting,
   getQuestionCardSettings,
-  saveQuestionCardRole,
   saveQuestionCardSetting,
   resetDefaultQuestionCardSettings,
 } from "@/app/actions/settings-actions";
 import AiGenerationModal from "./ai-generation-modal";
-import type { QuestionCardRole, QuestionCardSet } from "@/features/activities/types";
-import {
-  getCardMeta,
-  getCardTheme,
-  getRecommendedGradeChipClass,
-  getRecommendedGradeLabel,
-} from "@/features/activities/question-generator/card-meta";
+import type { QuestionCardSet } from "@/features/activities/types";
 
 type EditableQuestionCardSet = {
   id: string;
@@ -28,26 +20,47 @@ type EditableQuestionCardSet = {
   expanded?: boolean;
 };
 
-type EditableQuestionCardRole = {
-  id: string;
-  label: string;
-  subtitle: string;
-  description: string;
-  icon: string;
-  cardSetIds: string[];
-  expanded?: boolean;
-  isNew?: boolean;
-};
+// 핵심 질문 키워드 분류 정의
+const KEYWORD_TAGS = [
+  { id: "all", label: "전체", emoji: "🃏" },
+  { id: "상상", label: "상상·가정", emoji: "💡" },
+  { id: "마음", label: "마음·감정", emoji: "❤️" },
+  { id: "감각", label: "감각·장면", emoji: "👁️" },
+  { id: "이유", label: "이유·원인", emoji: "❓" },
+  { id: "비교", label: "비교·선택", emoji: "⚖️" },
+  { id: "변화", label: "변화·미래", emoji: "🌱" },
+] as const;
+
+function getCardKeyword(label: string): string {
+  if (label.includes("상상") || label.includes("가정")) return "상상";
+  if (label.includes("마음") || label.includes("감정") || label.includes("기분")) return "마음";
+  if (label.includes("감각") || label.includes("소리") || label.includes("풍경")) return "감각";
+  if (label.includes("이유") || label.includes("원인") || label.includes("까닭")) return "이유";
+  if (label.includes("비교") || label.includes("판단") || label.includes("선택")) return "비교";
+  if (label.includes("변화") || label.includes("미래") || label.includes("다짐")) return "변화";
+  return "기타";
+}
+
+function getKeywordColor(keyword: string): { bg: string; text: string; border: string } {
+  switch (keyword) {
+    case "상상": return { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" };
+    case "마음": return { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" };
+    case "감각": return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" };
+    case "이유": return { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" };
+    case "비교": return { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" };
+    case "변화": return { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" };
+    default: return { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-200" };
+  }
+}
 
 export default function SettingsPage() {
-  const [roles, setRoles] = useState<EditableQuestionCardRole[]>([]);
   const [cardSets, setCardSets] = useState<EditableQuestionCardSet[]>([]);
   const [cardSettingsLoading, setCardSettingsLoading] = useState(true);
   const [cardSettingsError, setCardSettingsError] = useState("");
   const [savingCardId, setSavingCardId] = useState<string | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
-  const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
-  const [deletingRoleId, setDeletingRoleId] = useState<string | null>(null);
+  const [activeTag, setActiveTag] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -58,7 +71,6 @@ export default function SettingsPage() {
       if (result.error) {
         setCardSettingsError(result.error);
       } else {
-        setRoles(result.roles.map(toEditableRole));
         setCardSets(result.cardSets.map(toEditableCardSet));
       }
       setCardSettingsLoading(false);
@@ -66,7 +78,7 @@ export default function SettingsPage() {
   }
 
   async function handleResetDefaultRoles() {
-    if (!confirm("탐정, 마법사, 판사, 상담사 4개의 기본 역할을 원본 기본값으로 되돌릴까요?\n(직접 수정한 기본 역할 내용과 카드 질문이 기본값으로 초기화됩니다. 교사가 직접 추가한 커스텀 역할은 유지됩니다.)")) {
+    if (!confirm("기본 질문 카드 세트를 원본 기본값으로 되돌릴까요?\n(직접 수정한 기본 질문 내용이 초기화됩니다. 새로 추가한 카드는 유지됩니다.)")) {
       return;
     }
 
@@ -83,13 +95,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     let active = true;
-
     getQuestionCardSettings().then((result) => {
       if (!active) return;
       if (result.error) {
         setCardSettingsError(result.error);
       } else {
-        setRoles(result.roles.map(toEditableRole));
         setCardSets(result.cardSets.map(toEditableCardSet));
       }
       setCardSettingsLoading(false);
@@ -102,107 +112,24 @@ export default function SettingsPage() {
     [cardSets]
   );
 
-  const roleCardSetCount = useMemo(
-    () => roles.reduce((count, role) => count + cardSets.filter((cardSet) => cardSet.roleId === role.id).length, 0),
-    [cardSets, roles],
-  );
-
-  function updateRole(id: string, patch: Partial<EditableQuestionCardRole>) {
-    setRoles((prev) => prev.map((role) => role.id === id ? { ...role, ...patch } : role));
-  }
-
   function updateCardSet(id: string, patch: Partial<EditableQuestionCardSet>) {
     setCardSets((prev) => prev.map((cardSet) => cardSet.id === id ? { ...cardSet, ...patch } : cardSet));
   }
 
-  function toggleRoleExpand(id: string) {
-    setRoles((prev) => prev.map((role) => role.id === id ? { ...role, expanded: !role.expanded } : role));
-  }
-
-  function addRole() {
-    const nextIndex = roles.length + 1;
-    setRoles((prev) => [
-      ...prev,
-      {
-        id: `draft-role-${Date.now()}`,
-        label: `새 역할 ${nextIndex}`,
-        subtitle: "",
-        description: "",
-        icon: "🃏",
-        cardSetIds: [],
-        expanded: true,
-        isNew: true,
-      },
-    ]);
-  }
-
-  function addCardSet(roleId: string) {
-    const role = roles.find((item) => item.id === roleId);
-    const nextIndex = cardSets.filter((cardSet) => cardSet.roleId === roleId).length + 1;
-
+  function addCardSet() {
+    const nextIndex = cardSets.length + 1;
     setCardSets((prev) => [
-      ...prev,
       {
         id: `draft-card-${Date.now()}`,
-        label: `${role?.label ?? "새 역할"} 카드 ${nextIndex}`,
-        description: "",
-        promptsText: "",
-        roleId,
+        label: `새 질문 카드 ${nextIndex}`,
+        description: "질문의 목적이나 방향을 적어주세요.",
+        promptsText: "1. 질문 힌트 문장 1\n2. 질문 힌트 문장 2",
+        roleId: null,
         isNew: true,
         expanded: true,
       },
+      ...prev,
     ]);
-    setRoles((prev) => prev.map((item) => item.id === roleId ? { ...item, expanded: true } : item));
-  }
-
-  async function handleSaveRole(role: EditableQuestionCardRole, index: number) {
-    setSavingRoleId(role.id);
-    setCardSettingsError("");
-    const result = await saveQuestionCardRole({
-      id: role.isNew ? undefined : role.id,
-      label: role.label,
-      subtitle: role.subtitle,
-      description: role.description,
-      icon: role.icon,
-      sortOrder: index,
-    });
-
-    if (result.error || !result.role) {
-      setCardSettingsError(result.error ?? "질문 카드 역할을 저장하지 못했습니다.");
-      setSavingRoleId(null);
-      return;
-    }
-
-    setRoles((prev) => prev.map((item) => (
-      item.id === role.id
-        ? { ...item, ...toEditableRole(result.role!), isNew: false, expanded: false }
-        : item
-    )));
-    setCardSets((prev) => prev.map((cardSet) => (
-      cardSet.roleId === role.id ? { ...cardSet, roleId: result.role!.id } : cardSet
-    )));
-    setSavingRoleId(null);
-  }
-
-  async function handleDeleteRole(role: EditableQuestionCardRole) {
-    if (role.isNew) {
-      setCardSets((prev) => prev.filter((cardSet) => cardSet.roleId !== role.id));
-      setRoles((prev) => prev.filter((item) => item.id !== role.id));
-      return;
-    }
-    if (!confirm(`「${role.label}」 역할을 삭제할까요?`)) return;
-
-    setDeletingRoleId(role.id);
-    setCardSettingsError("");
-    const result = await deleteQuestionCardRole(role.id);
-    if (result.error) {
-      setCardSettingsError(result.error);
-      setDeletingRoleId(null);
-      return;
-    }
-
-    setRoles((prev) => prev.filter((item) => item.id !== role.id));
-    setDeletingRoleId(null);
   }
 
   async function handleSaveCardSet(cardSet: EditableQuestionCardSet, index: number) {
@@ -251,337 +178,265 @@ export default function SettingsPage() {
     setDeletingCardId(null);
   }
 
+  // 필터링된 카드 목록
+  const filteredCardSets = useMemo(() => {
+    return cardSets.filter((card) => {
+      const keyword = getCardKeyword(card.label);
+      const matchesTag = activeTag === "all" || keyword === activeTag;
+      const matchesSearch =
+        !searchQuery.trim() ||
+        card.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        card.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        card.promptsText.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesTag && matchesSearch;
+    });
+  }, [cardSets, activeTag, searchQuery]);
+
   return (
     <main className="lab-page">
       <div className="lab-page__content lab-page__content--medium space-y-6">
+        {/* 상단 헤더 */}
         <div className="lab-panel lab-panel--raised p-6 sm:p-8">
-          <div className="text-5xl mb-3">🃏</div>
-          <h1 className="text-2xl font-bold text-gray-800">질문 카드 설정</h1>
-          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-            연구원 역할 아래에 질문 카드를 트리처럼 정리해 둘 수 있어요.
-            역할도 직접 만들고, 역할 안의 질문 카드도 추가하거나 수정해서 학생용 질문 만들기 흐름에 그대로 반영할 수 있습니다.
-          </p>
+          <div className="flex items-center gap-3">
+            <span className="text-4xl">🃏</span>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">질문 카드 보관함</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                질문의 핵심 키워드별로 카드를 정리하고, 학생들에게 제공할 질문 힌트 문장을 자유롭게 추가·수정할 수 있습니다.
+              </p>
+            </div>
+          </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-6 md:grid-cols-4">
-            <Stat label="연구원 역할" value={`${roles.length}개`} tone="emerald" />
-            <Stat label="역할별 카드" value={`${roleCardSetCount}개`} tone="sky" />
-            <Stat label="전체 질문" value={`${totalPrompts}개`} tone="amber" />
-            <Stat label="질문 카드 묶음" value={`${cardSets.length}개`} tone="indigo" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
+            <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
+              <p className="text-xs font-semibold text-indigo-700">질문 카드 묶음</p>
+              <p className="text-2xl font-bold text-indigo-950 mt-1">{cardSets.length}개</p>
+            </div>
+            <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4">
+              <p className="text-xs font-semibold text-emerald-700">전체 질문 힌트</p>
+              <p className="text-2xl font-bold text-emerald-950 mt-1">{totalPrompts}개</p>
+            </div>
+            <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 col-span-2 sm:col-span-1">
+              <p className="text-xs font-semibold text-amber-700">핵심 키워드 분류</p>
+              <p className="text-2xl font-bold text-amber-950 mt-1">6대 영역</p>
+            </div>
           </div>
         </div>
 
-        <div className="lab-panel lab-panel--raised p-6 sm:p-8 space-y-5">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <h2 className="text-xl font-bold text-gray-800">🧭 연구원 역할 트리</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                학생 질문 만들기에서 보이는 역할과 그 안의 질문 카드들을 여기서 관리합니다.
-              </p>
+        {/* 액션 및 필터 바 */}
+        <div className="lab-panel lab-panel--raised p-6 sm:p-7 space-y-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🏷️</span>
+              <h2 className="text-lg font-bold text-gray-800">질문 키워드별 카드 목록</h2>
+              <span className="text-xs font-semibold text-gray-400">({filteredCardSets.length}개)</span>
             </div>
-            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+
+            <div className="flex gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={handleResetDefaultRoles}
                 disabled={resetting}
-                className="rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-600 px-4 py-3 text-sm font-semibold whitespace-nowrap transition-all disabled:opacity-50"
-                title="탐정/마법사/판사/상담사 4개의 기본 역할을 원본 기본값으로 되돌립니다."
+                className="rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-600 px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-all disabled:opacity-50"
               >
-                {resetting ? "재설정 중..." : "🔄 기본값 재설정"}
+                {resetting ? "초기화 중..." : "🔄 기본값 되돌리기"}
               </button>
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}
-                title="AI가 주제에 꼭 맞는 역할을 자동으로 만들어줍니다."
-                className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-100 flex items-center gap-1.5 whitespace-nowrap transition-all"
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-2xs whitespace-nowrap transition-all"
               >
-                ✨ AI 역할 & 질문 생성
+                ✨ AI 질문 카드 생성
               </button>
               <button
                 type="button"
-                onClick={addRole}
-                className="rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700 whitespace-nowrap transition-colors"
+                onClick={addCardSet}
+                className="rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap transition-colors"
               >
-                + 역할 추가
+                + 새 카드 추가
               </button>
             </div>
           </div>
 
+          {/* 검색 및 키워드 탭 */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-y border-gray-100 py-3">
+            {/* 키워드 필터 탭 */}
+            <div className="flex flex-wrap gap-1.5">
+              {KEYWORD_TAGS.map((tag) => (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => setActiveTag(tag.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    activeTag === tag.id
+                      ? "bg-gray-800 text-white shadow-2xs"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {tag.emoji} {tag.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 검색창 */}
+            <input
+              type="text"
+              placeholder="질문 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-3.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full sm:w-48"
+            />
+          </div>
+
           {cardSettingsError && (
-            <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl">{cardSettingsError}</p>
+            <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl font-medium">{cardSettingsError}</p>
           )}
 
+          {/* 질문 카드 그리드 */}
           {cardSettingsLoading ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center text-gray-400">
-              질문 카드 역할을 불러오고 있어요...
+            <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-12 text-center text-gray-400">
+              질문 카드를 불러오고 있어요...
+            </div>
+          ) : filteredCardSets.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-12 text-center text-gray-400">
+              해당하는 질문 카드가 없습니다.
             </div>
           ) : (
-            <div className="space-y-4">
-              {roles.map((role, roleIndex) => {
-                const roleCardSets = cardSets.filter((cardSet) => cardSet.roleId === role.id);
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredCardSets.map((card, index) => {
+                const keyword = getCardKeyword(card.label);
+                const color = getKeywordColor(keyword);
+                const prompts = card.promptsText.split("\n").map((p) => p.trim()).filter(Boolean);
+
                 return (
-                  <div key={role.id} className="rounded-3xl border border-indigo-100 bg-indigo-50/40 overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleRoleExpand(role.id)}
-                      className="w-full px-5 py-4 text-left hover:bg-indigo-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex items-start gap-3">
-                          <span className="text-2xl">{role.icon || "🃏"}</span>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-bold text-gray-800 truncate">{role.label || "(이름 없음)"}</p>
-                              {role.subtitle && (
-                                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-600">
-                                  {role.subtitle}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1 truncate">{role.description || "설명 없음"}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs bg-white border border-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-semibold">
-                            카드 {roleCardSets.length}개
-                          </span>
-                          <span className={`text-gray-400 transition-transform ${role.expanded ? "rotate-180" : ""}`}>▾</span>
+                  <div
+                    key={card.id}
+                    className={`rounded-2xl border bg-white shadow-2xs hover:shadow-md transition-all p-5 flex flex-col justify-between gap-4 ${
+                      card.isNew ? "border-indigo-400 ring-2 ring-indigo-100" : "border-gray-200/90"
+                    }`}
+                  >
+                    {/* 카드 헤더 */}
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${color.bg} ${color.text} ${color.border}`}>
+                          {keyword}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => updateCardSet(card.id, { expanded: !card.expanded })}
+                            className="text-xs text-gray-500 hover:text-gray-800 font-medium px-2 py-0.5 rounded hover:bg-gray-100"
+                          >
+                            {card.expanded ? "접기 ▲" : "수정하기 ✏️"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCardSet(card)}
+                            disabled={deletingCardId === card.id}
+                            className="text-xs text-rose-500 hover:text-rose-700 font-medium px-2 py-0.5 rounded hover:bg-rose-50"
+                          >
+                            삭제
+                          </button>
                         </div>
                       </div>
-                    </button>
 
-                    {role.expanded && (
-                      <div className="border-t border-indigo-100 bg-white px-5 py-5 space-y-5">
-                        <div className="grid gap-4 md:grid-cols-2">
+                      {card.expanded ? (
+                        <div className="space-y-3 mt-3">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">역할 이름</label>
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">카드 제목</label>
                             <input
-                              value={role.label}
-                              onChange={(event) => updateRole(role.id, { label: event.target.value })}
-                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                              placeholder="예) 탐정 모드"
+                              type="text"
+                              value={card.label}
+                              onChange={(e) => updateCardSet(card.id, { label: e.target.value })}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                             />
                           </div>
+
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">아이콘</label>
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">카드 설명</label>
                             <input
-                              value={role.icon}
-                              onChange={(event) => updateRole(role.id, { icon: event.target.value })}
-                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                              placeholder="예) 🕵️"
+                              type="text"
+                              value={card.description}
+                              onChange={(e) => updateCardSet(card.id, { description: e.target.value })}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                             />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              질문 힌트 목록 (한 줄에 하나씩)
+                            </label>
+                            <textarea
+                              rows={5}
+                              value={card.promptsText}
+                              onChange={(e) => updateCardSet(card.id, { promptsText: e.target.value })}
+                              className="w-full text-xs border border-gray-200 rounded-lg p-2.5 text-gray-800 leading-relaxed focus:outline-none focus:ring-1 focus:ring-indigo-300 font-mono"
+                            />
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                            <button
+                              type="button"
+                              onClick={() => updateCardSet(card.id, { expanded: false })}
+                              className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                            >
+                              닫기
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveCardSet(card, index)}
+                              disabled={savingCardId === card.id}
+                              className="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all"
+                            >
+                              {savingCardId === card.id ? "저장 중..." : "저장 완료"}
+                            </button>
                           </div>
                         </div>
+                      ) : (
+                        <>
+                          <h3 className="font-bold text-gray-900 text-base">{card.label}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">{card.description}</p>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">짧은 성격 설명</label>
-                            <input
-                              value={role.subtitle}
-                              onChange={(event) => updateRole(role.id, { subtitle: event.target.value })}
-                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                              placeholder="예) 사실/추론"
-                            />
+                          {/* 포함된 질문 힌트 미리보기 목록 */}
+                          <div className="mt-3.5 space-y-1.5 border-t border-gray-100 pt-3">
+                            <p className="text-[11px] font-bold text-gray-400 mb-1">
+                              포함된 질문 ({prompts.length}개)
+                            </p>
+                            {prompts.slice(0, 3).map((prompt, pIdx) => (
+                              <div key={pIdx} className="flex items-start gap-1.5 text-xs text-gray-700 leading-snug">
+                                <span className="text-indigo-400 font-bold">·</span>
+                                <span className="truncate">{prompt}</span>
+                              </div>
+                            ))}
+                            {prompts.length > 3 && (
+                              <p className="text-[10px] text-gray-400 italic">
+                                외 {prompts.length - 3}개 질문 더보기...
+                              </p>
+                            )}
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">역할 설명</label>
-                            <input
-                              value={role.description}
-                              onChange={(event) => updateRole(role.id, { description: event.target.value })}
-                              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                              placeholder="학생에게 보여줄 역할 설명"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSaveRole(role, roleIndex)}
-                            disabled={savingRoleId === role.id}
-                            className="rounded-xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
-                          >
-                            {savingRoleId === role.id ? "저장 중..." : "역할 저장"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => addCardSet(role.id)}
-                            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600"
-                          >
-                            + 카드 추가
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRole(role)}
-                            disabled={deletingRoleId === role.id}
-                            className="rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            {deletingRoleId === role.id ? "삭제 중..." : "역할 삭제"}
-                          </button>
-                        </div>
-
-                        {roleCardSets.length === 0 ? (
-                          <div className="rounded-2xl border border-dashed border-gray-200 px-5 py-8 text-center text-sm text-gray-400">
-                            아직 이 역할 아래 카드가 없어요. 위 버튼으로 첫 카드를 추가해보세요.
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {roleCardSets.map((cardSet, cardIndex) => {
-                              const promptCount = cardSet.promptsText.split("\n").map((prompt) => prompt.trim()).filter(Boolean).length;
-                              const cardMeta = getCardMeta(cardSet.label);
-                              const cardTheme = getCardTheme(cardSet.label);
-                              return (
-                                <div key={cardSet.id} className={`rounded-2xl border border-gray-200 bg-gray-50/70 overflow-hidden ${cardTheme.accentBorder}`}>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateCardSet(cardSet.id, { expanded: !cardSet.expanded })}
-                                    className="w-full px-5 py-4 text-left hover:bg-gray-100/60 transition-colors"
-                                  >
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-bold ${cardTheme.chip}`}>
-                                            <span>{cardMeta.emoji}</span>
-                                            <span>{cardSet.label || "(이름 없음)"}</span>
-                                          </span>
-                                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getRecommendedGradeChipClass(cardMeta.recommendedGrades)}`}>
-                                            {getRecommendedGradeLabel(cardMeta.recommendedGrades)}
-                                          </span>
-                                        </div>
-                                        <p className="text-xs text-gray-400 mt-1 truncate">{cardSet.description || "설명 없음"}</p>
-                                      </div>
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-xs bg-white border border-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">
-                                          질문 {promptCount}개
-                                        </span>
-                                        <span className={`text-gray-400 transition-transform ${cardSet.expanded ? "rotate-180" : ""}`}>▾</span>
-                                      </div>
-                                    </div>
-                                  </button>
-
-                                  {cardSet.expanded && (
-                                    <div className="border-t border-gray-200 bg-white px-5 py-5 space-y-4">
-                                      <div className="grid gap-4 md:grid-cols-2">
-                                        <div>
-                                          <label className="block text-sm font-medium text-gray-700 mb-2">카드 이름</label>
-                                          <input
-                                            value={cardSet.label}
-                                            onChange={(event) => updateCardSet(cardSet.id, { label: event.target.value })}
-                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                            placeholder="예) 상상 카드"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="block text-sm font-medium text-gray-700 mb-2">소속 역할</label>
-                                          <select
-                                            value={cardSet.roleId ?? ""}
-                                            onChange={(event) => updateCardSet(cardSet.id, { roleId: event.target.value || null })}
-                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                          >
-                                            <option value="">역할 없음</option>
-                                            {roles.map((option) => (
-                                              <option key={option.id} value={option.id}>{option.label}</option>
-                                            ))}
-                                          </select>
-                                        </div>
-                                      </div>
-
-                                      <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">설명</label>
-                                        <input
-                                          value={cardSet.description}
-                                          onChange={(event) => updateCardSet(cardSet.id, { description: event.target.value })}
-                                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                          placeholder="예) 보이지 않는 이야기의 빈칸을 채워보는 질문 만들기"
-                                        />
-                                      </div>
-
-                                      <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">질문 카드</label>
-                                        <textarea
-                                          value={cardSet.promptsText}
-                                          onChange={(event) => updateCardSet(cardSet.id, { promptsText: event.target.value })}
-                                          rows={8}
-                                          className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-900 leading-6 focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-y"
-                                          placeholder={"질문을 한 줄에 하나씩 적어주세요.\n예)\n이 일이 끝난 뒤에 주인공은 어디로 갔을까?"}
-                                        />
-                                        <p className="text-xs text-gray-400 mt-2">한 줄에 하나씩 저장됩니다.</p>
-                                      </div>
-
-                                      <div className="flex gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleSaveCardSet(cardSet, cardIndex)}
-                                          disabled={savingCardId === cardSet.id}
-                                          className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
-                                        >
-                                          {savingCardId === cardSet.id ? "저장 중..." : "카드 저장"}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteCardSet(cardSet)}
-                                          disabled={deletingCardId === cardSet.id}
-                                          className="rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
-                                        >
-                                          {deletingCardId === cardSet.id ? "삭제 중..." : "카드 삭제"}
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
           )}
-      <AiGenerationModal
-        isOpen={isAiModalOpen}
-        onClose={() => setIsAiModalOpen(false)}
-        onSuccess={refreshSettings}
-      />
         </div>
       </div>
+
+      {isAiModalOpen && (
+        <AiGenerationModal
+          isOpen={isAiModalOpen}
+          onClose={() => setIsAiModalOpen(false)}
+          onSuccess={() => {
+            setIsAiModalOpen(false);
+            refreshSettings();
+          }}
+        />
+      )}
     </main>
   );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone: "emerald" | "sky" | "amber" | "indigo" }) {
-  const toneClass = {
-    emerald: "bg-emerald-50 text-emerald-700",
-    sky: "bg-sky-50 text-sky-700",
-    amber: "bg-amber-50 text-amber-700",
-    indigo: "bg-indigo-50 text-indigo-700",
-  }[tone];
-  const valueClass = {
-    emerald: "text-emerald-900",
-    sky: "text-sky-900",
-    amber: "text-amber-900",
-    indigo: "text-indigo-900",
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl ${toneClass} px-4 py-4`}>
-      <p className="text-xs font-semibold">{label}</p>
-      <p className={`text-2xl font-bold mt-1 ${valueClass}`}>{value}</p>
-    </div>
-  );
-}
-
-function toEditableRole(role: QuestionCardRole): EditableQuestionCardRole {
-  return {
-    id: role.id,
-    label: role.label,
-    subtitle: role.subtitle,
-    description: role.description,
-    icon: role.icon,
-    cardSetIds: role.cardSetIds,
-    expanded: false,
-  };
 }
 
 function toEditableCardSet(cardSet: QuestionCardSet): EditableQuestionCardSet {
@@ -590,7 +445,7 @@ function toEditableCardSet(cardSet: QuestionCardSet): EditableQuestionCardSet {
     label: cardSet.label,
     description: cardSet.description,
     promptsText: cardSet.prompts.join("\n"),
-    roleId: cardSet.roleId ?? null,
+    roleId: null,
     expanded: false,
   };
 }

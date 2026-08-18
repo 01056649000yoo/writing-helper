@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -647,16 +647,18 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [saving, setSaving] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [aiGenError, setAiGenError] = useState("");
-  const [showAllCardSets, setShowAllCardSets] = useState(false);
+  const [aiCount, setAiCount] = useState<number>(5);
+  const [modalTargetCardSet, setModalTargetCardSet] = useState<QuestionCardSet | null>(null);
   const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
   const [loadingCardSets, setLoadingCardSets] = useState(true);
+  const initializedRef = useRef(false);
 
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
     topic: "",
     topic_description: "",
     mode: "direct",
     max_selections: "3",
-    guidance: "오늘 주제에 대해 궁금한 점이나 더 알고 싶은 내용을 질문으로 만들어 봅시다.",
+    guidance: "",
     selectedCardSetIds: [],
     customAiQuestions: [],
   }), []);
@@ -673,16 +675,22 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
       if (cardResult.error) setError(cardResult.error);
       else {
         setAvailableCardSets(cardResult.cardSets);
-        if (draft.selectedCardSetIds.length === 0) {
-          // 기본 추천 2~3개 세트 미리 선택
-          const defaultIds = cardResult.cardSets.slice(0, 3).map((cs) => cs.id);
-          setDraft((prev) => ({ ...prev, selectedCardSetIds: defaultIds }));
+        // 최초 로드 시에만 기본 3개 카드 세트 자동 선택 (한 번만 실행)
+        if (!initializedRef.current) {
+          initializedRef.current = true;
+          setDraft((prev) => {
+            if (prev.selectedCardSetIds.length === 0 && prev.mode === "card_remix") {
+              const defaultIds = cardResult.cardSets.slice(0, 3).map((cs) => cs.id);
+              return { ...prev, selectedCardSetIds: defaultIds };
+            }
+            return prev;
+          });
         }
       }
       setLoadingCardSets(false);
     });
     return () => { active = false; };
-  }, [classId, setDraft, draft.selectedCardSetIds.length]);
+  }, [classId, setDraft]);
 
   // AI 질문 예시 생성 핸들러
   async function handleGenerateAiQuestions() {
@@ -692,7 +700,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     }
     setAiGenError("");
     setGeneratingAi(true);
-    const res = await generateQuestionsWithAI(draft.topic, draft.topic_description, 5);
+    const res = await generateQuestionsWithAI(draft.topic, draft.topic_description, aiCount);
     setGeneratingAi(false);
 
     if (res.error) {
@@ -793,381 +801,487 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* 1. 기본 정보 */}
-      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7 space-y-4">
-        <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-          <span className="text-xl">📌</span>
-          <h2 className="text-base font-bold text-gray-800">활동 기본 정보</h2>
-        </div>
-
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1.5">
-            활동 주제 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            placeholder="예) 우리 동네의 소중한 장소들, 미래의 인공지능과 우리 삶"
-            value={draft.topic}
-            onChange={(e) => setDraft((p) => ({ ...p, topic: e.target.value }))}
-            className="w-full px-4 py-3 text-base text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1.5">
-            주제 부연 설명 <span className="text-xs text-gray-400 font-normal">(선택)</span>
-          </label>
-          <textarea
-            rows={2}
-            placeholder="학생들이 활동을 시작할 때 참고할 추가 설명이나 배경을 적어주세요."
-            value={draft.topic_description}
-            onChange={(e) => setDraft((p) => ({ ...p, topic_description: e.target.value }))}
-            className="w-full px-4 py-2.5 text-sm text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none"
-          />
-        </div>
-      </div>
-
-      {/* 2. 질문 작성 방식 선택 (3대 모드) */}
-      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7 space-y-5">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🎯</span>
-            <div>
-              <h2 className="text-base font-bold text-gray-800">질문 작성 방식 선택</h2>
-              <p className="text-xs text-gray-500 mt-0.5">학생들에게 어떤 방식으로 질문을 만들게 할지 선택하세요.</p>
-            </div>
+    <>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* 1. 기본 정보 */}
+        <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7 space-y-4">
+          <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+            <span className="text-xl">📌</span>
+            <h2 className="text-base font-bold text-gray-800">활동 기본 정보</h2>
           </div>
-        </div>
 
-        {/* 3대 선택 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          {/* 모드 1: 직접 만들기 */}
-          <label
-            className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
-              draft.mode === "direct"
-                ? "border-sky-500 bg-sky-50/70 shadow-sm"
-                : "border-gray-200 bg-white hover:border-gray-300"
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-2xl">✍️</span>
-                <input
-                  type="radio"
-                  name="generator_mode"
-                  value="direct"
-                  checked={draft.mode === "direct"}
-                  onChange={() => setDraft((p) => ({ ...p, mode: "direct" }))}
-                  className="text-sky-500"
-                />
-              </div>
-              <h3 className="mt-2.5 text-base font-bold text-gray-800">1. 직접 만들기</h3>
-              <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-                카드 힌트 없이 학생이 스스로 생각해서 질문을 작성합니다.
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold text-sky-700 bg-white px-2.5 py-1 rounded-lg border border-sky-100 text-center">
-              자율 질문 창작
-            </span>
-          </label>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">
+              활동 주제 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="예) 우리 동네의 소중한 장소들, 미래의 인공지능과 우리 삶"
+              value={draft.topic}
+              onChange={(e) => setDraft((p) => ({ ...p, topic: e.target.value }))}
+              className="w-full px-4 py-3 text-base text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+          </div>
 
-          {/* 모드 2: 질문 카드 활용 */}
-          <label
-            className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
-              draft.mode === "card_remix"
-                ? "border-violet-500 bg-violet-50/70 shadow-sm"
-                : "border-gray-200 bg-white hover:border-gray-300"
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-2xl">🃏</span>
-                <input
-                  type="radio"
-                  name="generator_mode"
-                  value="card_remix"
-                  checked={draft.mode === "card_remix"}
-                  onChange={() => setDraft((p) => ({ ...p, mode: "card_remix" }))}
-                  className="text-violet-500"
-                />
-              </div>
-              <h3 className="mt-2.5 text-base font-bold text-gray-800">2. 질문 카드 활용</h3>
-              <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-                생각을 넓혀주는 질문 카드 묶음을 제공해 골라서 수정합니다.
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold text-violet-700 bg-white px-2.5 py-1 rounded-lg border border-violet-100 text-center">
-              비계(Scaffolding) 카드 제공
-            </span>
-          </label>
-
-          {/* 모드 3: AI 질문 예시 제공 */}
-          <label
-            className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
-              draft.mode === "ai_custom"
-                ? "border-emerald-500 bg-emerald-50/70 shadow-sm"
-                : "border-gray-200 bg-white hover:border-gray-300"
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-2xl">✨</span>
-                <input
-                  type="radio"
-                  name="generator_mode"
-                  value="ai_custom"
-                  checked={draft.mode === "ai_custom"}
-                  onChange={() => setDraft((p) => ({ ...p, mode: "ai_custom" }))}
-                  className="text-emerald-500"
-                />
-              </div>
-              <h3 className="mt-2.5 text-base font-bold text-gray-800">3. AI 질문 예시 제공</h3>
-              <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-                오늘 주제 맞춤 AI 질문 중 좋은 질문을 골라 학생에게 제공합니다.
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-100 text-center">
-              주제 맞춤 질문 풀(Pool)
-            </span>
-          </label>
-        </div>
-
-        {/* ── 선택된 모드별 전용 서브 패널 ── */}
-
-        {/* 모드 1: 직접 만들기 상세 설정 */}
-        {draft.mode === "direct" && (
-          <div className="rounded-2xl bg-sky-50/60 border border-sky-100 p-4 space-y-2.5">
-            <label className="block text-xs font-bold text-sky-800">
-              ✍️ 학생에게 전달할 질문 작성 가이드
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">
+              주제 부연 설명 <span className="text-xs text-gray-400 font-normal">(선택)</span>
             </label>
             <textarea
-              rows={3}
-              value={draft.guidance}
-              onChange={(e) => setDraft((p) => ({ ...p, guidance: e.target.value }))}
-              placeholder="예) 오늘 배운 내용에서 가장 신기했던 점이나 더 알아보고 싶은 내용을 질문으로 만들어 보세요."
-              className="w-full px-3.5 py-2.5 text-sm text-gray-800 bg-white border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300"
+              rows={2}
+              placeholder="학생들이 활동을 시작할 때 참고할 추가 설명이나 배경을 적어주세요."
+              value={draft.topic_description}
+              onChange={(e) => setDraft((p) => ({ ...p, topic_description: e.target.value }))}
+              className="w-full px-4 py-2.5 text-sm text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none"
             />
-            <p className="text-[11px] text-sky-600">
-              학생들은 카드 힌트 없이 입력창에서 바로 자신만의 질문을 작성하게 됩니다.
-            </p>
           </div>
-        )}
+        </div>
 
-        {/* 모드 2: 질문 카드 활용 상세 설정 */}
-        {draft.mode === "card_remix" && (
-          <div className="rounded-2xl bg-violet-50/60 border border-violet-100 p-4 space-y-3.5">
-            <div className="flex items-center justify-between">
+        {/* 2. 질문 작성 방식 선택 (3대 모드) */}
+        <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7 space-y-5">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🎯</span>
               <div>
-                <p className="text-xs font-bold text-violet-800">🃏 제공할 질문 카드 묶음 선택</p>
-                <p className="text-[11px] text-violet-600 mt-0.5">
-                  총 {availableCardSets.length}개 묶음 중 {draft.selectedCardSetIds.length}개 선택됨
-                </p>
+                <h2 className="text-base font-bold text-gray-800">질문 작성 방식 선택</h2>
+                <p className="text-xs text-gray-500 mt-0.5">학생들에게 어떤 방식으로 질문을 만들게 할지 선택하세요.</p>
               </div>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setDraft((p) => ({ ...p, selectedCardSetIds: availableCardSets.map((c) => c.id) }))}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-violet-200 text-violet-700 hover:bg-violet-100"
-                >
-                  전체 선택
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraft((p) => ({ ...p, selectedCardSetIds: [] }))}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"
-                >
-                  선택 해제
-                </button>
-              </div>
-            </div>
-
-            {/* 카드 묶음 칩 그리드 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-              {availableCardSets.map((cs) => {
-                const checked = draft.selectedCardSetIds.includes(cs.id);
-                return (
-                  <label
-                    key={cs.id}
-                    className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                      checked
-                        ? "bg-white border-violet-400 font-bold text-violet-900 shadow-2xs"
-                        : "bg-white/60 border-gray-200 text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => {
-                        const next = e.target.checked
-                          ? [...draft.selectedCardSetIds, cs.id]
-                          : draft.selectedCardSetIds.filter((id) => id !== cs.id);
-                        setDraft((p) => ({ ...p, selectedCardSetIds: next }));
-                      }}
-                      className="text-violet-600 rounded"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{cs.label}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{cs.prompts.length}개 질문 힌트</p>
-                    </div>
-                  </label>
-                );
-              })}
             </div>
           </div>
-        )}
 
-        {/* 모드 3: AI 질문 예시 제공 상세 설정 */}
-        {draft.mode === "ai_custom" && (
-          <div className="rounded-2xl bg-emerald-50/60 border border-emerald-100 p-4 space-y-3.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* 3대 선택 카드 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            {/* 모드 1: 직접 만들기 */}
+            <label
+              className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+                draft.mode === "direct"
+                  ? "border-sky-500 bg-sky-50/70 shadow-sm"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
               <div>
-                <p className="text-xs font-bold text-emerald-800">✨ AI 추천 질문 풀(Pool) 선별</p>
-                <p className="text-[11px] text-emerald-600 mt-0.5">
-                  선택된 질문들이 학생에게 질문 카드로 제공됩니다.
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">✍️</span>
+                  <input
+                    type="radio"
+                    name="generator_mode"
+                    value="direct"
+                    checked={draft.mode === "direct"}
+                    onChange={() => setDraft((p) => ({ ...p, mode: "direct" }))}
+                    className="text-sky-500"
+                  />
+                </div>
+                <h3 className="mt-2.5 text-base font-bold text-gray-800">1. 직접 만들기</h3>
+                <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                  카드 힌트 없이 학생이 스스로 생각해서 질문을 작성합니다.
                 </p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleGenerateAiQuestions}
-                  disabled={generatingAi}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {generatingAi ? "🧠 AI 생성 중..." : "✨ AI 질문 5개 추천받기"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAddCustomQuestion}
-                  className="rounded-xl bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-3 py-1.5 text-xs font-semibold transition-colors"
-                >
-                  + 직접 추가
-                </button>
+              <span className="text-[11px] font-semibold text-sky-700 bg-white px-2.5 py-1 rounded-lg border border-sky-100 text-center">
+                자율 질문 창작
+              </span>
+            </label>
+
+            {/* 모드 2: 질문 카드 활용 */}
+            <label
+              className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+                draft.mode === "card_remix"
+                  ? "border-violet-500 bg-violet-50/70 shadow-sm"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">🃏</span>
+                  <input
+                    type="radio"
+                    name="generator_mode"
+                    value="card_remix"
+                    checked={draft.mode === "card_remix"}
+                    onChange={() => setDraft((p) => ({ ...p, mode: "card_remix" }))}
+                    className="text-violet-500"
+                  />
+                </div>
+                <h3 className="mt-2.5 text-base font-bold text-gray-800">2. 질문 카드 활용</h3>
+                <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                  생각을 넓혀주는 질문 카드 묶음을 제공해 골라서 수정합니다.
+                </p>
               </div>
+              <span className="text-[11px] font-semibold text-violet-700 bg-white px-2.5 py-1 rounded-lg border border-violet-100 text-center">
+                비계(Scaffolding) 카드 제공
+              </span>
+            </label>
+
+            {/* 모드 3: AI 질문 예시 제공 */}
+            <label
+              className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+                draft.mode === "ai_custom"
+                  ? "border-emerald-500 bg-emerald-50/70 shadow-sm"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">✨</span>
+                  <input
+                    type="radio"
+                    name="generator_mode"
+                    value="ai_custom"
+                    checked={draft.mode === "ai_custom"}
+                    onChange={() => setDraft((p) => ({ ...p, mode: "ai_custom" }))}
+                    className="text-emerald-500"
+                  />
+                </div>
+                <h3 className="mt-2.5 text-base font-bold text-gray-800">3. AI 질문 예시 제공</h3>
+                <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                  오늘 주제 맞춤 AI 질문 중 좋은 질문을 골라 학생에게 제공합니다.
+                </p>
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-100 text-center">
+                주제 맞춤 질문 풀(Pool)
+              </span>
+            </label>
+          </div>
+
+          {/* ── 선택된 모드별 전용 서브 패널 ── */}
+
+          {/* 모드 1: 직접 만들기 상세 설정 */}
+          {draft.mode === "direct" && (
+            <div className="rounded-2xl bg-sky-50/60 border border-sky-100 p-4 space-y-2.5">
+              <label className="block text-xs font-bold text-sky-800">
+                ✍️ 학생에게 전달할 질문 작성 가이드 <span className="text-[11px] font-normal text-sky-600">(선택)</span>
+              </label>
+              <textarea
+                rows={3}
+                value={draft.guidance}
+                onChange={(e) => setDraft((p) => ({ ...p, guidance: e.target.value }))}
+                placeholder="학생들이 질문을 만들 때 참고할 안내나 유의사항을 입력하세요."
+                className="w-full px-3.5 py-2.5 text-sm text-gray-800 bg-white border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300"
+              />
+              <p className="text-[11px] text-sky-600">
+                학생들은 카드 힌트 없이 입력창에서 바로 자신만의 질문을 작성하게 됩니다.
+              </p>
             </div>
+          )}
 
-            {aiGenError && (
-              <p className="text-xs font-semibold text-red-600 bg-red-50 p-2 rounded-lg">{aiGenError}</p>
-            )}
-
-            {/* AI 질문 목록 */}
-            {draft.customAiQuestions.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-emerald-200 bg-white/70 p-6 text-center">
-                <p className="text-sm font-semibold text-emerald-800">아직 추천된 질문이 없습니다.</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  위의 <strong>[✨ AI 질문 5개 추천받기]</strong> 버튼을 누르면 오늘 주제에 딱 맞는 질문 예시가 생성됩니다.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {draft.customAiQuestions.map((q, idx) => (
-                  <div
-                    key={q.id}
-                    className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all ${
-                      q.included
-                        ? "bg-white border-emerald-300 shadow-2xs"
-                        : "bg-gray-50 border-gray-200 opacity-60"
-                    }`}
+          {/* 모드 2: 질문 카드 활용 상세 설정 */}
+          {draft.mode === "card_remix" && (
+            <div className="rounded-2xl bg-violet-50/60 border border-violet-100 p-4 space-y-3.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="text-xs font-bold text-violet-800">🃏 제공할 질문 카드 묶음 선택</p>
+                  <p className="text-[11px] text-violet-600 mt-0.5">
+                    총 {availableCardSets.length}개 묶음 중 {draft.selectedCardSetIds.length}개 선택됨
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDraft((p) => ({ ...p, selectedCardSetIds: availableCardSets.map((c) => c.id) }))}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-violet-200 text-violet-700 hover:bg-violet-100 transition-colors"
                   >
-                    <input
-                      type="checkbox"
-                      checked={q.included}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setDraft((p) => ({
-                          ...p,
-                          customAiQuestions: p.customAiQuestions.map((item) =>
-                            item.id === q.id ? { ...item, included: checked } : item
-                          ),
-                        }));
-                      }}
-                      className="mt-1 text-emerald-600 rounded"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-bold text-emerald-700">질문 예시 {idx + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
+                    전체 선택
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraft((p) => ({ ...p, selectedCardSetIds: [] }))}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
+                  >
+                    전체 해제
+                  </button>
+                </div>
+              </div>
+
+              {/* 카드 묶음 칩 그리드 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {availableCardSets.map((cs) => {
+                  const checked = draft.selectedCardSetIds.includes(cs.id);
+                  return (
+                    <div
+                      key={cs.id}
+                      className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border text-xs transition-all ${
+                        checked
+                          ? "bg-white border-violet-400 shadow-2xs"
+                          : "bg-white/60 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
                             setDraft((p) => ({
                               ...p,
-                              customAiQuestions: p.customAiQuestions.filter((item) => item.id !== q.id),
+                              selectedCardSetIds: isChecked
+                                ? [...p.selectedCardSetIds, cs.id]
+                                : p.selectedCardSetIds.filter((id) => id !== cs.id),
                             }));
                           }}
-                          className="text-[10px] text-gray-400 hover:text-red-500"
-                        >
-                          삭제
-                        </button>
-                      </div>
+                          className="text-violet-600 rounded shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate font-semibold ${checked ? "text-violet-950" : "text-gray-700"}`}>
+                            {cs.label}
+                          </p>
+                          <p className="text-[10px] text-gray-400 truncate">{cs.prompts.length}개 질문 힌트</p>
+                        </div>
+                      </label>
+
+                      {/* 세부 내용 모달 열기 버튼 */}
+                      <button
+                        type="button"
+                        onClick={() => setModalTargetCardSet(cs)}
+                        className="shrink-0 text-[11px] font-medium text-violet-600 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded-lg transition-colors"
+                        title="질문 세부 내용 보기"
+                      >
+                        👁️ 보기
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 모드 3: AI 질문 예시 제공 상세 설정 */}
+          {draft.mode === "ai_custom" && (
+            <div className="rounded-2xl bg-emerald-50/60 border border-emerald-100 p-4 space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <div>
+                  <p className="text-xs font-bold text-emerald-800">✨ AI 추천 질문 풀(Pool) 선별</p>
+                  <p className="text-[11px] text-emerald-600 mt-0.5">
+                    선택된 질문들이 학생에게 질문 카드로 제공됩니다.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* AI 생성 개수 선택기 */}
+                  <div className="flex items-center gap-1 bg-white border border-emerald-200 rounded-xl px-2 py-1 text-xs">
+                    <span className="text-gray-500 font-medium">개수:</span>
+                    {[3, 5, 8, 10].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setAiCount(num)}
+                        className={`px-1.5 py-0.5 rounded font-bold transition-all ${
+                          aiCount === num
+                            ? "bg-emerald-600 text-white shadow-2xs"
+                            : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiQuestions}
+                    disabled={generatingAi}
+                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {generatingAi ? "🧠 생성 중..." : `✨ AI 질문 ${aiCount}개 추천`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomQuestion}
+                    className="rounded-xl bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-3 py-1.5 text-xs font-semibold transition-colors"
+                  >
+                    + 직접 추가
+                  </button>
+                </div>
+              </div>
+
+              {aiGenError && (
+                <p className="text-xs font-semibold text-red-600 bg-red-50 p-2 rounded-lg">{aiGenError}</p>
+              )}
+
+              {/* AI 질문 목록 */}
+              {draft.customAiQuestions.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-emerald-200 bg-white/70 p-6 text-center">
+                  <p className="text-sm font-semibold text-emerald-800">아직 추천된 질문이 없습니다.</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    위의 <strong>[✨ AI 질문 {aiCount}개 추천]</strong> 버튼을 누르면 오늘 주제에 딱 맞는 질문 예시가 생성됩니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {draft.customAiQuestions.map((q, idx) => (
+                    <div
+                      key={q.id}
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all ${
+                        q.included
+                          ? "bg-white border-emerald-300 shadow-2xs"
+                          : "bg-gray-50 border-gray-200 opacity-60"
+                      }`}
+                    >
                       <input
-                        type="text"
-                        value={q.text}
+                        type="checkbox"
+                        checked={q.included}
                         onChange={(e) => {
-                          const val = e.target.value;
+                          const checked = e.target.checked;
                           setDraft((p) => ({
                             ...p,
                             customAiQuestions: p.customAiQuestions.map((item) =>
-                              item.id === q.id ? { ...item, text: val } : item
+                              item.id === q.id ? { ...item, included: checked } : item
                             ),
                           }));
                         }}
-                        className="w-full text-xs text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                        className="mt-1 text-emerald-600 rounded"
                       />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] font-bold text-emerald-700">질문 예시 {idx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDraft((p) => ({
+                                ...p,
+                                customAiQuestions: p.customAiQuestions.filter((item) => item.id !== q.id),
+                              }));
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-red-500"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={q.text}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDraft((p) => ({
+                              ...p,
+                              customAiQuestions: p.customAiQuestions.map((item) =>
+                                item.id === q.id ? { ...item, text: val } : item
+                              ),
+                            }));
+                          }}
+                          className="w-full text-xs text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-      {/* 3. 공통 설정 (질문 개수) */}
-      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <label className="block text-sm font-bold text-gray-800">
-              학생당 완성할 질문 수
-            </label>
-            <p className="text-xs text-gray-500 mt-0.5">학생 한 명이 최종 제출해야 하는 질문 개수입니다.</p>
-          </div>
-
-          <div className="flex gap-2">
-            {[1, 2, 3, 4].map((count) => (
-              <label
-                key={count}
-                className={`px-4 py-2 rounded-xl border-2 text-sm font-bold cursor-pointer transition-all ${
-                  draft.max_selections === String(count)
-                    ? "border-sky-500 bg-sky-50 text-sky-700 shadow-2xs"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="max_selections"
-                  value={count}
-                  checked={draft.max_selections === String(count)}
-                  onChange={() => setDraft((p) => ({ ...p, max_selections: String(count) }))}
-                  className="sr-only"
-                />
-                {count}개
+        {/* 3. 공통 설정 (질문 개수) */}
+        <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <label className="block text-sm font-bold text-gray-800">
+                학생당 완성할 질문 수
               </label>
-            ))}
+              <p className="text-xs text-gray-500 mt-0.5">학생 한 명이 최종 제출해야 하는 질문 개수입니다.</p>
+            </div>
+
+            <div className="flex gap-2">
+              {[1, 2, 3, 4].map((count) => (
+                <label
+                  key={count}
+                  className={`px-4 py-2 rounded-xl border-2 text-sm font-bold cursor-pointer transition-all ${
+                    draft.max_selections === String(count)
+                      ? "border-sky-500 bg-sky-50 text-sky-700 shadow-2xs"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="max_selections"
+                    value={count}
+                    checked={draft.max_selections === String(count)}
+                    onChange={() => setDraft((p) => ({ ...p, max_selections: String(count) }))}
+                    className="sr-only"
+                  />
+                  {count}개
+                </label>
+              ))}
+            </div>
           </div>
         </div>
+
+        {error && <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl font-medium">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full py-4 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl font-bold text-lg shadow-md transition-all active:scale-[0.99] disabled:opacity-50"
+        >
+          {saving ? "활동 생성 중..." : "🚀 질문 만들기 활동 시작"}
+        </button>
+      </form>
+
+      {/* 질문 카드 세부내용 모달 팝업 */}
+      {modalTargetCardSet && (
+        <CardSetDetailModal
+          cardSet={modalTargetCardSet}
+          onClose={() => setModalTargetCardSet(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function CardSetDetailModal({
+  cardSet,
+  onClose,
+}: {
+  cardSet: QuestionCardSet;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 bg-gradient-to-r from-violet-50 to-indigo-50 border-b border-violet-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🃏</span>
+            <div>
+              <h3 className="font-bold text-gray-900 text-base">{cardSet.label}</h3>
+              <p className="text-xs text-gray-500">{cardSet.description || "질문 카드 묶음"}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 text-xl font-bold p-1 rounded-lg hover:bg-white/60 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
+          <p className="text-xs font-bold text-gray-600 mb-2">
+            포함된 질문 힌트 목록 ({cardSet.prompts.length}개)
+          </p>
+          {cardSet.prompts.map((prompt, idx) => (
+            <div
+              key={idx}
+              className="p-3.5 rounded-2xl bg-gray-50/80 border border-gray-100 flex items-start gap-3"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-[11px] font-bold">
+                {idx + 1}
+              </span>
+              <p className="text-xs text-gray-800 leading-relaxed font-medium flex-1">
+                {prompt}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold rounded-xl transition-all"
+          >
+            확인 및 닫기
+          </button>
+        </div>
       </div>
-
-      {error && <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl font-medium">{error}</p>}
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full py-4 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl font-bold text-lg shadow-md transition-all active:scale-[0.99] disabled:opacity-50"
-      >
-        {saving ? "활동 생성 중..." : "🚀 질문 만들기 활동 시작"}
-      </button>
-    </form>
+    </div>
   );
 }
 
