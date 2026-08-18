@@ -1180,11 +1180,19 @@ export default function LiveStudentPanel({
         />
       )}
 
-      <div className="bg-white rounded-3xl shadow-xl p-8 space-y-6">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between">
+      <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+        {/* 헤더 & 활동 모아보기 버튼 */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">학생 활동 현황</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-black text-gray-800">학생 활동 현황</h2>
+              {isActive && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  실시간 자동 반영
+                </span>
+              )}
+            </div>
             {activityType === "question_generator" && (
               <p className="mt-1 text-sm text-gray-500">학생들이 만든 질문을 모달에서 한 번에 모아볼 수 있어요.</p>
             )}
@@ -1197,105 +1205,164 @@ export default function LiveStudentPanel({
             {activityType === "hanja_writing" && (
               <p className="mt-1 text-sm text-gray-500">학생들이 만든 한자 문장을 실시간으로 모아보고 학급 전체 결과를 함께 볼 수 있어요.</p>
             )}
+            {activityType === "outline_builder" && (
+              <p className="mt-1 text-sm text-gray-500">학생들의 개요 작성 현황을 확인하고 완성된 개요를 바로 열람할 수 있어요.</p>
+            )}
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2 shrink-0">
             {activityType === "question_generator" && (
               <button
                 type="button"
                 onClick={() => setIsQuestionResultsOpen(true)}
-                className="rounded-2xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-200"
+                className="rounded-2xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-sky-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-sky-200"
                 disabled={questionResults.length === 0}
               >
-                질문 결과 모아보기
+                📊 질문 결과 모아보기
               </button>
             )}
             {activityType === "question_voting" && (
               <button
                 type="button"
                 onClick={() => setIsQuestionVotingResultsOpen(true)}
-                className="rounded-2xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-600 disabled:cursor-not-allowed disabled:bg-violet-200"
+                className="rounded-2xl bg-violet-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-violet-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-violet-200"
                 disabled={questionVotingResults.length === 0}
               >
-                좋은 질문 결과 보기
+                📊 좋은 질문 결과 보기
               </button>
             )}
             {activityType === "one_line_share" && (
               <button
                 type="button"
                 onClick={() => setIsOneLineShareResultsOpen(true)}
-                className="rounded-2xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-rose-200"
+                className="rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-rose-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-rose-200"
                 disabled={oneLineShareResults.length === 0}
               >
-                한줄모아 결과 보기
+                💬 한줄모아 결과 보기
               </button>
             )}
             {activityType === "hanja_writing" && (
               <button
                 type="button"
                 onClick={() => setIsHanjaWritingResultsOpen(true)}
-                className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-200"
+                className="rounded-2xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-amber-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-amber-200"
                 disabled={hanjaWritingResults.length === 0}
               >
-                한자 문장 결과 보기
+                📜 한자 문장 결과 보기
               </button>
-            )}
-            <div className="flex gap-3 text-sm">
-              <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
-                작성 중 {activeSessions.length}명
-              </span>
-              <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full font-medium">
-                완료 {doneSessions.length}명
-              </span>
-              <span className="bg-gray-50 text-gray-500 px-3 py-1 rounded-full font-medium">
-                전체 {students.length}명
-              </span>
-            </div>
-            {isActive && (
-              <span className="flex items-center gap-1 text-xs text-gray-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                실시간
-              </span>
             )}
           </div>
         </div>
 
-        {activeSessions.length > 0 && (
-          <div>
-            <p className="text-sm font-semibold text-blue-600 mb-2">✏️ 작성 중 (미제출)</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {activeSessions.map((s) => (
-                  <div key={s.id} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-blue-300 font-mono w-5 shrink-0">{s.student_number}</span>
-                      <span className="text-sm font-medium text-blue-800 truncate flex-1">{s.student_name}</span>
-                      {s.level && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${levelStyle(s.level)}`}>
-                          {levelLabel(s.level)}
-                        </span>
-                      )}
-                    </div>
+        {/* 📊 상단 핵심 현황 대시보드 (20명 기준 시각화) */}
+        {(() => {
+          const totalCount = students.length || (doneSessions.length + activeSessions.length);
+          const donePct = totalCount > 0 ? Math.round((doneSessions.length / totalCount) * 100) : 0;
+          const activePct = totalCount > 0 ? Math.round((activeSessions.length / totalCount) * 100) : 0;
+          const notConnectedPct = totalCount > 0 ? Math.max(0, 100 - donePct - activePct) : 0;
+
+          return (
+            <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-4 sm:p-5 space-y-3.5">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-500">
+                <span>학급 전체 진척도 (총 {totalCount}명)</span>
+                <span className="text-emerald-700 font-extrabold">{donePct}% 완료</span>
+              </div>
+
+              {/* 3단 프로그레스 바 */}
+              <div className="h-3.5 w-full rounded-full bg-gray-200 overflow-hidden flex shadow-inner">
+                <div
+                  style={{ width: `${donePct}%` }}
+                  className="bg-emerald-500 transition-all duration-500"
+                  title={`제출 완료: ${doneSessions.length}명 (${donePct}%)`}
+                />
+                <div
+                  style={{ width: `${activePct}%` }}
+                  className="bg-sky-400 transition-all duration-500"
+                  title={`작성 중: ${activeSessions.length}명 (${activePct}%)`}
+                />
+                <div
+                  style={{ width: `${notConnectedPct}%` }}
+                  className="bg-gray-300 transition-all duration-500"
+                  title={`시작 전: ${notConnected.length}명 (${notConnectedPct}%)`}
+                />
+              </div>
+
+              {/* 3개 지표 카드 */}
+              <div className="grid grid-cols-3 gap-2.5 sm:gap-3 text-center pt-1">
+                <div className="rounded-xl bg-white p-3 border border-emerald-200 shadow-sm">
+                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-emerald-700">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    제출 완료
                   </div>
+                  <div className="mt-1 flex items-baseline justify-center gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-800">{doneSessions.length}</span>
+                    <span className="text-xs font-semibold text-gray-400">/{totalCount}명</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 border border-sky-200 shadow-sm">
+                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-sky-700">
+                    <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                    작성 중
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-center gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-sky-800">{activeSessions.length}</span>
+                    <span className="text-xs font-semibold text-gray-400">명</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-gray-500">
+                    <span className="w-2 h-2 rounded-full bg-gray-300" />
+                    시작 전
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-center gap-1">
+                    <span className="text-2xl sm:text-3xl font-black text-gray-700">{notConnected.length}</span>
+                    <span className="text-xs font-semibold text-gray-400">명</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 1. 작성 중인 학생 목록 */}
+        {activeSessions.length > 0 && (
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-sky-800 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+                ✏️ 작성 중인 학생 ({activeSessions.length}명)
+              </p>
+              <span className="text-xs text-sky-600 font-medium">활동 진행 중</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+              {activeSessions.map((s) => (
+                <div key={s.id} className="rounded-xl border border-sky-200 bg-white px-3 py-2.5 shadow-sm flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-xs font-bold text-sky-700 font-mono">
+                    {s.student_number}
+                  </span>
+                  <span className="text-sm font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
+                  {s.level && (
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full shrink-0 ${levelStyle(s.level)}`}>
+                      {levelLabel(s.level)}
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* 완료 */}
+        {/* 2. 제출 완료 학생 목록 */}
         {doneSessions.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold text-green-600">
-                {activityType === "question_generator"
-                  ? "✅ 질문 제출 완료"
-                  : activityType === "question_voting"
-                    ? "✅ 좋은 질문 평가 완료"
-                    : activityType === "one_line_share"
-                      ? "✅ 한 줄 제출 완료"
-                      : activityType === "hanja_writing"
-                        ? "✅ 한자 문장 제출 완료"
-                    : "✅ 개요 완성"}
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                ✅ 제출 완료 ({doneSessions.length}명)
               </p>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-emerald-700 font-medium">
                 {activityType === "question_generator"
                   ? "보기 → 학생 질문 상세"
                   : activityType === "question_voting"
@@ -1309,47 +1376,55 @@ export default function LiveStudentPanel({
                       : "보기 → 학생 개요 상세"}
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {doneSessions.map(s => (
-                <div key={s.id}
-                  className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
-                  <span className="text-sm text-green-300 font-mono w-5 shrink-0">{s.student_number}</span>
-                  <span className="text-sm font-medium text-green-800 truncate flex-1">{s.student_name}</span>
-                  {/* QR 버튼 */}
-                  {activityType === "outline_builder" && showResultQr ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {doneSessions.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 bg-white border border-emerald-200 rounded-xl px-3.5 py-2.5 shadow-sm hover:border-emerald-300 transition-colors"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-700 font-mono">
+                      {s.student_number}
+                    </span>
+                    <span className="text-sm font-bold text-gray-800 truncate">{s.student_name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {activityType === "outline_builder" && showResultQr ? (
+                      <button
+                        type="button"
+                        onClick={() => setQrTarget(s)}
+                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-lg font-medium transition-colors"
+                        title="개인 결과 QR 보기"
+                      >
+                        QR
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={() => setQrTarget(s)}
-                      className="text-xs bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded-lg font-medium transition-colors shrink-0"
-                      title="개인 결과 QR 보기"
+                      onClick={() => setActiveSessionResult(s)}
+                      className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg shadow-sm transition-all active:scale-95"
                     >
-                      QR
+                      보기 →
                     </button>
-                  ) : null}
-                  {/* 결과 보기 링크 */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveSessionResult(s)}
-                    className="text-xs font-bold bg-green-100 hover:bg-green-200 text-green-700 px-2.5 py-1 rounded-lg transition-colors shrink-0"
-                  >
-                    보기 →
-                  </button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* 미접속 */}
+        {/* 3. 시작 전 학생 목록 */}
         {notConnected.length > 0 && (
-          <div>
-            <p className="text-sm font-semibold text-gray-400 mb-2">⬜ 시작 전 ({notConnected.length}명)</p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-              {notConnected.map(s => (
-                <div key={s.id}
-                  className="flex items-center gap-1.5 bg-gray-50 rounded-xl px-3 py-2">
-                  <span className="text-xs text-gray-300 font-mono w-4 shrink-0">{s.student_number}</span>
-                  <span className="text-sm text-gray-500 truncate">{s.student_name}</span>
+          <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-gray-600">⬜ 시작 전 ({notConnected.length}명)</p>
+              <span className="text-xs text-gray-400">아직 활동을 시작하지 않은 학생입니다</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              {notConnected.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-2.5 py-2 shadow-2xs">
+                  <span className="text-xs text-gray-400 font-mono w-4 shrink-0">{s.student_number}</span>
+                  <span className="text-sm text-gray-600 font-medium truncate">{s.student_name}</span>
                 </div>
               ))}
             </div>
