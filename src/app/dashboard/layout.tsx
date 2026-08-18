@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTeacherProfile, signOut } from "@/app/actions/auth-actions";
-import { DashboardNav } from "./dashboard-nav";
+import { DashboardNav, DashboardBrandLink } from "./dashboard-nav";
 
 const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
   ?? "https://xn--vz0ba242ncqcba79xhwx.site";
@@ -14,13 +14,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="lab-shell">
       <div className="lab-shell__chrome">
         <header className="lab-shell__header">
-          <Link href="/dashboard" className="lab-brand" aria-label="글쓰기 연구소 대시보드">
-            <span className="lab-brand__mark" aria-hidden="true">✏️</span>
-            <span>
-              <span className="lab-brand__eyebrow">끄적끄적 아지트</span>
-              <span className="lab-brand__title">글쓰기 연구소</span>
-            </span>
-          </Link>
+          {/* 끄적끄적 아지트 글쓰기 연구소 브랜드 링크 (활성 학급 유지) */}
+          <DashboardBrandLink />
 
           <div className="lab-shell__actions">
             <span className="lab-profile">{profile?.name} 선생님</span>
