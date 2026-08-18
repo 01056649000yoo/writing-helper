@@ -73,7 +73,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                 </Link>
               </div>
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {activeRooms.map((room) => (
                   <ActivityCard key={room.id} room={room} status="active" />
                 ))}
@@ -97,23 +97,23 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
   if (status === "closed") {
     return (
       <div className={`relative bg-white/60 rounded-2xl hover:bg-white transition-colors opacity-70 hover:opacity-100 border-l-4 ${cardAccentBorder(room)}`}>
-        <Link href={href} className="block p-6">
-          <div className="flex items-start gap-3 mb-2 pr-16">
-            <span className="text-2xl shrink-0">{cardEmoji(room)}</span>
-            <h3 className="font-semibold text-gray-700 text-base leading-snug">{room.title}</h3>
+        <Link href={href} className="block p-4">
+          <div className="flex items-start gap-2 pr-9">
+            <span className="text-xl shrink-0">{cardEmoji(room)}</span>
+            <h3 className="font-semibold text-gray-700 text-sm leading-snug line-clamp-2">{room.title}</h3>
           </div>
-          <p className="text-sm text-gray-500 mt-1">주제: {room.topic}</p>
-          <div className="flex gap-2 mt-2.5 flex-wrap">
-            <span className={`text-xs px-2.5 py-1 rounded-full ${kindChipColor(room)}`}>
+          <p className="mt-1.5 text-xs text-gray-500 line-clamp-1">주제: {room.topic}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className={`text-[0.68rem] px-2 py-0.5 rounded-full ${kindChipColor(room)}`}>
               {kindLabel(room)}
             </span>
             {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
-              <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
+              <span className="text-[0.68rem] bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full">{room.subject_type}</span>
             )}
           </div>
-          <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
+          <p className="mt-2 text-[0.68rem] text-gray-400">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
         </Link>
-        <div className="absolute top-3 right-3"><DeleteRoomButton roomId={room.id} /></div>
+        <div className="absolute top-2 right-2"><DeleteRoomButton roomId={room.id} /></div>
       </div>
     );
   }
@@ -122,7 +122,7 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
     <div className={`relative bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border-l-4 ${cardAccentBorder(room)}`}>
       {/* 이름·주제 수정은 카드 위에 겹쳐 둔다. 카드가 통째로 링크라 그 안에 버튼을 넣으면
           링크 안의 링크가 되어 눌림이 엉킨다. */}
-      <div className="absolute top-3 right-3 z-10 flex gap-1">
+      <div className="absolute top-2 right-2 z-10 flex gap-1">
         <EditRoomButton
           roomId={room.id}
           title={room.title}
@@ -130,29 +130,30 @@ function ActivityCard({ room, status }: { room: UnifiedRoom; status: "active" | 
           topicDescription={room.topic_description}
         />
       </div>
-      <Link href={href} className="block p-6">
-      <div className="flex items-start justify-between mb-3">
-        <span className="text-2xl">{cardEmoji(room)}</span>
-        {isActive ? (
-          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${activeBadgeColor(room)}`}>
-            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${activeDotColor(room)}`} />
-            진행 중
+      <Link href={href} className="block p-4">
+        {/* 5열이라 폭이 좁다. 아이콘과 상태를 한 줄에 두되 수정 버튼 자리를 비워 둔다. */}
+        <div className="flex items-center gap-2 pr-9">
+          <span className="text-xl shrink-0">{cardEmoji(room)}</span>
+          {isActive ? (
+            <span className={`inline-flex items-center gap-1 text-[0.68rem] font-semibold px-2 py-0.5 rounded-full ${activeBadgeColor(room)}`}>
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${activeDotColor(room)}`} />
+              진행 중
+            </span>
+          ) : (
+            <span className="text-[0.68rem] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">종료</span>
+          )}
+        </div>
+        <h3 className="mt-2 font-bold text-gray-800 text-sm leading-snug line-clamp-2">{room.title}</h3>
+        <p className="mt-1 text-xs text-gray-500 line-clamp-1">주제: {room.topic}</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className={`text-[0.68rem] px-2 py-0.5 rounded-full ${kindChipColor(room)}`}>
+            {kindLabel(room)}
           </span>
-        ) : (
-          <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">종료</span>
-        )}
-      </div>
-      <h3 className="font-bold text-gray-800 text-base">{room.title}</h3>
-      <p className="text-sm text-gray-500 mt-1 line-clamp-1">주제: {room.topic}</p>
-      <div className="flex gap-2 mt-2.5 flex-wrap">
-        <span className={`text-xs px-2.5 py-1 rounded-full ${kindChipColor(room)}`}>
-          {kindLabel(room)}
-        </span>
-        {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
-          <span className="text-xs bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full">{room.subject_type}</span>
-        )}
-      </div>
-      <p className="text-sm text-gray-400 mt-2">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
+          {room.subject_type && String(room.subject_type) !== "null" && String(room.subject_type).trim() !== "" && (
+            <span className="text-[0.68rem] bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full">{room.subject_type}</span>
+          )}
+        </div>
+        <p className="mt-2 text-[0.68rem] text-gray-400">{new Date(room.created_at).toLocaleDateString("ko-KR")}</p>
       </Link>
     </div>
   );

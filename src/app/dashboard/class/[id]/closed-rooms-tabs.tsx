@@ -198,7 +198,7 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
           <p className="text-gray-400 text-base font-medium">{emptyMessage()}</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtered.map((room) => {
             const href = `/dashboard/room/${room.id}`;
 
@@ -207,32 +207,33 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
                 key={`${room.kind}-${room.id}`}
                 className={`relative bg-white/60 rounded-2xl hover:bg-white transition-all duration-200 opacity-80 hover:opacity-100 border-l-4 ${cardAccentBorder(room)} hover:shadow-xs group`}
               >
-                <Link href={href} className="block p-6">
-                  <div className="flex items-start gap-3 mb-2 pr-16">
-                    <span className="text-2xl shrink-0 group-hover:scale-110 transition-transform duration-200">
+                {/* 5열이라 폭이 좁다. 진행 중 카드와 같은 크기로 맞춘다. */}
+                <Link href={href} className="block p-4">
+                  <div className="flex items-start gap-2 pr-9">
+                    <span className="text-xl shrink-0 group-hover:scale-110 transition-transform duration-200">
                       {cardEmoji(room)}
                     </span>
-                    <h3 className="font-semibold text-gray-700 text-base leading-snug group-hover:text-indigo-600 transition-colors">
+                    <h3 className="font-semibold text-gray-700 text-sm leading-snug line-clamp-2 group-hover:text-indigo-600 transition-colors">
                       {room.title}
                     </h3>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1 line-clamp-1">주제: {room.topic}</p>
+                  <p className="mt-1.5 text-xs text-gray-500 line-clamp-1">주제: {room.topic}</p>
 
-                  <div className="flex gap-2 mt-3 flex-wrap">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${kindChipColor(room)}`}>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <span className={`text-[0.68rem] px-2 py-0.5 rounded-full font-medium ${kindChipColor(room)}`}>
                       {kindLabel(room)}
                     </span>
                     {room.subject_type && (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium">
+                      <span className="text-[0.68rem] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
                         {room.subject_type}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-3 font-medium">
+                  <p className="mt-2 text-[0.68rem] text-gray-400 font-medium">
                     {new Date(room.created_at).toLocaleDateString("ko-KR")} 개설
                   </p>
                 </Link>
-                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   {renderDeleteBtn(room)}
                 </div>
               </div>
