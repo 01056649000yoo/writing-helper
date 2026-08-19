@@ -19,6 +19,8 @@ import {
   getCardKeywordBadge,
   getQuestionAreaByCardLabel,
 } from "@/features/activities/question-generator/areas";
+import { saveQuestionCardSetting } from "@/app/actions/settings-actions";
+import { LabGuide } from "@/features/activities/LabGuide";
 import {
   getCardMeta,
   getCardTheme,
@@ -145,6 +147,53 @@ const WRITING_BUNDLE_DEFINITIONS = activityDefinitions.filter(
 );
 
 
+/** 활동을 고르는 자리에서 바로 여는 도움말. 내용은 대시보드 안내 탭과 같은 것을 본다. */
+function LabGuideButton() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="shrink-0 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-50"
+      >
+        ❓ 활동 도움말
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
+          <div className="my-8 w-full max-w-4xl rounded-3xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-3xl border-b border-gray-100 bg-white px-6 py-4">
+              <h2 className="text-base font-bold text-gray-900">📖 글쓰기 연구소 도움말</h2>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-lg p-1 text-xl font-bold text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                aria-label="도움말 닫기"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6">
+              <LabGuide compact />
+            </div>
+            <div className="flex justify-end border-t border-gray-100 bg-gray-50 px-6 py-3.5">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-xl bg-gray-800 px-5 py-2 text-xs font-bold text-white hover:bg-gray-900"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ActivitySelectionScreen({ classId }: { classId: string }) {
   return (
     <main className="lab-page">
@@ -161,7 +210,10 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 <p className="text-xs font-semibold text-indigo-600">Step 1</p>
                 <h1 className="mt-0.5 text-xl font-bold text-gray-800">어떤 활동을 시작할까요?</h1>
               </div>
-              <p className="text-xs text-gray-400">활동을 고르면 각 활동에 맞는 설정 화면이 열립니다</p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-gray-400">활동을 고르면 각 활동에 맞는 설정 화면이 열립니다</p>
+                <LabGuideButton />
+              </div>
             </div>
           </div>
 
@@ -664,6 +716,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [aiGenError, setAiGenError] = useState("");
   const [aiCount, setAiCount] = useState<number>(5);
   const [modalTargetCardSet, setModalTargetCardSet] = useState<QuestionCardSet | null>(null);
+  const [creatingCardSet, setCreatingCardSet] = useState(false);
   const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
   const [loadingCardSets, setLoadingCardSets] = useState(true);
   const initializedRef = useRef(false);
@@ -743,7 +796,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
       ...prev,
       customAiQuestions: [
         ...prev.customAiQuestions,
-        { id: newId, text: "새로운 질문 예시를 입력하세요.", included: true },
+        { id: newId, text: "무엇을 살펴보고 어떤 질문을 만들지 안내하는 문장을 쓰세요. 예) ~을(를) 떠올려 보고, 그것을 묻는 질문을 만들어 보세요.", included: true },
       ],
     }));
   }
@@ -764,7 +817,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     }
 
     if (draft.mode === "ai_custom" && activeAiQuestions.length === 0) {
-      setError("학생에게 보여 줄 질문 예시를 1개 이상 만들거나 선택해주세요.");
+      setError("학생에게 보여 줄 질문 카드를 1개 이상 만들거나 선택해주세요.");
       return;
     }
 
@@ -942,13 +995,13 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                     className="text-emerald-500"
                   />
                 </div>
-                <h3 className="mt-2.5 text-base font-bold text-gray-800">3. AI 질문 예시 제공</h3>
+                <h3 className="mt-2.5 text-base font-bold text-gray-800">3. AI 질문 카드 만들기</h3>
                 <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-                  오늘 주제 맞춤 AI 질문 중 좋은 질문을 골라 학생에게 제공합니다.
+                  오늘 주제에 맞는 <strong>질문 카드</strong>(완성된 질문이 아니라 관점을 여는 문장)를 AI가 만들어 줍니다.
                 </p>
               </div>
               <span className="text-[11px] font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-100 text-center">
-                주제 맞춤 질문 풀(Pool)
+주제 맞춤 질문 카드
               </span>
             </label>
           </div>
@@ -985,6 +1038,14 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                   </p>
                 </div>
                 <div className="flex gap-1.5">
+                  {/* 마음에 드는 카드가 없으면 여기서 바로 만든다 — 설정 화면으로 나가지 않는다. */}
+                  <button
+                    type="button"
+                    onClick={() => setCreatingCardSet(true)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"
+                  >
+                    ＋ 질문 카드 만들기
+                  </button>
                   <button
                     type="button"
                     onClick={() => setDraft((p) => ({ ...p, selectedCardSetIds: availableCardSets.map((c) => c.id) }))}
@@ -1064,9 +1125,9 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             <div className="rounded-2xl bg-emerald-50/60 border border-emerald-100 p-4 space-y-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2.5">
                 <div>
-                  <p className="text-xs font-bold text-emerald-800">✨ AI 추천 질문 풀(Pool) 선별</p>
+                  <p className="text-xs font-bold text-emerald-800">✨ AI 질문 카드 고르기</p>
                   <p className="text-[11px] text-emerald-600 mt-0.5">
-                    선택된 질문들이 학생에게 질문 카드로 제공됩니다.
+                    고른 카드가 학생 화면에 그대로 보입니다. 학생은 카드를 힌트 삼아 <strong>자기 질문</strong>을 씁니다.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1095,7 +1156,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                     disabled={generatingAi}
                     className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all active:scale-95 disabled:opacity-50"
                   >
-                    {generatingAi ? "🧠 생성 중..." : `✨ AI 질문 ${aiCount}개 추천`}
+                    {generatingAi ? "🧠 생성 중..." : `✨ AI 질문 카드 ${aiCount}개 만들기`}
                   </button>
                   <button
                     type="button"
@@ -1116,7 +1177,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                 <div className="rounded-xl border border-dashed border-emerald-200 bg-white/70 p-6 text-center">
                   <p className="text-sm font-semibold text-emerald-800">아직 추천된 질문이 없습니다.</p>
                   <p className="mt-1 text-xs text-gray-500">
-                    위의 <strong>[✨ AI 질문 {aiCount}개 추천]</strong> 버튼을 누르면 오늘 주제에 딱 맞는 질문 예시가 생성됩니다.
+                    위의 <strong>[✨ AI 질문 카드 {aiCount}개 만들기]</strong> 버튼을 누르면 오늘 주제에 맞는 질문 카드가 만들어집니다.
                   </p>
                 </div>
               ) : (
@@ -1146,7 +1207,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] font-bold text-emerald-700">질문 예시 {idx + 1}</span>
+                          <span className="text-[11px] font-bold text-emerald-700">질문 카드 {idx + 1}</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -1229,6 +1290,21 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
         </button>
       </form>
 
+      {/* 새 질문 카드 만들기 — 만들면 곧바로 목록에 담기고 선택된다. */}
+      {creatingCardSet && (
+        <NewCardSetModal
+          topic={draft.topic}
+          topicDescription={draft.topic_description}
+          nextSortOrder={availableCardSets.length}
+          onClose={() => setCreatingCardSet(false)}
+          onCreated={(cardSet) => {
+            setAvailableCardSets((prev) => [...prev, cardSet]);
+            setDraft((p) => ({ ...p, selectedCardSetIds: [...p.selectedCardSetIds, cardSet.id] }));
+            setCreatingCardSet(false);
+          }}
+        />
+      )}
+
       {/* 질문 카드 세부내용 모달 팝업 */}
       {modalTargetCardSet && (
         <CardSetDetailModal
@@ -1237,6 +1313,165 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
         />
       )}
     </>
+  );
+}
+
+/**
+ * 활동을 만들다가 마음에 드는 질문 카드가 없을 때, 그 자리에서 새 카드 묶음을 만든다.
+ * 저장하면 교사 설정(질문 카드 보관함)에도 남아 다음 활동에서 다시 쓸 수 있다.
+ */
+function NewCardSetModal({
+  topic,
+  topicDescription,
+  nextSortOrder,
+  onClose,
+  onCreated,
+}: {
+  topic: string;
+  topicDescription: string;
+  nextSortOrder: number;
+  onClose: () => void;
+  onCreated: (cardSet: QuestionCardSet) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [description, setDescription] = useState("");
+  const [promptText, setPromptText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
+
+  const prompts = promptText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const area = getQuestionAreaByCardLabel(label || "기타");
+
+  async function handleGenerate() {
+    if (!topic.trim()) {
+      setError("먼저 위쪽에 활동 주제를 입력해 주세요. 주제에 맞춰 카드를 만듭니다.");
+      return;
+    }
+    setError("");
+    setGenerating(true);
+    const result = await generateQuestionsWithAI(topic, topicDescription, 5);
+    setGenerating(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    const generated = (result.questions ?? []).join("\n");
+    setPromptText((current) => (current.trim() ? `${current.trim()}\n${generated}` : generated));
+  }
+
+  async function handleSave() {
+    if (!label.trim()) {
+      setError("카드 묶음 이름을 입력해 주세요.");
+      return;
+    }
+    if (prompts.length === 0) {
+      setError("질문 카드 문장을 한 줄에 하나씩 1개 이상 입력해 주세요.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    const result = await saveQuestionCardSetting({
+      label: label.trim(),
+      description: description.trim(),
+      prompts,
+      sortOrder: nextSortOrder,
+    });
+    setSaving(false);
+    if (result.error || !result.cardSet) {
+      setError(result.error ?? "카드를 저장하지 못했습니다.");
+      return;
+    }
+    onCreated(result.cardSet);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🃏</span>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">새 질문 카드 만들기</h3>
+              <p className="text-xs text-gray-500">완성된 질문이 아니라, 학생이 질문을 만들 관점을 주는 문장을 씁니다.</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-xl font-bold text-gray-400 hover:bg-white/60 hover:text-gray-700">
+            ✕
+          </button>
+        </div>
+
+        <div className="max-h-[65vh] space-y-4 overflow-y-auto p-6">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-gray-700">카드 묶음 이름 *</label>
+              <input
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="예) 상상, 마음, 감각"
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-300"
+              />
+              <p className={`mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${area.chip.bg} ${area.chip.text} ${area.chip.border}`}>
+                <span>{area.emoji}</span>
+                <span>{area.label} 카테고리로 묶여요</span>
+              </p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-gray-700">설명 <span className="font-normal text-gray-400">(선택)</span></label>
+              <input
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="학생 화면에 함께 보이는 한 줄 설명"
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-300"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-bold text-gray-700">질문 카드 문장 * <span className="font-normal text-gray-400">(한 줄에 하나 · {prompts.length}장)</span></label>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={generating}
+                className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {generating ? "🧠 만드는 중..." : "✨ AI로 5장 만들기"}
+              </button>
+            </div>
+            <textarea
+              rows={7}
+              value={promptText}
+              onChange={(event) => setPromptText(event.target.value)}
+              placeholder={"예) 이야기가 끝난 다음 날 주인공에게 무슨 일이 생길지 상상해 보고, 그것을 묻는 질문을 만들어 보세요.\n예) 가장 또렷이 떠오르는 장면을 고르고, 그곳에서 어떤 소리가 들렸을지 묻는 질문을 만들어 보세요."}
+              className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm leading-6 text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-300"
+            />
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              학생은 이 문장을 힌트로 읽고 <strong>자기 질문</strong>을 씁니다. 물음표로 끝나는 완성된 질문은 그대로 베끼게 되니 피해 주세요.
+            </p>
+          </div>
+
+          {error && <p className="rounded-lg bg-red-50 p-2.5 text-xs font-semibold text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 px-6 py-3.5">
+          <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100">
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-xl bg-violet-600 px-5 py-2 text-xs font-bold text-white transition-all hover:bg-violet-700 disabled:opacity-50"
+          >
+            {saving ? "저장 중..." : "만들고 이 활동에 넣기"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -211,16 +211,30 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   if (activityType === "question_generator" && questionSubmission) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
-        <div className="max-w-2xl mx-auto pt-8 pb-16 space-y-4">
-          <div className="bg-white rounded-3xl shadow-xl p-6 text-center">
-            <div className="text-5xl mb-2">🃏</div>
-            <h1 className="text-2xl font-bold text-gray-800">질문 완성!</h1>
-            <p className="text-gray-500 mt-1 text-sm">
-              <strong className="text-sky-600">{studentName}</strong>의{" "}
-              <strong>{topic}</strong> 질문 만들기 활동
-            </p>
+        <div className="w-full max-w-[1200px] mx-auto pt-8 pb-16 space-y-4">
+          <div className="rounded-3xl bg-white p-6 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">🃏</span>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800">질문 완성!</h1>
+                  <p className="mt-1 text-sm text-gray-500">
+                    <strong className="text-sky-600">{studentName}</strong>의{" "}
+                    <strong>{topic}</strong> 질문 만들기 활동
+                  </p>
+                </div>
+              </div>
+              {/* 제출 뒤 고치는 길을 맨 위에 둔다 — 결과를 보고 바로 고치고 싶어진다. */}
+              <Link
+                href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+                className="rounded-2xl bg-sky-500 px-6 py-3 text-center font-bold text-white transition-colors hover:bg-sky-600"
+              >
+                ✏️ 질문 고치기
+              </Link>
+            </div>
           </div>
 
+          <div className="grid gap-4 lg:grid-cols-2">
           {questionSubmission.selections.map((selection, index) => (
             <div key={selection.id} className="bg-white rounded-3xl shadow-xl p-6 space-y-4">
               <div className="flex items-center justify-between gap-3">
@@ -252,22 +266,16 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
 
             </div>
           ))}
+          </div>
 
           <button
             onClick={copyCurrentText}
             className={`w-full py-4 rounded-2xl font-bold text-lg transition-colors ${
-              copied ? "bg-green-500 text-white" : "bg-sky-500 text-white hover:bg-sky-600"
+              copied ? "bg-green-500 text-white" : "bg-white text-sky-700 border border-sky-200 hover:bg-sky-50"
             }`}
           >
             {copied ? "✅ 복사됐어요!" : "📋 내 질문 복사하기"}
           </button>
-
-          <Link
-            href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
-            className="block w-full rounded-2xl border border-sky-200 bg-white py-4 text-center font-bold text-sky-700 transition-colors hover:bg-sky-50"
-          >
-            ✏️ 질문 다시 수정하기
-          </Link>
 
           <div className="bg-white rounded-3xl shadow-xl p-6">
             <div className="flex items-center justify-between gap-3">

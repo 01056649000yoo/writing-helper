@@ -9,8 +9,11 @@ import type {
  *
  * 교사 화면·서버 액션·학생 화면이 각자 조건을 판단하면 어긋난다(2026-08-19에 실제로 어긋났다 —
  * 교사 화면은 방식을 3가지로 나눴는데 서버는 모드와 무관하게 "카드 묶음 1개 이상"을 요구했고,
- * 학생 화면은 늘 역할→카드→다듬기 3단계를 강요했다. 역할은 2026-08-19에 걷어냈다 — `areas.ts` 참고).
- * 그래서 **시작 조건과 단계 구성의 원본은 이 파일 하나**다.
+ * 학생 화면은 늘 역할→카드→다듬기 3단계를 강요했다).
+ * 그래서 **시작 조건의 원본은 이 파일 하나**다.
+ *
+ * 2026-08-19 저녁에 학생 화면은 **단계 없이 한 화면**이 됐다 — 왼쪽에서 고르고 오른쪽에서 바로 쓴다.
+ * 방식(mode)이 정하는 것은 "왼쪽에 무엇이 있는가"뿐이다(카테고리+질문 / 선생님 질문 / 없음).
  */
 
 export const QUESTION_GENERATOR_MODES = ["direct", "card_remix", "ai_custom"] as const;
@@ -33,30 +36,12 @@ export const QUESTION_GENERATOR_MODE_META: Record<
     studentHint: "질문 카테고리를 고르고, 그 안의 질문을 오늘 주제에 맞게 바꿔 써 보세요.",
   },
   ai_custom: {
-    label: "선생님 추천 질문",
+    label: "선생님 질문 카드",
     icon: "✨",
-    teacherHint: "선생님이 고른 질문 예시만 학생에게 보여 줍니다.",
-    studentHint: "선생님이 준비한 질문 예시를 고른 뒤, 내 질문으로 바꿔 써 보세요.",
+    teacherHint: "선생님이 고른 질문 카드(관점을 여는 문장)만 학생에게 보여 줍니다.",
+    studentHint: "선생님이 준비한 질문 카드를 보고, 내 질문을 만들어 보세요.",
   },
 };
-
-/** 방식별 학생 화면 단계 — 화면은 이 목록만 보고 마법사를 그린다. */
-const MODE_STEPS: Record<QuestionGeneratorMode, ReadonlyArray<{ key: string; label: string }>> = {
-  direct: [{ key: "rewrite", label: "질문 쓰기" }],
-  ai_custom: [
-    { key: "set", label: "질문 고르기" },
-    { key: "rewrite", label: "질문 완성" },
-  ],
-  card_remix: [
-    { key: "path", label: "카테고리 고르기" },
-    { key: "set", label: "질문 고르기" },
-    { key: "rewrite", label: "질문 바꿔 쓰기" },
-  ],
-};
-
-export function questionGeneratorSteps(mode: QuestionGeneratorMode) {
-  return MODE_STEPS[mode];
-}
 
 /** 옛 방에는 `mode`가 없다 — 그때는 전부 카드 방식이었으므로 카드 방식으로 읽는다. */
 export function parseQuestionGeneratorMode(value: unknown): QuestionGeneratorMode {
@@ -66,14 +51,14 @@ export function parseQuestionGeneratorMode(value: unknown): QuestionGeneratorMod
 }
 
 export const AI_CUSTOM_CARD_SET_ID = "ai-custom-card-set";
-export const AI_CUSTOM_CARD_SET_LABEL = "선생님 추천 질문";
+export const AI_CUSTOM_CARD_SET_LABEL = "선생님 질문 카드";
 export const MAX_AI_CUSTOM_QUESTIONS = 20;
 export const MAX_AI_CUSTOM_QUESTION_LENGTH = 200;
 
 export const DEFAULT_QUESTION_GENERATOR_GUIDANCE: Record<QuestionGeneratorMode, string> = {
   direct: "오늘 주제를 잘 보고, 내가 정말 궁금한 것을 질문으로 만들어 봅시다.",
   card_remix: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
-  ai_custom: "선생님이 준비한 질문 예시를 고른 뒤, 내 생각이 드러나게 바꿔 봅시다.",
+  ai_custom: "선생님이 준비한 질문 카드를 보고, 오늘 주제에 맞는 내 질문을 만들어 봅시다.",
 };
 
 /**
@@ -158,13 +143,13 @@ export function buildQuestionGeneratorConfig(input: {
       .slice(0, MAX_AI_CUSTOM_QUESTIONS);
 
     if (questions.length === 0) {
-      return { ok: false, error: "학생에게 보여 줄 질문 예시를 1개 이상 만들거나 선택해주세요." };
+      return { ok: false, error: "학생에게 보여 줄 질문 카드를 1개 이상 만들거나 선택해주세요." };
     }
 
     const cardSet: QuestionCardSet = {
       id: AI_CUSTOM_CARD_SET_ID,
       label: AI_CUSTOM_CARD_SET_LABEL,
-      description: "선생님이 오늘 주제에 맞게 골라 둔 질문 예시입니다.",
+      description: "선생님이 오늘 주제에 맞게 골라 둔 질문 카드입니다.",
       prompts: questions,
     };
 

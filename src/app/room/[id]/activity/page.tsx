@@ -18,7 +18,6 @@ import type {
   ActivityType,
   HanjaWritingConfig,
   OneLineShareConfig,
-  QuestionCardRole,
   QuestionCardSet,
   QuestionGeneratorConfig,
   QuestionGeneratorSubmission,
@@ -29,15 +28,8 @@ import type { OutlineTemplateAnswer, OutlineTemplate } from "@/features/activiti
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import { StudentSpellingTextarea } from "@/components/student-spelling-textarea";
 import {
-  getCardMeta,
-  getCardTheme,
-  getRecommendedGradeChipClass,
-  getRecommendedGradeLabel,
-} from "@/features/activities/question-generator/card-meta";
-import {
   QUESTION_GENERATOR_MODE_META,
   normalizeQuestionGeneratorConfig,
-  questionGeneratorSteps,
 } from "@/features/activities/question-generator/config";
 import {
   getQuestionAreaByCardLabel,
@@ -48,11 +40,7 @@ import type { QuestionGeneratorMode } from "@/features/activities/types";
 
 type Step =
   | "outline_sections"
-  | "question_intro"
-  | "question_path"
-  | "question_set"
-  | "question_prompt"
-  | "question_rewrite"
+  | "question_build"
   | "question_submitting"
   | "question_voting"
   | "one_line_share"
@@ -61,7 +49,6 @@ type Step =
   | "hanja_submitting";
 
 type QuestionSelection = QuestionGeneratorSubmission["selections"][number];
-type QuestionBuildMode = "direct" | "card_remix";
 type OutlineSectionKey = "처음" | "가운데" | "끝";
 
 type OutlineSharedQuestion = {
@@ -118,24 +105,16 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [remixedQuestion, setRemixedQuestion] = useState("");
   const [questionSelections, setQuestionSelections] = useState<QuestionSelection[]>([]);
   const [editingSelectionId, setEditingSelectionId] = useState<string | null>(null);
-  const [questionBuildMode, setQuestionBuildMode] = useState<QuestionBuildMode | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<QuestionAreaId | null>(null);
   const [selectedCategoryLabel, setSelectedCategoryLabel] = useState<string | null>(null);
   const [promptSearch, setPromptSearch] = useState("");
+  const [guideOpen, setGuideOpen] = useState(true);
   const [selectedVotingQuestionIds, setSelectedVotingQuestionIds] = useState<string[]>([]);
   const [oneLineContent, setOneLineContent] = useState("");
 
   const maxSelections = questionGeneratorConfig?.maxSelections ?? 1;
   const questionMode: QuestionGeneratorMode = questionGeneratorConfig?.mode ?? "card_remix";
   const questionModeMeta = QUESTION_GENERATOR_MODE_META[questionMode];
-  const questionSteps = questionGeneratorSteps(questionMode);
-  /** 방식마다 첫 단계가 다르다 — 직접 쓰기는 곧바로 입력창부터 연다. */
-  const firstQuestionStep: Step = questionMode === "direct"
-    ? "question_rewrite"
-    : questionMode === "ai_custom"
-      ? "question_set"
-      : "question_path";
-  const questionSelectionsFull = questionSelections.length >= maxSelections;
 
   const enabledCardSets = useMemo(() => {
     const allowedIds = new Set(questionGeneratorConfig?.enabledCardSetIds ?? []);
@@ -218,13 +197,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       if (type === "question_generator") {
         setQuestionGeneratorConfig(normalizeQuestionGeneratorConfig(data.activity_config));
         const existingSubmission = data.existing_submission as QuestionGeneratorSubmission | null;
-        if (existingSubmission?.selections?.length) {
-          setQuestionSelections(existingSubmission.selections);
-          setStep(editMode ? "question_path" : "question_intro");
-        } else {
-          setQuestionSelections([]);
-          setStep("question_intro");
-        }
+        // 화면이 하나라 처음 들어와도, 고치러 다시 들어와도 같은 곳에서 이어 한다.
+        setQuestionSelections(existingSubmission?.selections ?? []);
+        setStep("question_build");
       } else if (type === "question_voting") {
         const votingConfig = normalizeQuestionVotingConfig(data.activity_config);
         setQuestionVotingConfig(votingConfig);
@@ -397,15 +372,31 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     router.push(`/room/${roomId}/result?session=${sessionId}`);
   }
 
-  function selectQuestionPrompt(prompt: string) {
-    if (!activeCardSet) return;
-    setSelectedCardSetId(activeCardSet.id);
+  /**
+   * 질문 카드를 누르면 곧바로 오른쪽 입력창 옆에 붙는다 — 화면을 넘기지 않는다.
+   * 카드는 대부분 "~ 질문을 만들어 보세요" 같은 **관점 안내**라 그대로 옮겨 적을 것이 아니다.
+   * 물음표로 끝나는 완성된 질문일 때만 입력창에 담아 고쳐 쓰게 한다.
+   */
+  function selectQuestionPrompt(prompt: string, cardSet: QuestionCardSet | null) {
+    const source = cardSet ?? activeCardSet;
+    if (!source) return;
+    setSelectedCardSetId(source.id);
     setSelectedPrompt(prompt);
-    setRemixedQuestion(prompt);
+    setRemixedQuestion(/[?？]\s*$/.test(prompt) ? prompt : "");
+    setError("");
   }
 
+  /** 입력창을 비운다(카테고리 선택은 그대로 두어 다음 질문을 바로 고를 수 있게 한다). */
+  function clearQuestionEditor() {
+    setEditingSelectionId(null);
+    setSelectedCardSetId(null);
+    setSelectedPrompt(null);
+    setRemixedQuestion("");
+    setError("");
+  }
 
-  async function handleQuestionSelectionSubmit() {
+  /** 쓴 질문을 목록에 담는다. 저장해도 화면은 그대로다. */
+  function saveQuestionSelection() {
     const normalizedQuestion = remixedQuestion.trim();
     if (!normalizedQuestion) {
       setError("오늘 주제에 맞게 바꾼 질문을 적어주세요.");
@@ -413,597 +404,404 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     }
 
     if (!editingSelectionId && questionSelections.length >= maxSelections) {
-      setError(`질문을 이미 ${maxSelections}개 만들었어요. 아래 목록에서 질문을 눌러 고쳐 보세요.`);
+      setError(`질문을 이미 ${maxSelections}개 담았어요. 오른쪽 목록에서 질문을 눌러 고쳐 보세요.`);
       return;
     }
 
+    const isDirect = questionMode === "direct";
     const selection: QuestionSelection = {
-      id: editingSelectionId ?? `selection-${questionSelections.length + 1}`,
-      method: questionBuildMode ?? "card_remix",
-      cardSetId: questionBuildMode === "direct" ? "custom" : selectedCardSet?.id ?? "custom",
-      cardSetLabel:
-        questionBuildMode === "direct"
-          ? "직접 질문 만들기"
-          : selectedCardSet?.label ?? "질문 카드",
-      originalPrompt: questionBuildMode === "direct" ? null : selectedPrompt,
+      id: editingSelectionId ?? `selection-${Date.now()}`,
+      method: isDirect ? "direct" : "card_remix",
+      cardSetId: isDirect ? "custom" : selectedCardSet?.id ?? "custom",
+      cardSetLabel: isDirect
+        ? "직접 질문 만들기"
+        : selectedCardSet?.label ?? "직접 쓴 질문",
+      originalPrompt: isDirect ? null : selectedPrompt,
       remixedQuestion: normalizedQuestion,
     };
 
-    const nextSelections = editingSelectionId
-      ? questionSelections.map((currentSelection) => (
-          currentSelection.id === editingSelectionId ? selection : currentSelection
-        ))
-      : [...questionSelections, selection];
-    setQuestionSelections(nextSelections);
-    setError("");
+    setQuestionSelections((prev) => (
+      editingSelectionId
+        ? prev.map((current) => (current.id === editingSelectionId ? selection : current))
+        : [...prev, selection]
+    ));
+    clearQuestionEditor();
+  }
 
-    if (editingSelectionId) {
-      setEditingSelectionId(null);
+  /** 담은 질문을 모두 제출한다. 제출 뒤에도 결과 화면에서 다시 고칠 수 있다. */
+  async function submitQuestionSelections() {
+    const pending = remixedQuestion.trim();
+    // 쓰다 만 질문이 있으면 먼저 담아 준다 — 눌렀는데 사라지는 일이 없게.
+    let nextSelections = questionSelections;
+    if (pending) {
+      const isDirect = questionMode === "direct";
+      const selection: QuestionSelection = {
+        id: editingSelectionId ?? `selection-${Date.now()}`,
+        method: isDirect ? "direct" : "card_remix",
+        cardSetId: isDirect ? "custom" : selectedCardSet?.id ?? "custom",
+        cardSetLabel: isDirect ? "직접 질문 만들기" : selectedCardSet?.label ?? "직접 쓴 질문",
+        originalPrompt: isDirect ? null : selectedPrompt,
+        remixedQuestion: pending,
+      };
+      nextSelections = editingSelectionId
+        ? questionSelections.map((current) => (current.id === editingSelectionId ? selection : current))
+        : [...questionSelections, selection].slice(0, maxSelections);
     }
 
-    if (nextSelections.length < maxSelections) {
-      startQuestionBuilder();
+    if (nextSelections.length === 0) {
+      setError("질문을 한 개 이상 만들어 주세요.");
       return;
     }
 
+    setQuestionSelections(nextSelections);
+    clearQuestionEditor();
     setStep("question_submitting");
+
     const result = await submitQuestionGenerator(sessionId, roomId, { selections: nextSelections });
     if (result.error) {
       setError(result.error);
-      setStep("question_rewrite");
+      setStep("question_build");
       return;
     }
 
     router.push(`/room/${roomId}/result?session=${sessionId}`);
   }
 
-  /** 방식에 맞는 첫 단계로 질문 만들기를 연다. 직접 쓰기는 카드 단계가 없어 입력창부터 열린다. */
-  function startQuestionBuilder() {
-    setEditingSelectionId(null);
-    setQuestionBuildMode(questionMode === "direct" ? "direct" : "card_remix");
-    setSelectedAreaId(null);
-    setSelectedCategoryLabel(null);
-    setSelectedCardSetId(null);
-    setSelectedPrompt(null);
-    setRemixedQuestion("");
-    setPromptSearch("");
-    setError("");
-    setStep(firstQuestionStep);
-  }
-
   function removeQuestionSelection(selectionId: string) {
-    if (editingSelectionId === selectionId) {
-      startQuestionBuilder();
-    }
+    if (editingSelectionId === selectionId) clearQuestionEditor();
     setQuestionSelections((prev) => prev.filter((selection) => selection.id !== selectionId));
   }
 
+  /** 담은 질문을 눌러 바로 고친다 — 화면을 넘기지 않고 입력창에 불러온다. */
   function editQuestionSelection(selection: QuestionSelection) {
     const selectedCard = enabledCardSets.find((cardSet) => cardSet.id === selection.cardSetId) ?? null;
 
     setEditingSelectionId(selection.id);
-    setQuestionBuildMode(selection.method);
     setSelectedCardSetId(selection.cardSetId === "custom" ? null : selection.cardSetId);
     setSelectedPrompt(selection.originalPrompt);
     setRemixedQuestion(selection.remixedQuestion);
-    setSelectedAreaId(selectedCard ? getQuestionAreaByCardLabel(selectedCard.label).id : null);
-    setSelectedCategoryLabel(selectedCard ? buildCardSetLabel(selectedCard) : null);
-    setPromptSearch("");
+    if (selectedCard) {
+      setSelectedAreaId(getQuestionAreaByCardLabel(selectedCard.label).id);
+      setSelectedCategoryLabel(buildCardSetLabel(selectedCard));
+    }
     setError("");
-    setStep("question_rewrite");
   }
 
   if (activityType === "question_generator") {
-    if (step === "question_intro") {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
-          <div className="mx-auto w-full max-w-[1200px] py-8">
-            <div className="rounded-3xl bg-white p-6 shadow-xl sm:p-8">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
-                <div className="lg:w-[58%]">
-                  <div className="flex items-center gap-3">
-                    <span className="text-5xl">{questionModeMeta.icon}</span>
-                    <div>
-                      <h1 className="text-2xl font-bold text-gray-800">질문 만들기</h1>
-                      <p className="text-sm font-semibold text-sky-600">{questionModeMeta.label}</p>
-                    </div>
-                  </div>
-                  <div className="mt-5 rounded-3xl bg-gradient-to-br from-sky-50 to-cyan-100 px-5 py-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">오늘의 미션</p>
-                    <p className="mt-2 text-2xl font-bold leading-snug text-sky-950">{topic}</p>
-                    <div className="mt-4 rounded-2xl bg-white/80 px-4 py-4">
-                      <p className="text-xs font-semibold text-sky-700">활동 가이드</p>
-                      <p className="mt-2 whitespace-pre-line text-sm leading-7 text-sky-950">
-                        {topicDescription || questionGeneratorConfig?.guidance || questionModeMeta.studentHint}
-                      </p>
-                    </div>
-                    {topicDescription && questionGeneratorConfig?.guidance && (
-                      <p className="mt-3 text-sm leading-relaxed text-sky-800">{questionGeneratorConfig.guidance}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col justify-between gap-4 lg:w-[42%]">
-                  <div className="grid grid-cols-2 gap-3 text-left text-sm">
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <p className="font-semibold text-gray-700">오늘의 방법</p>
-                      <p className="mt-1 text-lg font-bold text-sky-600">{questionModeMeta.label}</p>
-                    </div>
-                    <div className="rounded-2xl bg-gray-50 p-4">
-                      <p className="font-semibold text-gray-700">완성할 질문</p>
-                      <p className="mt-1 text-2xl font-bold text-sky-600">{maxSelections}개</p>
-                    </div>
-                    {questionMode === "card_remix" && (
-                      <div className="rounded-2xl bg-gray-50 p-4">
-                        <p className="font-semibold text-gray-700">질문 카테고리</p>
-                        <p className="mt-1 text-2xl font-bold text-sky-600">{availableAreas.length}개</p>
-                      </div>
-                    )}
-                    {questionMode === "ai_custom" && (
-                      <div className="rounded-2xl bg-gray-50 p-4">
-                        <p className="font-semibold text-gray-700">선생님 질문 예시</p>
-                        <p className="mt-1 text-2xl font-bold text-sky-600">{enabledCardSets[0]?.prompts.length ?? 0}개</p>
-                      </div>
-                    )}
-                    <div className="rounded-2xl bg-sky-50 p-4 text-sky-900">
-                      <p className="text-xs font-semibold text-sky-700">이렇게 해요</p>
-                      <p className="mt-1 text-sm leading-relaxed">{questionModeMeta.studentHint}</p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={startQuestionBuilder}
-                    className="w-full rounded-2xl bg-sky-500 py-4 text-lg font-bold text-white transition-colors hover:bg-sky-600"
-                  >
-                    {questionMode === "direct" ? "가이드 읽었어요. 질문 쓰러 가기" : "가이드 읽었어요. 질문 고르기"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (step === "question_path") {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
-          <div className="mx-auto w-full max-w-[1200px] py-8">
-            <div className="space-y-4">
-            <QuestionWizardHeader
-              steps={questionSteps}
-              currentStepKey="path"
-              completedCount={questionSelections.length}
-              maxSelections={maxSelections}
-              modeLabel={questionModeMeta.label}
-            />
-
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="bg-white rounded-3xl shadow-xl p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-sky-600 font-semibold">Step 1. 카테고리 고르기</p>
-                    <h1 className="text-2xl font-bold text-gray-800 mt-1">어떤 종류의 질문을 만들지 골라보세요.</h1>
-                    <p className="text-sm text-gray-500 mt-2">카테고리를 고르면 그 안의 질문만 보여드려요. 고른 질문은 다음 단계에서 오늘 주제에 맞게 바꿔 쓰면 돼요.</p>
-                  </div>
-                  <div className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700 whitespace-nowrap">
-                    {questionSelections.length} / {maxSelections}개 완료
-                  </div>
-                </div>
-                <div className="mt-5 rounded-3xl bg-gradient-to-br from-sky-50 to-cyan-100 px-5 py-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">오늘의 미션</p>
-                  <p className="mt-2 text-2xl font-bold leading-snug text-sky-950">{topic}</p>
-                  {topicDescription && (
-                    <p className="mt-3 whitespace-pre-line text-sm leading-7 text-sky-900">{topicDescription}</p>
-                  )}
-                  {questionGeneratorConfig?.guidance && (
-                    <p className="mt-3 text-sm leading-relaxed text-sky-800">{questionGeneratorConfig.guidance}</p>
-                  )}
-                </div>
-              </div>
-
-              <QuestionSelectionList
-                selections={questionSelections}
-                onEdit={editQuestionSelection}
-                onRemove={removeQuestionSelection}
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {availableAreas.map(({ area, cardSets, promptCount }) => {
-                const selected = selectedAreaId === area.id;
-                return (
-                  <button
-                    key={area.id}
-                    disabled={questionSelectionsFull}
-                    onClick={() => {
-                      setQuestionBuildMode("card_remix");
-                      setSelectedAreaId(area.id);
-                      setSelectedCategoryLabel(null);
-                      setSelectedCardSetId(null);
-                      setSelectedPrompt(null);
-                      setRemixedQuestion("");
-                    }}
-                    className={`rounded-3xl p-6 shadow-xl text-left transition-all duration-300 disabled:opacity-50 ${
-                      selected
-                        ? `bg-gradient-to-br ${area.surface} ring-2 shadow-2xl`
-                        : "bg-white hover:-translate-y-0.5 hover:shadow-2xl"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-4xl">{area.emoji}</div>
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        selected ? area.badge : `${area.chip.bg} ${area.chip.text}`
-                      }`}>
-                        {selected ? "선택됨" : `질문 ${promptCount}개`}
-                      </span>
-                    </div>
-                    <h2 className="mt-4 text-xl font-bold text-gray-800">{area.label}</h2>
-                    <p className="mt-3 text-sm leading-relaxed text-gray-600">{area.hint}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {cardSets.map((cardSet) => (
-                        <span key={cardSet.id} className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-black/5">
-                          {buildCardSetLabel(cardSet)}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                );
-              })}
-              {availableAreas.length === 0 && (
-                <div className="rounded-3xl bg-white p-8 text-center shadow-xl md:col-span-2 xl:col-span-3">
-                  <p className="text-sm font-semibold text-gray-700">선생님이 고른 질문 카드가 아직 없어요.</p>
-                  <p className="mt-2 text-sm text-gray-500">선생님께 알려 주세요.</p>
-                </div>
-              )}
-            </div>
-
-            {questionSelectionsFull && (
-              <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                질문을 모두 채웠어요. 수정하려면 위의 질문을 눌러 바로 고칠 수 있어요.
-              </div>
-            )}
-
-            <button
-              onClick={() => {
-                if (questionSelectionsFull) return;
-                if (selectedAreaId) {
-                  setStep("question_set");
-                }
-              }}
-              disabled={!selectedAreaId}
-              className="w-full mt-6 py-4 bg-sky-500 text-white rounded-2xl font-bold text-lg hover:bg-sky-600 disabled:opacity-40 disabled:hover:bg-sky-500 transition-colors"
-            >
-              다음으로 →
-            </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (step === "question_set") {
+    if (step === "question_build") {
+      const showPicker = questionMode !== "direct";
       const isTeacherPool = questionMode === "ai_custom";
+      const filled = questionSelections.length >= maxSelections;
+      const canPickMore = !filled || Boolean(editingSelectionId);
 
       return (
-        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
-          <div className="mx-auto w-full max-w-[1200px] py-8">
-            <div className="space-y-4">
-            <QuestionWizardHeader
-              steps={questionSteps}
-              currentStepKey="set"
-              completedCount={questionSelections.length}
-              maxSelections={maxSelections}
-              modeLabel={questionModeMeta.label}
-            />
-
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="bg-white rounded-3xl shadow-xl p-6">
-                <div className="flex items-start justify-between gap-4">
+        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100">
+          <div className="mx-auto w-full max-w-[1200px] px-4 py-6 space-y-4">
+            {/* 머리말 — 어느 단계인지가 아니라 몇 개 담았는지를 보여 준다(화면이 하나뿐이다). */}
+            <div className="rounded-3xl bg-white p-5 shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{questionModeMeta.icon}</span>
                   <div>
-                    <p className="text-sm text-sky-600 font-semibold">
-                      {isTeacherPool ? "Step 1. 질문 고르기" : "Step 2. 질문 고르기"}
-                    </p>
-                    <h1 className="text-2xl font-bold text-gray-800 mt-1">
-                      {isTeacherPool
-                        ? "선생님이 준비한 질문 중에서 하나를 골라보세요."
-                        : `${selectedArea?.area.label ?? "질문"} 카테고리의 질문 중 하나를 골라보세요.`}
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-2">
-                      {isTeacherPool
-                        ? "마음에 드는 질문 하나를 고르면 다음 단계에서 내 질문으로 바꿔 쓸 수 있어요."
-                        : "고른 질문을 다음 단계에서 오늘 선생님이 낸 주제에 맞게 바꿔 쓰면 됩니다."}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700 whitespace-nowrap">
-                    {questionSelections.length} / {maxSelections}개 완료
+                    <h1 className="text-xl font-bold text-gray-800">질문 만들기</h1>
+                    <p className="text-sm text-sky-600 font-semibold">{questionModeMeta.label}</p>
                   </div>
                 </div>
-                <div className="mt-5 rounded-2xl bg-gray-50 px-5 py-4">
-                  {isTeacherPool ? (
-                    <>
-                      <p className="text-xs font-semibold text-gray-500">오늘의 미션</p>
-                      <p className="mt-1 font-bold text-gray-800">{topic}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-xs font-semibold text-gray-500">오늘의 미션</p>
-                      <p className="mt-1 font-bold text-gray-800">{topic}</p>
-                      <div className="mt-3 flex items-center gap-3 border-t border-gray-200 pt-3">
-                        <span className="text-2xl">{selectedArea?.area.emoji ?? "🃏"}</span>
-                        <div>
-                          <p className="text-xs font-semibold text-gray-500">고른 카테고리</p>
-                          <p className="font-bold text-gray-800">{selectedArea?.area.label ?? "질문 카테고리"}</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <QuestionSelectionList
-                selections={questionSelections}
-                onEdit={editQuestionSelection}
-                onRemove={removeQuestionSelection}
-              />
-            </div>
-
-            {areaCardSets.length > 1 && (
-              <div className="rounded-3xl bg-white p-4 shadow-lg">
-                <div className="flex flex-wrap gap-2">
-                  {areaCardSets.map((cardSet) => {
-                    const label = buildCardSetLabel(cardSet);
-                    const selected = activeCategoryLabel === label;
-                    const meta = getCardMeta(cardSet.label);
-                    const theme = getCardTheme(cardSet.label);
-                    return (
-                      <button
-                        key={cardSet.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategoryLabel(label);
-                          setSelectedCardSetId(null);
-                          setSelectedPrompt(null);
-                          setRemixedQuestion("");
-                        }}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                          selected
-                            ? `${theme.badge}`
-                            : `${theme.chip} hover:opacity-80`
-                        }`}
-                      >
-                        <span>{meta.emoji}</span>
-                        <span>{label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="rounded-3xl bg-white p-4 shadow-lg">
-              <label className="block text-xs font-semibold text-sky-700 mb-2">질문 찾기</label>
-              <input
-                value={promptSearch}
-                onChange={(event) => setPromptSearch(event.target.value)}
-                placeholder="바꾸고 싶은 질문의 단어나 표현을 찾아보세요."
-                className="w-full rounded-2xl border-2 border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-sky-400"
-              />
-            </div>
-
-            {activeCardSet ? (
-              <div className={`rounded-3xl bg-white p-6 shadow-xl ${getCardTheme(activeCardSet.label).accentBorder}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold ${getCardTheme(activeCardSet.label).chip}`}>
-                        <span>{getCardMeta(activeCardSet.label).emoji}</span>
-                        <span>{activeCardSet.label}</span>
-                      </span>
-                      {!isTeacherPool && (
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getRecommendedGradeChipClass(getCardMeta(activeCardSet.label).recommendedGrades)}`}>
-                          {getRecommendedGradeLabel(getCardMeta(activeCardSet.label).recommendedGrades)}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="mt-2 text-xl font-bold text-gray-800">예시 질문을 보고 하나 골라보세요.</h2>
-                    <p className="mt-2 text-sm text-gray-500 leading-relaxed">{activeCardSet.description}</p>
-                  </div>
-                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 shrink-0">
-                    {activeCardSet.prompts.length}장
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: maxSelections }).map((_, index) => (
+                    <span
+                      key={index}
+                      className={`h-2.5 w-10 rounded-full ${index < questionSelections.length ? "bg-sky-500" : "bg-sky-100"}`}
+                    />
+                  ))}
+                  <span className="ml-1 rounded-2xl bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700">
+                    {questionSelections.length} / {maxSelections}개
                   </span>
                 </div>
+              </div>
+            </div>
 
-                <div className="mt-5 grid gap-3 lg:grid-cols-2">
-                  {filteredPrompts.map((prompt, index) => {
-                    const selected = selectedPrompt === prompt;
-                    return (
-                      <button
-                        key={`${activeCardSet.id}-${index}-${prompt}`}
-                        type="button"
-                        aria-pressed={selected}
-                        onPointerUp={(event) => {
-                          if (event.pointerType === "mouse" && event.button !== 0) return;
-                          selectQuestionPrompt(prompt);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            selectQuestionPrompt(prompt);
-                          }
-                        }}
-                        className={`relative overflow-hidden rounded-3xl border-2 p-5 text-left touch-manipulation transition-all ${
-                          selected
-                            ? "border-sky-500 bg-sky-50 shadow-md shadow-sky-100"
-                            : "border-gray-200 bg-gray-50 active:border-sky-300 active:bg-sky-50 hover:border-sky-200 hover:bg-sky-50"
-                        }`}
-                      >
-                        {selected && <div className="absolute inset-y-0 left-0 w-1.5 bg-sky-500" />}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-sky-600 mb-2">질문 카드 {index + 1}</p>
-                            <p className="text-gray-800 font-medium leading-relaxed">{prompt}</p>
-                          </div>
-                          <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
-                            selected ? "bg-sky-600 text-white" : "bg-white text-gray-500"
-                          }`}>
-                            {selected ? "✓ 선택됨" : "선택"}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {filteredPrompts.length === 0 && (
-                    <div className="rounded-3xl bg-gray-50 p-8 text-center lg:col-span-2">
-                      <p className="text-sm font-semibold text-gray-700">찾는 질문이 아직 안 보여요.</p>
-                      <p className="mt-2 text-sm text-gray-500">검색어를 조금 다르게 바꾸거나 지우고 다시 찾아보세요.</p>
+            {/* 오늘의 미션 — 접었다 펼 수 있게 두어 첫 화면을 따로 두지 않는다. */}
+            <div className="rounded-3xl bg-white p-5 shadow-lg">
+              <button
+                type="button"
+                onClick={() => setGuideOpen((open) => !open)}
+                className="flex w-full items-start justify-between gap-4 text-left"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">오늘의 미션</p>
+                  <p className="mt-1 text-xl font-bold leading-snug text-sky-950">{topic}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700">
+                  {guideOpen ? "안내 접기" : "안내 보기"}
+                </span>
+              </button>
+              {guideOpen && (
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  {topicDescription && (
+                    <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-cyan-100 px-4 py-4">
+                      <p className="text-xs font-semibold text-sky-700">선생님 설명</p>
+                      <p className="mt-2 whitespace-pre-line text-sm leading-7 text-sky-950">{topicDescription}</p>
                     </div>
                   )}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-3xl bg-white p-8 text-center shadow-xl">
-                <p className="text-sm font-semibold text-gray-700">
-                  {isTeacherPool ? "선생님이 준비한 질문이 아직 없어요." : "이 카테고리에는 질문이 아직 없어요."}
-                </p>
-                <p className="mt-2 text-sm text-gray-500">
-                  {isTeacherPool ? "선생님께 알려 주세요." : "이전으로 돌아가 다른 카테고리를 골라 보세요."}
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              {questionMode === "card_remix" && (
-                <button
-                  onClick={() => setStep("question_path")}
-                  className="flex-1 rounded-2xl border border-sky-200 bg-white py-4 text-center font-bold text-sky-700 transition-colors hover:bg-sky-50"
-                >
-                  이전
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (!selectedPrompt) return;
-                  setError("");
-                  setStep("question_rewrite");
-                }}
-                disabled={!selectedPrompt}
-                className="flex-1 rounded-2xl bg-sky-500 py-4 text-center font-bold text-white transition-colors hover:bg-sky-600 disabled:opacity-40 disabled:hover:bg-sky-500"
-              >
-                다음
-              </button>
-            </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (step === "question_rewrite") {
-      const isDirect = questionMode === "direct";
-
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-100 p-4">
-          <div className="mx-auto w-full max-w-[1200px] py-8 space-y-4">
-            <QuestionWizardHeader
-              steps={questionSteps}
-              currentStepKey="rewrite"
-              completedCount={questionSelections.length}
-              maxSelections={maxSelections}
-              modeLabel={questionModeMeta.label}
-            />
-
-            {/* 태블릿 가로 화면에서는 왼쪽에 미션·힌트를 두고 오른쪽 입력창을 넓게 쓴다. */}
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:items-start">
-              <div className="space-y-4">
-                <div className="rounded-3xl bg-white p-5 shadow-xl">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">오늘의 미션</p>
-                  <p className="mt-2 text-xl font-bold leading-snug text-sky-950">{topic}</p>
-                  {topicDescription && (
-                    <p className="mt-3 whitespace-pre-line text-sm leading-7 text-gray-600">{topicDescription}</p>
-                  )}
-                  <div className="mt-4 rounded-2xl bg-sky-50 px-4 py-3">
-                    <p className="text-xs font-semibold text-sky-700">
-                      {isDirect ? questionModeMeta.label : selectedCardSet?.label ?? activeCategoryLabel ?? "질문 카드"}
-                    </p>
-                    <p className="mt-1 text-sm leading-relaxed text-sky-900">
+                  <div className="rounded-2xl bg-gray-50 px-4 py-4">
+                    <p className="text-xs font-semibold text-gray-500">이렇게 해요</p>
+                    <p className="mt-2 text-sm leading-7 text-gray-700">
                       {questionGeneratorConfig?.guidance || questionModeMeta.studentHint}
                     </p>
                   </div>
                 </div>
+              )}
+            </div>
 
-                {selectedPrompt && (
-                  <div className="rounded-3xl bg-white p-5 shadow-xl">
-                    <p className="text-xs font-semibold text-gray-500">고른 힌트 질문</p>
-                    <p className="mt-2 leading-relaxed text-gray-800">{selectedPrompt}</p>
+            {/* 본문 — 왼쪽에서 고르고 오른쪽에서 바로 쓴다. 화면을 넘기지 않는다. */}
+            <div className={`grid gap-4 ${showPicker ? "lg:grid-cols-2" : ""}`}>
+              {showPicker && (
+                <div className="rounded-3xl bg-white p-5 shadow-lg">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-base font-bold text-gray-800">
+                      {isTeacherPool ? "선생님이 준비한 질문" : "질문 고르기"}
+                    </h2>
+                    <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                      {filteredPrompts.length}개
+                    </span>
                   </div>
-                )}
 
-                <QuestionSelectionList
-                  selections={questionSelections}
-                  onEdit={editQuestionSelection}
-                  onRemove={removeQuestionSelection}
-                />
-              </div>
-
-              <div className="rounded-3xl bg-white p-6 shadow-xl sm:p-8">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-sky-600">
-                      Step {questionSteps.length}. {questionSteps[questionSteps.length - 1]?.label}
-                    </p>
-                    <h1 className="mt-1 text-2xl font-bold text-gray-800">
-                      {editingSelectionId
-                        ? "내가 만든 질문을 다시 다듬어 보세요."
-                        : isDirect
-                          ? "오늘 주제를 보고 내가 궁금한 것을 질문으로 써 보세요!"
-                          : "고른 힌트를 바탕으로 미션에 맞는 나만의 질문을 완성해 보세요!"}
-                    </h1>
-                  </div>
-                  <div className="rounded-2xl bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 whitespace-nowrap">
-                    {questionSelections.length} / {maxSelections}개 완료
-                  </div>
-                </div>
-                <p className="mt-3 text-sm leading-relaxed text-gray-500">
-                  {editingSelectionId
-                    ? "수정한 뒤 저장하면 선생님에게 보이는 질문도 새 내용으로 바뀝니다."
-                    : isDirect
-                      ? "정답이 있는 질문보다, 친구들과 이야기 나눌 수 있는 질문이 좋아요."
-                      : "힌트는 출발점이에요. 내 생각이 드러나도록 문장을 자유롭게 바꿔도 좋아요."}
-                </p>
-
-                <div className="mt-5">
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">내가 완성한 질문</label>
-                  <StudentSpellingTextarea
-                    value={remixedQuestion}
-                    onValueChange={setRemixedQuestion}
-                    rows={8}
-                    placeholder={isDirect ? "예) 만약 내가 그때 그곳에 있었다면 무엇을 했을까?" : "오늘의 미션에 맞는 질문으로 바꿔 써보세요."}
-                    className="w-full min-h-[220px] rounded-2xl border-2 border-gray-200 bg-white px-4 py-3 text-lg leading-8 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-sky-400 resize-y lg:min-h-[300px]"
-                  />
-                </div>
-
-                {error && <p className="mt-3 text-center text-sm text-red-500">{error}</p>}
-
-                <div className="mt-5 flex gap-3">
-                  {(questionMode !== "direct" || editingSelectionId) && (
-                    <button
-                      onClick={() => setStep(editingSelectionId ? firstQuestionStep : "question_set")}
-                      className="flex-1 rounded-2xl border border-sky-200 bg-white py-4 text-center font-bold text-sky-700 transition-colors hover:bg-sky-50"
-                    >
-                      {editingSelectionId ? "목록으로" : "이전"}
-                    </button>
+                  {!isTeacherPool && (
+                    <>
+                      <p className="mt-1 text-xs text-gray-500">질문의 종류를 고르면 그 안의 질문 카드만 보여드려요.</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {availableAreas.map(({ area, promptCount }) => {
+                          const selected = selectedAreaId === area.id;
+                          return (
+                            <button
+                              key={area.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedAreaId(area.id);
+                                setSelectedCategoryLabel(null);
+                                setPromptSearch("");
+                              }}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
+                                selected ? area.badge : `${area.chip.bg} ${area.chip.text} ${area.chip.border} border`
+                              }`}
+                            >
+                              <span>{area.emoji}</span>
+                              <span>{area.label}</span>
+                              <span className={`text-xs ${selected ? "text-white/80" : "opacity-60"}`}>{promptCount}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
+
+                  {(isTeacherPool || selectedArea) && (
+                    <>
+                      {areaCardSets.length > 1 && (
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+                          {areaCardSets.map((cardSet) => {
+                            const label = buildCardSetLabel(cardSet);
+                            const selected = activeCategoryLabel === label;
+                            return (
+                              <button
+                                key={cardSet.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCategoryLabel(label);
+                                  setPromptSearch("");
+                                }}
+                                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                  selected ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <input
+                        value={promptSearch}
+                        onChange={(event) => setPromptSearch(event.target.value)}
+                        placeholder="질문 속 낱말로 찾아보기"
+                        className="mt-3 w-full rounded-2xl border-2 border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-sky-400 focus:outline-none"
+                      />
+
+                      <div className="mt-3 space-y-2 lg:max-h-[420px] lg:overflow-y-auto lg:pr-1">
+                        {filteredPrompts.map((prompt, index) => {
+                          const selected = selectedPrompt === prompt;
+                          return (
+                            <button
+                              key={`${activeCardSet?.id ?? "cards"}-${index}-${prompt}`}
+                              type="button"
+                              aria-pressed={selected}
+                              disabled={!canPickMore}
+                              onClick={() => selectQuestionPrompt(prompt, activeCardSet)}
+                              className={`w-full rounded-2xl border-2 p-4 text-left transition-all disabled:opacity-40 ${
+                                selected
+                                  ? "border-sky-500 bg-sky-50"
+                                  : "border-gray-200 bg-gray-50 hover:border-sky-300 hover:bg-sky-50"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <p className="leading-relaxed text-gray-800">{prompt}</p>
+                                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                                  selected ? "bg-sky-600 text-white" : "bg-white text-gray-500"
+                                }`}>
+                                  {selected ? "고름" : "고르기"}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {filteredPrompts.length === 0 && (
+                          <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-500">
+                            찾는 질문이 없어요. 검색어를 지우거나 다른 종류를 골라 보세요.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {!isTeacherPool && !selectedArea && (
+                    <p className="mt-4 rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-500">
+                      위에서 질문의 종류를 골라 주세요.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* 오른쪽 — 쓰는 곳. 고른 질문이 여기에 담긴다. */}
+              <div className="space-y-4">
+                <div className="rounded-3xl bg-white p-5 shadow-lg">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-base font-bold text-gray-800">
+                      {editingSelectionId ? "담은 질문 고치기" : "내 질문 쓰기"}
+                    </h2>
+                    {selectedCardSet && (
+                      <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                        {buildCardSetLabel(selectedCardSet)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    {questionMode === "direct"
+                      ? "오늘 주제를 보고 내가 궁금한 것을 질문으로 써 보세요."
+                      : "왼쪽 카드는 질문을 만드는 힌트예요. 카드를 보고 내 질문을 물음표로 끝나게 써 보세요."}
+                  </p>
+
+                  {selectedPrompt && (
+                    <div className="mt-3 rounded-2xl bg-amber-50 px-4 py-3">
+                      <p className="text-xs font-semibold text-amber-700">고른 질문 카드</p>
+                      <p className="mt-1 text-sm leading-relaxed text-amber-900">{selectedPrompt}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-3">
+                    <StudentSpellingTextarea
+                      value={remixedQuestion}
+                      onValueChange={setRemixedQuestion}
+                      rows={6}
+                      placeholder={questionMode === "direct"
+                        ? "예) 만약 내가 그때 그곳에 있었다면 무엇을 했을까?"
+                        : "예) 주인공은 그때 왜 아무 말도 하지 않았을까?"}
+                      className="w-full min-h-[180px] rounded-2xl border-2 border-gray-200 bg-white px-4 py-3 text-lg leading-8 text-gray-900 placeholder:text-gray-400 focus:border-sky-400 focus:outline-none resize-y"
+                    />
+                  </div>
+
+                  {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+
+                  <div className="mt-3 flex gap-2">
+                    {(editingSelectionId || remixedQuestion.trim()) && (
+                      <button
+                        type="button"
+                        onClick={clearQuestionEditor}
+                        className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-50"
+                      >
+                        지우기
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={saveQuestionSelection}
+                      disabled={!remixedQuestion.trim()}
+                      className="flex-1 rounded-2xl bg-sky-500 py-3 text-base font-bold text-white transition-colors hover:bg-sky-600 disabled:opacity-40"
+                    >
+                      {editingSelectionId
+                        ? "고친 내용 담기"
+                        : questionSelections.length + 1 < maxSelections
+                          ? "이 질문 담기"
+                          : "이 질문 담기 (마지막)"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl bg-white p-5 shadow-lg">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-base font-bold text-gray-800">담은 질문</h2>
+                    <span className="text-xs font-semibold text-sky-600">
+                      {questionSelections.length > 0 ? "누르면 고칠 수 있어요" : `${maxSelections}개까지 담을 수 있어요`}
+                    </span>
+                  </div>
+
+                  {questionSelections.length === 0 ? (
+                    <p className="mt-3 rounded-2xl bg-gray-50 p-5 text-center text-sm text-gray-500">
+                      아직 담은 질문이 없어요.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {questionSelections.map((selection, index) => {
+                        const editing = editingSelectionId === selection.id;
+                        return (
+                          <div
+                            key={selection.id}
+                            className={`rounded-2xl p-3 transition-colors ${editing ? "bg-sky-100 ring-2 ring-sky-300" : "bg-sky-50"}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <button
+                                type="button"
+                                onClick={() => editQuestionSelection(selection)}
+                                className="min-w-0 flex-1 text-left"
+                              >
+                                <p className="text-xs font-semibold text-sky-700">
+                                  {index + 1}. {selection.cardSetLabel}
+                                </p>
+                                <p className="mt-1 text-sm leading-relaxed text-gray-800">{selection.remixedQuestion}</p>
+                              </button>
+                              <div className="flex shrink-0 flex-col gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => editQuestionSelection(selection)}
+                                  className="rounded-full bg-white px-3 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100"
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeQuestionSelection(selection.id)}
+                                  className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100"
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <button
-                    onClick={handleQuestionSelectionSubmit}
-                    className="flex-1 rounded-2xl bg-sky-500 py-4 text-lg font-bold text-white transition-colors hover:bg-sky-600"
+                    type="button"
+                    onClick={submitQuestionSelections}
+                    disabled={questionSelections.length === 0 && !remixedQuestion.trim()}
+                    className="mt-4 w-full rounded-2xl bg-emerald-500 py-4 text-lg font-bold text-white transition-colors hover:bg-emerald-600 disabled:opacity-40"
                   >
-                    {editingSelectionId
-                      ? "수정 저장하기"
-                      : questionSelections.length + 1 < maxSelections
-                        ? "이 질문 저장하고 다음 질문 만들기"
-                        : "제출하기"}
+                    제출하기
                   </button>
+                  <p className="mt-2 text-center text-xs text-gray-400">제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요.</p>
                 </div>
               </div>
             </div>
@@ -1795,115 +1593,6 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   }
 
   return null;
-}
-
-function QuestionWizardHeader({
-  steps,
-  currentStepKey,
-  completedCount,
-  maxSelections,
-  modeLabel,
-}: {
-  steps: ReadonlyArray<{ key: string; label: string }>;
-  currentStepKey: string;
-  completedCount: number;
-  maxSelections: number;
-  modeLabel: string;
-}) {
-  const currentIndex = Math.max(0, steps.findIndex((step) => step.key === currentStepKey));
-  const progressPercent = ((currentIndex + 1) / steps.length) * 100;
-
-  return (
-    <div className="bg-white rounded-3xl shadow-lg p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-sky-500">질문 만들기 · {modeLabel}</p>
-          <p className="mt-1 text-sm text-gray-500">지금은 {steps[currentIndex]?.label} 단계예요.</p>
-        </div>
-        <div className="rounded-2xl bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">
-          {completedCount} / {maxSelections}개 완료
-        </div>
-      </div>
-
-      <div className="mt-4 h-2 rounded-full bg-sky-100 overflow-hidden">
-        <div
-          className="h-full rounded-full bg-sky-500 transition-all duration-300 ease-out"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-
-      {steps.length > 1 && (
-        <div className={`mt-4 grid gap-2 ${steps.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-          {steps.map((wizardStep, index) => {
-            const active = index === currentIndex;
-            const complete = index < currentIndex;
-
-            return (
-              <div
-                key={wizardStep.key}
-                className={`rounded-2xl px-3 py-3 text-center transition-colors ${
-                  active
-                    ? "bg-sky-500 text-white"
-                    : complete
-                      ? "bg-sky-100 text-sky-700"
-                      : "bg-gray-100 text-gray-400"
-                }`}
-              >
-                <p className="text-xs font-semibold">Step {index + 1}</p>
-                <p className="mt-1 text-sm font-bold">{wizardStep.label}</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** 지금까지 만든 질문 — 어느 단계에서든 눌러서 고칠 수 있다. */
-function QuestionSelectionList({
-  selections,
-  onEdit,
-  onRemove,
-}: {
-  selections: QuestionSelection[];
-  onEdit: (selection: QuestionSelection) => void;
-  onRemove: (selectionId: string) => void;
-}) {
-  if (selections.length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-3xl shadow-lg p-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-gray-700">지금까지 만든 질문</p>
-        <p className="text-xs font-semibold text-sky-600">질문을 누르면 고칠 수 있어요</p>
-      </div>
-      <div className="space-y-2">
-        {selections.map((selection) => (
-          <div key={selection.id} className="rounded-2xl bg-sky-50 p-2">
-            <button
-              type="button"
-              onClick={() => onEdit(selection)}
-              className="w-full rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/80 focus:outline-none focus:ring-2 focus:ring-sky-300"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-sky-700">{selection.cardSetLabel}</p>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-sky-700">수정</span>
-              </div>
-              <p className="mt-1 text-sm text-gray-800">{selection.remixedQuestion}</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => onRemove(selection.id)}
-              className="mt-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100"
-            >
-              삭제
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function normalizeQuestionVotingConfig(value: unknown): QuestionVotingConfig {

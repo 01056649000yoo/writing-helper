@@ -62,25 +62,27 @@ test("연구소의 별도 서비스 관리와 화면 배포 번호를 제거한�
   ]);
 });
 
-test("활동 선택과 설명은 통합 대상 다섯 활동만 같은 꾸러미로 안내한다", async () => {
-  const activityIds = [
-    "outline_builder",
-    "question_generator",
-    "question_voting",
-    "one_line_share",
-    "hanja_writing",
-  ];
-
-  for (const activityId of activityIds) {
+test("도움말은 새로 만들 수 있는 네 활동을 활동 폴더 한 곳에서 설명한다", async () => {
+  // 새로 만들 수 있는 활동(한자는 단어집 자료로만 남았다).
+  for (const activityId of ["outline_builder", "question_generator", "question_voting", "one_line_share"]) {
     assert.match(roomNew, new RegExp(`"${activityId}"`));
   }
 
-  assert.match(guide, /글쓰기 활동 꾸러미 5가지 핵심 활동/);
-  assert.match(guide, /글 개요 짜기/);
-  assert.match(guide, /질문 만들기/);
-  assert.match(guide, /좋은 질문 고르기/);
-  assert.match(guide, /한줄모아/);
-  assert.match(guide, /한자 활용 문장 만들기/);
+  const guideSource = await readFile("src/features/activities/guide.ts", "utf8");
+  assert.match(guideSource, /글 개요 짜기/);
+  assert.match(guideSource, /질문 만들기/);
+  assert.match(guideSource, /좋은 질문 고르기/);
+  assert.match(guideSource, /한줄모아/);
+  // 용도·언제·학생이 하는 일·결과가 어디로 — 네 가지를 모두 담는다.
+  for (const field of ["purpose:", "whenToUse:", "studentFlow:", "resultUse:", "teacherSetup:"]) {
+    assert.ok(guideSource.includes(field), `${field} 없음`);
+  }
+
+  // 화면은 안내 문구를 따로 베껴 쓰지 않고 이 자료를 읽어 그린다.
+  assert.match(guide, /LabGuide/);
+  assert.match(roomNew, /LabGuide/);
   assert.doesNotMatch(guide, /4대 모듈|4개 모듈|AI 자동 대기열|GPT/);
+  // 옛 안내가 남긴 틀린 문장("연동할 예정")이 다시 들어오지 않게 한다.
+  assert.doesNotMatch(guide, /연동할 예정/);
   await assert.rejects(access("src/app/dashboard/manual-modal.tsx"));
 });
