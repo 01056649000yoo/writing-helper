@@ -9,6 +9,12 @@ import {
 } from "@/app/actions/settings-actions";
 import AiGenerationModal from "./ai-generation-modal";
 import type { QuestionCardSet } from "@/features/activities/types";
+import {
+  OTHER_QUESTION_AREA,
+  QUESTION_AREAS,
+  getCardKeywordBadge,
+  getQuestionAreaId,
+} from "@/features/activities/question-generator/areas";
 
 type EditableQuestionCardSet = {
   id: string;
@@ -21,43 +27,23 @@ type EditableQuestionCardSet = {
   isExpanded?: boolean;
 };
 
-// 12개 질문 카드 세트를 6대 핵심 질문 영역으로 완벽하게 분류
+// 카테고리 기준의 원본은 features/activities/question-generator/areas.ts 하나다(학생 화면과 같은 기준).
 const KEYWORD_TAGS = [
   { id: "all", label: "전체", emoji: "🃏" },
-  { id: "상상·반전", label: "상상·반전", emoji: "💡" },
-  { id: "마음·가치", label: "마음·가치", emoji: "❤️" },
-  { id: "감각·관찰", label: "감각·관찰", emoji: "👁️" },
-  { id: "이유·해결", label: "이유·해결", emoji: "❓" },
-  { id: "연결·비유", label: "연결·비유", emoji: "🌱" },
-  { id: "관점·시간", label: "관점·시간", emoji: "⏳" },
+  ...QUESTION_AREAS.map((area) => ({ id: area.id as string, label: area.label, emoji: area.emoji })),
 ] as const;
 
 function getCardCategory(label: string): string {
-  if (label.includes("상상") || label.includes("반전") || label.includes("가정")) return "상상·반전";
-  if (label.includes("마음") || label.includes("가치") || label.includes("감정") || label.includes("의미")) return "마음·가치";
-  if (label.includes("감각") || label.includes("관찰") || label.includes("오감") || label.includes("단서")) return "감각·관찰";
-  if (label.includes("이유") || label.includes("해결") || label.includes("원인") || label.includes("위기")) return "이유·해결";
-  if (label.includes("연결") || label.includes("비유") || label.includes("삶") || label.includes("경험")) return "연결·비유";
-  if (label.includes("관점") || label.includes("시간") || label.includes("입장") || label.includes("미래")) return "관점·시간";
-  return "기타";
+  return getQuestionAreaId(label);
 }
 
 function getCardBadge(label: string): string {
-  const match = ["상상", "반전", "마음", "가치", "감각", "관찰", "이유", "해결", "연결", "비유", "관점", "시간"]
-    .find((k) => label.includes(k));
-  return match ?? label.slice(0, 4);
+  return getCardKeywordBadge(label);
 }
 
 function getKeywordColor(category: string): { bg: string; text: string; border: string; emoji: string } {
-  switch (category) {
-    case "상상·반전": return { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200", emoji: "💡" };
-    case "마음·가치": return { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", emoji: "❤️" };
-    case "감각·관찰": return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", emoji: "👁️" };
-    case "이유·해결": return { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", emoji: "❓" };
-    case "연결·비유": return { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200", emoji: "🌱" };
-    case "관점·시간": return { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", emoji: "⏳" };
-    default: return { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-200", emoji: "🃏" };
-  }
+  const area = QUESTION_AREAS.find((entry) => entry.id === category) ?? OTHER_QUESTION_AREA;
+  return { ...area.chip, emoji: area.emoji };
 }
 
 export default function SettingsPage() {

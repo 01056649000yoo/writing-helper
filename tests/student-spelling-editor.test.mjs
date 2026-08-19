@@ -7,10 +7,13 @@ const spellingEditor = await readFile("src/components/student-spelling-textarea.
 const spellingLookup = await readFile("src/components/student-spelling-lookup-dialog.tsx", "utf8");
 const globalStyles = await readFile("src/app/globals.css", "utf8");
 
-test("학생 활동의 실제 글 입력 화면은 아지트 글쓰기와 같은 1200px 폭 계약을 쓴다", () => {
-  assert.equal((activityPage.match(/max-w-\[1200px\]/g) ?? []).length, 4);
-  assert.match(activityPage, /w-full max-w-\[1200px\] space-y-4/);
+test("학생 활동 화면은 아지트 글쓰기와 같은 1200px 폭 계약을 쓴다", () => {
+  // 질문 만들기 네 화면(안내·역할·카드·쓰기)까지 같은 폭을 쓴다 — 태블릿 가로에서 좁은 기둥이 되지 않게.
+  assert.equal((activityPage.match(/max-w-\[1200px\]/g) ?? []).length, 7);
+  assert.match(activityPage, /mx-auto w-full max-w-\[1200px\] py-8 space-y-4/);
   assert.doesNotMatch(activityPage, /max-w-lg mx-auto/);
+  // 질문 만들기 네 화면이 모두 같은 폭 계약을 쓴다.
+  assert.equal((activityPage.match(/mx-auto w-full max-w-\[1200px\] py-8/g) ?? []).length, 4);
 });
 
 test("다섯 학생 글 입력란은 공용 아지트 맞춤법 입력 컴포넌트를 쓴다", () => {

@@ -148,10 +148,13 @@ export type QuestionSet = {
   items: QuestionSetItem[];
 };
 
+/** 교사가 고른 질문 작성 방식 — 학생 화면의 단계 구성과 시작 조건이 여기서 갈린다. */
+export type QuestionGeneratorMode = "direct" | "card_remix" | "ai_custom";
+
 export type QuestionGeneratorConfig = {
+  mode: QuestionGeneratorMode;
   enabledCardSetIds: string[];
   cardSets: QuestionCardSet[];
-  roles?: QuestionCardRole[];
   maxSelections: number;
   guidance: string;
 };

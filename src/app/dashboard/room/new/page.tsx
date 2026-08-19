@@ -16,6 +16,10 @@ import { getQuestionCardSettings } from "@/app/actions/settings-actions";
 import { activityDefinitions, getActivityDefinition } from "@/features/activities/registry";
 import type { ActivityType, QuestionCardRole, QuestionCardSet } from "@/features/activities/types";
 import {
+  getCardKeywordBadge,
+  getQuestionAreaByCardLabel,
+} from "@/features/activities/question-generator/areas";
+import {
   getCardMeta,
   getCardTheme,
   getRecommendedGradeChipClass,
@@ -643,28 +647,14 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
 }
 
 
+// 카테고리 기준의 원본은 features/activities/question-generator/areas.ts 하나다(학생 화면과 같은 기준).
 function getCardBadge(label: string): string {
-  const match = ["상상", "반전", "마음", "가치", "감각", "관찰", "이유", "해결", "연결", "비유", "관점", "시간"]
-    .find((k) => label.includes(k));
-  return match ?? label.slice(0, 4);
+  return getCardKeywordBadge(label);
 }
 
-function getCardBadgeStyle(badge: string): string {
-  switch (badge) {
-    case "상상":
-    case "반전": return "bg-indigo-50 text-indigo-700 border-indigo-200";
-    case "마음":
-    case "가치": return "bg-rose-50 text-rose-700 border-rose-200";
-    case "감각":
-    case "관찰": return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    case "이유":
-    case "해결": return "bg-amber-50 text-amber-700 border-amber-200";
-    case "연결":
-    case "비유": return "bg-teal-50 text-teal-700 border-teal-200";
-    case "관점":
-    case "시간": return "bg-violet-50 text-violet-700 border-violet-200";
-    default: return "bg-gray-100 text-gray-700 border-gray-200";
-  }
+function getCardBadgeStyle(label: string): string {
+  const { chip } = getQuestionAreaByCardLabel(label);
+  return `${chip.bg} ${chip.text} ${chip.border}`;
 }
 
 function QuestionGeneratorSetup({ classId }: { classId: string }) {
@@ -758,7 +748,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     }));
   }
 
-  // 폼 제출
+  // 폼 제출 — 시작 조건은 방식마다 다르다(서버 판정과 같은 규칙: question-generator/config.ts).
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.topic.trim()) {
@@ -766,12 +756,16 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
       return;
     }
 
-    if (draft.mode === "ai_custom") {
-      const activeAiQuestions = draft.customAiQuestions.filter((q) => q.included && q.text.trim());
-      if (activeAiQuestions.length === 0) {
-        setError("학생들에게 제공할 질문 예시를 최소 1개 이상 선택하거나 생성해주세요.");
-        return;
-      }
+    const activeAiQuestions = draft.customAiQuestions.filter((q) => q.included && q.text.trim());
+
+    if (draft.mode === "card_remix" && draft.selectedCardSetIds.length === 0) {
+      setError("제공할 질문 카드 묶음을 1개 이상 선택해주세요.");
+      return;
+    }
+
+    if (draft.mode === "ai_custom" && activeAiQuestions.length === 0) {
+      setError("학생에게 보여 줄 질문 예시를 1개 이상 만들거나 선택해주세요.");
+      return;
     }
 
     setError("");
@@ -784,33 +778,17 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     fd.set("topic_description", draft.topic_description.trim());
     if (classId) fd.set("class_id", classId);
 
-    // activity_config 구성
-    let finalCardSets = availableCardSets;
-    let enabledIds = draft.selectedCardSetIds;
-
-    if (draft.mode === "ai_custom") {
-      const activeQuestions = draft.customAiQuestions.filter((q) => q.included && q.text.trim());
-      const customSet: QuestionCardSet = {
-        id: "ai-custom-card-set",
-        label: "선생님 추천 질문",
-        description: "선생님이 준비한 질문 예시 카드",
-        prompts: activeQuestions.map((q) => q.text.trim()),
-      };
-      finalCardSets = [customSet];
-      enabledIds = [customSet.id];
-    } else if (draft.mode === "direct") {
-      enabledIds = [];
-    }
-
+    // 카드 내용은 서버가 교사 설정에서 다시 채운다 — 화면은 무엇을 골랐는지만 보낸다.
     fd.set(
       "activity_config",
       JSON.stringify({
         mode: draft.mode,
-        cardSets: finalCardSets,
-        enabledCardSetIds: enabledIds,
-        maxSelections: Number(draft.max_selections) || 3,
+        enabledCardSetIds: draft.mode === "card_remix" ? draft.selectedCardSetIds : [],
+        maxSelections: Number(draft.max_selections) || 1,
         guidance: draft.guidance.trim(),
-        customAiQuestions: draft.mode === "ai_custom" ? draft.customAiQuestions : [],
+        customAiQuestions: draft.mode === "ai_custom"
+          ? activeAiQuestions.map((q) => ({ id: q.id, text: q.text.trim(), included: true }))
+          : [],
       })
     );
 
@@ -923,7 +901,14 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                     name="generator_mode"
                     value="card_remix"
                     checked={draft.mode === "card_remix"}
-                    onChange={() => setDraft((p) => ({ ...p, mode: "card_remix" }))}
+                    onChange={() => setDraft((p) => ({
+                      ...p,
+                      mode: "card_remix",
+                      // 카드 방식으로 바꾸면 고른 묶음이 없을 때 기본 3개를 미리 담아 준다.
+                      selectedCardSetIds: p.selectedCardSetIds.length > 0
+                        ? p.selectedCardSetIds
+                        : availableCardSets.slice(0, 3).map((cardSet) => cardSet.id),
+                    }))}
                     className="text-violet-500"
                   />
                 </div>
@@ -1047,7 +1032,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${getCardBadgeStyle(getCardBadge(cs.label))}`}>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${getCardBadgeStyle(cs.label)}`}>
                               {getCardBadge(cs.label)}
                             </span>
                             <p className={`truncate font-bold text-xs ${checked ? "text-violet-950" : "text-gray-800"}`}>

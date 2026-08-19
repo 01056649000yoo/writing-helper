@@ -13,7 +13,12 @@ import { getCurrentUser } from "./auth-actions";
 import { correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
 import { callAgitAi, parseAiJsonObject } from "@/lib/agit-ai";
 import { buildHanjaWritingBoard } from "@/lib/hanja-writing";
-import { getTeacherQuestionCardSettingsTree } from "@/lib/question-card-sets";
+import { getTeacherQuestionCardSets, getTeacherQuestionCardSettingsTree } from "@/lib/question-card-sets";
+import {
+  buildQuestionGeneratorConfig,
+  parseQuestionGeneratorMode,
+  type QuestionGeneratorSetupInput,
+} from "@/features/activities/question-generator/config";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
@@ -197,35 +202,13 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       outlineTemplate,
     };
   } else if (activityType === "question_generator") {
-    if (!topicDescription) {
-      return { error: "학생에게 보여줄 활동 가이드를 주제 부연 설명에 입력해주세요." };
-    }
-
-    const guidance = String(formData.get("guidance") ?? "").trim()
-      || "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.";
-    const { cardSets: teacherCardSets, roles: teacherRoles } = await getTeacherQuestionCardSettingsTree(admin, user.id);
-    const allowedIds = new Set(teacherCardSets.map((cardSet) => cardSet.id));
-    const enabledCardSetIds = formData
-      .getAll("enabled_card_set_ids")
-      .map((value) => String(value))
-      .filter((value): value is string => allowedIds.has(value));
-
-    if (enabledCardSetIds.length === 0) {
-      return { error: "질문 카드 묶음을 1개 이상 선택해주세요." };
-    }
-
-    activityConfig = {
-      enabledCardSetIds,
-      cardSets: teacherCardSets.filter((cardSet) => enabledCardSetIds.includes(cardSet.id)),
-      roles: teacherRoles
-        .map((role) => ({
-          ...role,
-          cardSetIds: role.cardSetIds.filter((cardSetId) => enabledCardSetIds.includes(cardSetId)),
-        }))
-        .filter((role) => role.cardSetIds.length > 0),
-      maxSelections: clampNumber(formData.get("max_selections"), 1, 4, 1),
-      guidance,
-    };
+    // 시작 조건은 방식(mode)마다 다르다 — 판정의 원본은 features/activities/question-generator/config.ts.
+    // 카드 묶음만은 교사가 실제로 가진 것으로 서버에서 다시 채운다(화면이 보낸 카드 내용은 믿지 않는다).
+    const setup = parseQuestionGeneratorSetupPayload(formData);
+    const teacherCardSets = await getTeacherQuestionCardSets(admin, user.id);
+    const built = buildQuestionGeneratorConfig({ setup, teacherCardSets });
+    if (!built.ok) return { error: built.error };
+    activityConfig = built.value;
   } else if (activityType === "question_voting") {
     const sourceRoomId = String(formData.get("source_room_id") ?? "").trim();
     const evaluationCriteria = String(formData.get("evaluation_criteria") ?? "")
@@ -437,6 +420,51 @@ function clampNumber(value: FormDataEntryValue | null, min: number, max: number,
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue)) return fallback;
   return Math.min(Math.max(Math.trunc(numberValue), min), max);
+}
+
+/**
+ * 질문 만들기 설정을 폼에서 읽는다.
+ * 새 교사 화면은 `activity_config` JSON 한 덩어리로 보내고, 옛 폼은 낱개 필드로 보낸다 — 둘 다 받는다.
+ */
+function parseQuestionGeneratorSetupPayload(formData: FormData): QuestionGeneratorSetupInput {
+  let raw: Record<string, unknown> = {};
+  const rawConfig = String(formData.get("activity_config") ?? "").trim();
+  if (rawConfig) {
+    try {
+      const parsed: unknown = JSON.parse(rawConfig);
+      if (isRecord(parsed)) raw = parsed;
+    } catch {
+      // 깨진 JSON은 낱개 필드로 읽는다.
+    }
+  }
+
+  const legacyCardSetIds = formData.getAll("enabled_card_set_ids").map((value) => String(value));
+  const selectedCardSetIds = Array.isArray(raw.enabledCardSetIds)
+    ? raw.enabledCardSetIds.filter((value): value is string => typeof value === "string")
+    : legacyCardSetIds;
+
+  const customQuestions = Array.isArray(raw.customAiQuestions)
+    ? raw.customAiQuestions
+        .filter(isRecord)
+        .filter((item) => item.included !== false)
+        .map((item) => (typeof item.text === "string" ? item.text : ""))
+    : [];
+
+  const maxSelections = raw.maxSelections !== undefined
+    ? Number(raw.maxSelections)
+    : Number(formData.get("max_selections"));
+
+  const guidance = typeof raw.guidance === "string" && raw.guidance.trim()
+    ? raw.guidance
+    : String(formData.get("guidance") ?? "");
+
+  return {
+    mode: parseQuestionGeneratorMode(raw.mode),
+    selectedCardSetIds,
+    customQuestions,
+    maxSelections: Number.isFinite(maxSelections) ? maxSelections : 1,
+    guidance,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
