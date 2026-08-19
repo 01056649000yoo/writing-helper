@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
+import { BadgeCircle } from "@/components/badge-circle";
 import {
   applyQuestionGeneratorSpellingCorrections,
   correctQuestionGeneratorSpelling,
@@ -767,9 +768,9 @@ function StudentSessionResultModal({
                   const match = questionVotingResults.find((r) => r.questionId === qId);
                   return (
                     <div key={String(qId)} className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4 flex items-start gap-3">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-200 text-xs font-bold text-violet-800">
+                      <BadgeCircle className="bg-violet-200 text-violet-800">
                         {idx + 1}
-                      </span>
+                      </BadgeCircle>
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-violet-950">
                           {match ? match.text : String(qId)}

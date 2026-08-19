@@ -79,8 +79,14 @@ test("도움말은 새로 만들 수 있는 네 활동을 활동 폴더 한 곳�
   }
 
   // 화면은 안내 문구를 따로 베껴 쓰지 않고 이 자료를 읽어 그린다.
-  assert.match(guide, /LabGuide/);
+  const guidePage = await readFile("src/app/dashboard/guide/page.tsx", "utf8");
+  assert.match(guidePage, /LabGuide/);
   assert.match(roomNew, /LabGuide/);
+  // 도움말은 상단 메뉴에 있다 — 학급 안에서도 열려야 한다(2026-08-20).
+  assert.match(nav, /도움말/);
+  assert.match(nav, /\/dashboard\/guide/);
+  // 학급 목록 화면의 옛 탭은 없앴다(같은 안내가 두 곳에 있으면 한쪽만 낡는다).
+  assert.doesNotMatch(guide, /LabGuide|활동별 설명서/);
   assert.doesNotMatch(guide, /4대 모듈|4개 모듈|AI 자동 대기열|GPT/);
   // 옛 안내가 남긴 틀린 문장("연동할 예정")이 다시 들어오지 않게 한다.
   assert.doesNotMatch(guide, /연동할 예정/);

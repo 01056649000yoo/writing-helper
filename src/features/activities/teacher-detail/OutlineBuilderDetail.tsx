@@ -2,6 +2,7 @@ import { getDefaultOutlineTemplate, type OutlineTemplate } from "@/lib/outline-t
 import type { SubjectType } from "@/types";
 import { DetailSection, EmptyLine, FactRows } from "./parts";
 import type { ActivityTeacherDetailProps } from "./types";
+import { BadgeCircle } from "@/components/badge-circle";
 
 /** 글 개요 짜기 — 학생이 채울 개요 틀을 처음·가운데·끝으로 보여 준다. */
 export function OutlineBuilderDetail({ config, room }: ActivityTeacherDetailProps) {
@@ -29,9 +30,9 @@ export function OutlineBuilderDetail({ config, room }: ActivityTeacherDetailProp
           <ol className="space-y-1.5">
             {legacyQuestions.map((question, index) => (
               <li key={`${index}-${question}`} className="flex gap-2 text-sm text-gray-700">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[0.68rem] font-bold text-gray-500">
+                <BadgeCircle size="sm" className="mt-0.5 bg-gray-100 text-gray-500">
                   {index + 1}
-                </span>
+                </BadgeCircle>
                 <span className="min-w-0 flex-1 leading-relaxed">{question}</span>
               </li>
             ))}

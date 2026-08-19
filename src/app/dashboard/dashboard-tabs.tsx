@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { LabGuide } from "@/features/activities/LabGuide";
 
 interface ClassItem {
   id: string;
@@ -20,41 +18,11 @@ const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
   ?? "https://끄적끄적아지트.site";
 
 export function DashboardTabs({ classes, integratedRoster = false }: DashboardTabsProps) {
-  const [activeTab, setActiveTab] = useState<"classes" | "manual">("classes");
+  // 도움말은 2026-08-20에 상단 메뉴(`/dashboard/guide`)로 옮겼다. 여기는 학급 목록만 그린다.
 
   return (
     <div className="space-y-6">
-      {/* 탭 헤더 */}
-      <div className="flex overflow-x-auto border-b border-gray-200" aria-label="대시보드 보기">
-        <button
-          type="button"
-          aria-pressed={activeTab === "classes"}
-          onClick={() => setActiveTab("classes")}
-          className={`flex min-h-11 shrink-0 items-center gap-2 px-5 py-3 font-semibold text-base border-b-2 transition-all ${
-            activeTab === "classes"
-              ? "border-blue-600 text-blue-600 bg-blue-50"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          🏫 내 학급 목록
-        </button>
-        <button
-          type="button"
-          aria-pressed={activeTab === "manual"}
-          onClick={() => setActiveTab("manual")}
-          className={`flex min-h-11 shrink-0 items-center gap-2 px-5 py-3 font-semibold text-base border-b-2 transition-all ${
-            activeTab === "manual"
-              ? "border-blue-600 text-blue-600 bg-blue-50"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          📖 도움말 (활동 4가지 사용법)
-        </button>
-      </div>
-
-      {/* 탭 콘텐츠 */}
-      {activeTab === "classes" ? (
-        <div className="space-y-6">
+      <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-800">내 학급 목록</h2>
             {integratedRoster ? (
@@ -128,12 +96,7 @@ export function DashboardTabs({ classes, integratedRoster = false }: DashboardTa
               ))}
             </div>
           )}
-        </div>
-      ) : (
-        <div className="space-y-8">
-          <LabGuide />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

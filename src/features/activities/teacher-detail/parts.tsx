@@ -1,3 +1,4 @@
+import { BadgeCircle } from "@/components/badge-circle";
 /**
  * 활동 내용 화면이 함께 쓰는 조각들.
  *
@@ -28,9 +29,9 @@ export function NumberedList({ items }: { items: Array<{ key: string; text: stri
     <ol className="space-y-1.5">
       {items.map((item, index) => (
         <li key={item.key} className="flex gap-2 text-sm text-gray-700">
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[0.68rem] font-bold text-gray-500">
+          <BadgeCircle size="sm" className="mt-0.5 bg-gray-100 text-gray-500">
             {index + 1}
-          </span>
+          </BadgeCircle>
           <span className="min-w-0 flex-1 leading-relaxed">
             {item.text}
             {item.note && <span className="ml-1.5 text-xs text-gray-400">{item.note}</span>}

@@ -27,6 +27,7 @@ import { isActivityType } from "@/features/activities/types";
 import type { OutlineTemplateAnswer, OutlineTemplate } from "@/features/activities/types";
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import { StudentSpellingTextarea } from "@/components/student-spelling-textarea";
+import { BadgeCircle } from "@/components/badge-circle";
 import {
   QUESTION_GENERATOR_MODE_META,
   normalizeQuestionGeneratorConfig,
@@ -1364,9 +1365,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-base font-bold text-orange-500 flex items-center gap-2">
-                    <span className="inline-block w-6 h-6 rounded-full bg-orange-100 text-orange-500 text-xs font-bold flex items-center justify-center">
+                    <BadgeCircle className="bg-orange-100 text-orange-500">
                       {key === "처음" ? "1" : key === "가운데" ? "2" : "3"}
-                    </span>
+                    </BadgeCircle>
                     {key}
                   </h2>
                   <span className="text-xs font-semibold text-orange-400">{sectionSelectedCount}개 고름</span>

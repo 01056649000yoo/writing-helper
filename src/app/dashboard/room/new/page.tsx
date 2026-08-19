@@ -21,6 +21,7 @@ import {
 } from "@/features/activities/question-generator/areas";
 import { saveQuestionCardSetting } from "@/app/actions/settings-actions";
 import { LabGuide } from "@/features/activities/LabGuide";
+import { BadgeCircle } from "@/components/badge-circle";
 import {
   getCardMeta,
   getCardTheme,
@@ -1558,9 +1559,9 @@ function CardSetDetailModal({
               key={idx}
               className="p-3.5 rounded-2xl bg-gray-50/80 border border-gray-100 flex items-start gap-3"
             >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-[11px] font-bold">
+              <BadgeCircle size="sm" className="bg-violet-100 text-violet-700">
                 {idx + 1}
-              </span>
+              </BadgeCircle>
               <p className="text-xs text-gray-800 leading-relaxed font-medium flex-1">
                 {prompt}
               </p>
