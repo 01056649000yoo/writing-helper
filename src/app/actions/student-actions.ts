@@ -559,6 +559,26 @@ export async function getOutlineSharedQuestionCandidates(sessionId: string, room
     return { rooms: [], error: "친구들과 만든 질문을 불러오지 못했습니다." };
   }
 
+  // 우리 반이 실제로 고른 질문을 **득표순**으로 보여 준다(후보 전체가 아니다).
+  // 개요에 넣을 질문은 "친구들이 좋다고 고른 것"이어야 활동이 이어진다.
+  const votingRoomIds = (votingRooms ?? []).map((room) => room.id);
+  const { data: votingSessions } = votingRoomIds.length > 0
+    ? await admin
+        .schema("writing_helper")
+        .from("student_sessions")
+        .select("room_id, submission")
+        .in("room_id", votingRoomIds)
+    : { data: [] as Array<{ room_id: string; submission: unknown }> };
+
+  const submissionsByRoom = new Map<string, QuestionVotingSubmission[]>();
+  for (const row of votingSessions ?? []) {
+    const submission = normalizeQuestionVotingSubmission(row.submission);
+    if (!submission || submission.selectedQuestionIds.length === 0) continue;
+    const bucket = submissionsByRoom.get(row.room_id) ?? [];
+    bucket.push(submission);
+    submissionsByRoom.set(row.room_id, bucket);
+  }
+
   let remainingQuestionCount = 100;
   const rooms = (votingRooms ?? []).flatMap((room) => {
     if (remainingQuestionCount <= 0) return [];
@@ -566,12 +586,21 @@ export async function getOutlineSharedQuestionCandidates(sessionId: string, room
     const config = normalizeQuestionVotingConfig(room.activity_config);
     if (!config) return [];
 
-    const questions = config.sourceQuestions
+    const ranking = buildQuestionVotingRanking(config, submissionsByRoom.get(room.id) ?? []);
+    // 한 표도 못 받은 질문은 담지 않는다 — `선별된 좋은 질문`이라는 말의 뜻이 흐려진다.
+    // 아직 아무도 고르지 않았으면(투표 전) 후보를 순서대로 보여 준다.
+    const voted = ranking.filter((entry) => entry.votes > 0);
+    const source = voted.length > 0
+      ? voted
+      : config.sourceQuestions.map((question) => ({ questionId: question.id, text: question.text, votes: 0 }));
+
+    const questions = source
       .slice(0, remainingQuestionCount)
-      .map((question, index) => ({
+      .map((entry, index) => ({
         // 원본 ID에는 학생 세션 ID가 들어갈 수 있어 학생 화면에는 노출하지 않는다.
         id: `question-${index + 1}`,
-        text: question.text,
+        text: entry.text,
+        votes: entry.votes,
       }));
     remainingQuestionCount -= questions.length;
     if (questions.length === 0) return [];

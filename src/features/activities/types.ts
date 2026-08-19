@@ -98,6 +98,12 @@ export type OutlineBuilderConfig = {
   outlineDepth: OutlineDepth;
   /** null이면 글 종류 기본 템플릿 사용 */
   outlineTemplate: import("@/lib/outline-templates").OutlineTemplate | null;
+  /**
+   * 학생이 개요 틀을 고칠 수 있는가.
+   * `true`(기본)면 항목을 빼고 더하고 친구들이 고른 질문을 불러올 수 있다.
+   * `false`면 교사가 준 틀 그대로 채우기만 한다. 옛 방에는 이 값이 없어 기본값(허용)으로 읽는다.
+   */
+  studentEditable?: boolean;
   /** @deprecated 이전 방식 호환용 — 새 방에는 사용 안 함 */
   questionSets?: QuestionSets | null;
   /** @deprecated 이전 방식 호환용 */

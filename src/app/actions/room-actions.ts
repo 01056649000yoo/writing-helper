@@ -195,11 +195,15 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       }
     }
 
+    // 학생 편집 허용 여부. 값이 없으면 허용(기본)으로 둔다 — 옛 방과 같은 동작이다.
+    const studentEditable = String(formData.get("student_editable") ?? "true") !== "false";
+
     activityConfig = {
       subjectType,
       gradeLevel,
       outlineDepth,
       outlineTemplate,
+      studentEditable,
     };
   } else if (activityType === "question_generator") {
     // 시작 조건은 방식(mode)마다 다르다 — 판정의 원본은 features/activities/question-generator/config.ts.

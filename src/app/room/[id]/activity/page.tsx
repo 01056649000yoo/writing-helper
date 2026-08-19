@@ -54,6 +54,8 @@ type OutlineSectionKey = "처음" | "가운데" | "끝";
 type OutlineSharedQuestion = {
   id: string;
   text: string;
+  /** 우리 반이 좋은 질문으로 고른 표 수. 투표 전이면 0이다. */
+  votes?: number;
 };
 
 type OutlineSharedQuestionRoom = {
@@ -90,6 +92,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [pageLoading, setPageLoading] = useState(true);
   // outline_builder 전용 상태
   const [outlineTemplate, setOutlineTemplate] = useState<OutlineTemplate | null>(null);
+  // 교사가 `선생님 틀 그대로`를 고르면 항목을 빼거나 더할 수 없다. 옛 방에는 값이 없어 허용이 기본이다.
+  const [outlineEditable, setOutlineEditable] = useState(true);
   const [templateAnswers, setTemplateAnswers] = useState<OutlineTemplateAnswer[]>([]);
   const [outlineSubmitting, setOutlineSubmitting] = useState(false);
   const [sharedQuestionPickerSection, setSharedQuestionPickerSection] = useState<OutlineSectionKey | null>(null);
@@ -229,6 +233,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         const subjectType = (config?.subjectType as import("@/types").SubjectType | undefined) ?? "생활문";
         const template = data.outline_template ?? getDefaultOutlineTemplate(subjectType);
         setOutlineTemplate(template);
+        setOutlineEditable(config?.studentEditable !== false);
         const savedAnswers = (data.existing_outline_answers ?? []) as OutlineTemplateAnswer[];
         if (savedAnswers.length > 0) {
           setTemplateAnswers(savedAnswers);
@@ -274,9 +279,17 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   }
 
   function handleTemplateAnswerChange(itemId: string, value: string) {
-    setTemplateAnswers((prev) =>
-      prev.map((a) => a.itemId === itemId ? { ...a, answer: value } : a)
-    );
+    setTemplateAnswers((prev) => {
+      if (prev.some((a) => a.itemId === itemId)) {
+        return prev.map((a) => a.itemId === itemId ? { ...a, answer: value } : a);
+      }
+      // 고정 틀에서는 `+ 쓸래요`로 항목을 여는 절차가 없다. 처음 적을 때 항목을 만들어 준다.
+      const found = (outlineTemplate?.sections ?? []).flatMap((section) => (
+        section.items.map((item) => ({ section: section.key, item }))
+      )).find((entry) => entry.item.id === itemId);
+      if (!found) return prev;
+      return [...prev, { section: found.section, itemId, label: found.item.label, answer: value }];
+    });
   }
 
   function handleTemplateLabelChange(itemId: string, value: string) {
@@ -1363,7 +1376,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     const selected = templateAnswers.some((a) => a.itemId === item.id);
                     const currentAnswer = templateAnswers.find((a) => a.itemId === item.id)?.answer ?? "";
 
-                    if (!selected) {
+                    // 선생님 틀 그대로일 때는 고르고 말고가 없다 — 모든 항목을 바로 채운다.
+                    if (!selected && outlineEditable) {
                       return (
                         <button
                           key={item.id}
@@ -1383,13 +1397,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       <div key={item.id} className="rounded-2xl border-2 border-orange-300 bg-white p-3 space-y-2 shadow-sm">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-gray-800 flex-1 leading-relaxed">{item.label}</p>
-                          <button
-                            type="button"
-                            onClick={() => toggleTemplateItem(item, key)}
-                            className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          >
-                            × 빼기
-                          </button>
+                          {outlineEditable && (
+                            <button
+                              type="button"
+                              onClick={() => toggleTemplateItem(item, key)}
+                              className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              × 빼기
+                            </button>
+                          )}
                         </div>
                         <StudentSpellingTextarea
                           value={currentAnswer}
@@ -1441,13 +1457,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     </div>
                   ))}
 
-                  <button
-                    type="button"
-                    onClick={() => openSharedQuestionPicker(key)}
-                    className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/30 px-4 py-3 text-sm font-semibold text-amber-700 hover:border-amber-400 hover:bg-amber-50 transition-colors"
-                  >
-                    + 직접 추가하기
-                  </button>
+                  {outlineEditable && (
+                    <button
+                      type="button"
+                      onClick={() => openSharedQuestionPicker(key)}
+                      className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/30 px-4 py-3 text-sm font-semibold text-amber-700 hover:border-amber-400 hover:bg-amber-50 transition-colors"
+                    >
+                      + 항목 추가하기 · 친구들이 고른 질문 불러오기
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -1562,7 +1580,14 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                                 }`}>
                                   {selected ? "추가됨" : "+ 선택"}
                                 </span>
-                                <span className="text-sm font-medium leading-relaxed text-gray-800">{question.text}</span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block text-sm font-medium leading-relaxed text-gray-800">{question.text}</span>
+                                  {(question.votes ?? 0) > 0 && (
+                                    <span className="mt-1 inline-block rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                                      친구들 {question.votes}표
+                                    </span>
+                                  )}
+                                </span>
                               </button>
                             );
                           })}

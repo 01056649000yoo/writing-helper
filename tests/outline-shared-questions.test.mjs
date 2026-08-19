@@ -16,7 +16,7 @@ function actionSource(name, nextName) {
   return studentActions.slice(start, end);
 }
 
-test("교사가 고르기 활동에 올린 최종 질문만 같은 교사·같은 학급에서 조회한다", () => {
+test("우리 반이 고른 질문을 득표순으로, 같은 교사·같은 학급에서만 조회한다", () => {
   const source = actionSource("getOutlineSharedQuestionCandidates", "getStudentRoomEntry");
 
   assert.match(source, /ownsIntegratedStudentSession\(admin, sessionId, roomId\)/);
@@ -25,9 +25,17 @@ test("교사가 고르기 활동에 올린 최종 질문만 같은 교사·같�
   assert.match(source, /\.eq\(classColumn, classId\)/);
   assert.match(source, /\.eq\("activity_type", "question_voting"\)/);
   assert.match(source, /normalizeQuestionVotingConfig\(room\.activity_config\)/);
+
+  // 2026-08-20 결정 뒤집기: 후보 전체가 아니라 **친구들이 실제로 고른 질문**을 득표순으로 준다.
+  // 개요에 넣을 질문은 "좋다고 뽑힌 것"이어야 좋은 질문 고르기 활동과 이어진다.
+  assert.match(source, /buildQuestionVotingRanking\(config, submissionsByRoom/);
+  assert.match(source, /entry\.votes > 0/);
+  // 아직 아무도 고르지 않았으면 후보를 그대로 보여 준다(활동 직후에도 비어 보이지 않게).
+  assert.match(source, /voted\.length > 0/);
   assert.match(source, /config\.sourceQuestions/);
-  assert.doesNotMatch(source, /student_sessions[\s\S]*submission/);
-  assert.doesNotMatch(source, /buildQuestionVotingRanking/);
+  // 집계만 읽고 누가 골랐는지는 화면에 내보내지 않는다.
+  assert.match(source, /\.select\("room_id, submission"\)/);
+  assert.doesNotMatch(source, /student_name|agit_student_id/);
 });
 
 test("학생 질문 원본 ID는 숨기고 조회량은 최근 10개 활동·질문 100개로 제한한다", () => {

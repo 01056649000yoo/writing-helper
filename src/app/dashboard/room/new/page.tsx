@@ -50,6 +50,8 @@ type OutlineBuilderDraft = {
   topic_description: string;
   subject_type: string;
   grade_level: string;
+  /** 학생이 개요 틀을 고칠 수 있는가(기본 허용). */
+  student_editable: boolean;
 };
 
 type QuestionGeneratorMode = "direct" | "card_remix" | "ai_custom";
@@ -332,6 +334,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     topic_description: "",
     subject_type: "생활문",
     grade_level: "중학년",
+    student_editable: true,
       }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<OutlineBuilderDraft>(
     buildDraftStorageKey(classId, "outline_builder"),
@@ -452,6 +455,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("topic_description", draft.topic_description);
     fd.set("subject_type", draft.subject_type);
     fd.set("grade_level", draft.grade_level);
+    fd.set("student_editable", draft.student_editable === false ? "false" : "true");
     if (customTemplate) {
       fd.set("outline_template_json", JSON.stringify(customTemplate));
     }
@@ -521,6 +525,49 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
               <span className="text-base text-gray-700">{gradeLabel(grade)}</span>
             </label>
           ))}
+        </div>
+      </div>
+
+      {/* 개요를 주는 방식 두 가지. 학생 화면의 자유도가 여기서 갈린다(2026-08-20 사용자 요청). */}
+      <div>
+        <label className="block text-base font-medium text-gray-700 mb-3">학생이 개요를 다루는 방식</label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className={`flex flex-col gap-1.5 rounded-2xl border-2 p-4 cursor-pointer transition-all ${
+            draft.student_editable !== false ? "border-indigo-500 bg-indigo-50/70" : "border-gray-200 bg-white hover:border-gray-300"
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-gray-800">✏️ 학생이 고쳐 쓰기</span>
+              <input
+                type="radio"
+                name="student_editable"
+                checked={draft.student_editable !== false}
+                onChange={() => setDraft((prev) => ({ ...prev, student_editable: true }))}
+                className="text-indigo-500"
+              />
+            </div>
+            <p className="text-xs leading-relaxed text-gray-600">
+              선생님 틀을 <strong>기본값</strong>으로 주고, 학생이 항목을 빼거나 더하고
+              <strong> 친구들이 고른 좋은 질문</strong>도 불러와 자기 개요로 만듭니다.
+            </p>
+          </label>
+
+          <label className={`flex flex-col gap-1.5 rounded-2xl border-2 p-4 cursor-pointer transition-all ${
+            draft.student_editable === false ? "border-indigo-500 bg-indigo-50/70" : "border-gray-200 bg-white hover:border-gray-300"
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-gray-800">📋 선생님 틀 그대로</span>
+              <input
+                type="radio"
+                name="student_editable"
+                checked={draft.student_editable === false}
+                onChange={() => setDraft((prev) => ({ ...prev, student_editable: false }))}
+                className="text-indigo-500"
+              />
+            </div>
+            <p className="text-xs leading-relaxed text-gray-600">
+              항목을 빼거나 더할 수 없습니다. 모두 같은 틀로 채우게 해 <strong>글의 짜임을 익히는</strong> 수업에 씁니다.
+            </p>
+          </label>
         </div>
       </div>
 
