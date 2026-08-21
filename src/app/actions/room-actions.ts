@@ -1365,7 +1365,6 @@ export async function saveTeacherHanjaWordCard(
 
   const saved = normalizeSavedHanjaWordCardRow(data);
   if (!saved) return { error: "저장된 한자 카드를 읽지 못했습니다." };
-  revalidatePath("/dashboard/hanja-wordbook");
   return { card: saved };
 }
 
@@ -1389,7 +1388,6 @@ export async function deleteTeacherHanjaWordCard(cardId: string): Promise<{ erro
     return { error: error.message };
   }
 
-  revalidatePath("/dashboard/hanja-wordbook");
   return {};
 }
 

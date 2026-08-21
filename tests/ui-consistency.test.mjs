@@ -27,7 +27,7 @@ test("연구소는 끄적끄적 아지트 공통 디자인 토큰을 사용한�
   assert.match(globals, /@media \(max-width:\s*767px\)/);
 });
 
-test("교사용 대시보드는 공통 셸과 현재 메뉴 표시를 한 번만 렌더링한다", () => {
+test("교사용 대시보드는 공통 셸과 현재 메뉴 표시를 한 번만 렌더링한다", async () => {
   assert.match(layout, /끄적끄적 아지트/);
   assert.match(layout, /글쓰기 연구소/);
   assert.match(layout, /DashboardNav/);
@@ -37,7 +37,14 @@ test("교사용 대시보드는 공통 셸과 현재 메뉴 표시를 한 번만
   assert.match(nav, /aria-current/);
   assert.match(nav, /학급·활동/);
   assert.match(nav, /질문 카드/);
-  assert.match(nav, /한자 단어집/);
+  assert.doesNotMatch(nav, /한자 단어집|hanja-wordbook/);
+
+  await Promise.all([
+    assert.rejects(access("src/app/dashboard/hanja-wordbook/page.tsx")),
+    assert.rejects(access("src/app/dashboard/hanja-wordbook/wordbook-client.tsx")),
+    assert.rejects(access("src/app/dashboard/hanja-wordbook/print/page.tsx")),
+    assert.rejects(access("src/app/dashboard/hanja-wordbook/print/print-client.tsx")),
+  ]);
 
   for (const page of [dashboard, classPage, roomNew]) {
     assert.doesNotMatch(page, /bg-gradient-to-br from-blue-50 to-indigo-100/);

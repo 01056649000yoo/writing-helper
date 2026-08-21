@@ -7,10 +7,9 @@ import { withoutBasePath } from "@/lib/app-path";
 
 const LAST_CLASS_ID_KEY = "lab_last_active_class_id";
 
-function isCurrentSection(pathname: string, section: "home" | "settings" | "guide" | "hanja") {
+function isCurrentSection(pathname: string, section: "home" | "settings" | "guide") {
   if (section === "settings") return pathname.startsWith("/dashboard/settings");
   if (section === "guide") return pathname.startsWith("/dashboard/guide");
-  if (section === "hanja") return pathname.startsWith("/dashboard/hanja-wordbook");
   return pathname === "/dashboard"
     || pathname.startsWith("/dashboard/class")
     || pathname.startsWith("/dashboard/room");
@@ -48,7 +47,6 @@ export function DashboardNav() {
     { href: "/dashboard/settings", label: "질문 카드", section: "settings" as const },
     // 도움말은 상단에 둔다 — 학급 안에서 활동을 만드는 자리에서도 열려야 한다(2026-08-20).
     { href: "/dashboard/guide", label: "도움말", section: "guide" as const },
-    { href: "/dashboard/hanja-wordbook", label: "한자 단어집", section: "hanja" as const },
   ];
 
   return (
