@@ -96,6 +96,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   // 교사가 `선생님 틀 그대로`를 고르면 항목을 빼거나 더할 수 없다. 옛 방에는 값이 없어 허용이 기본이다.
   const [outlineEditable, setOutlineEditable] = useState(true);
   const [templateAnswers, setTemplateAnswers] = useState<OutlineTemplateAnswer[]>([]);
+  // 교사 항목을 빼도 답변은 잠시 보존한다. 실수로 뺐다가 다시 넣으면 작성하던 내용이 돌아온다.
+  const [excludedTemplateItemIds, setExcludedTemplateItemIds] = useState<string[]>([]);
   const [outlineSubmitting, setOutlineSubmitting] = useState(false);
   const [sharedQuestionPickerSection, setSharedQuestionPickerSection] = useState<OutlineSectionKey | null>(null);
   const [sharedQuestionRooms, setSharedQuestionRooms] = useState<OutlineSharedQuestionRoom[]>([]);
@@ -233,12 +235,29 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         const config = data.activity_config as Record<string, unknown> | null;
         const subjectType = (config?.subjectType as import("@/types").SubjectType | undefined) ?? "생활문";
         const template = data.outline_template ?? getDefaultOutlineTemplate(subjectType);
+        const editable = config?.studentEditable !== false;
         setOutlineTemplate(template);
-        setOutlineEditable(config?.studentEditable !== false);
+        setOutlineEditable(editable);
         const savedAnswers = (data.existing_outline_answers ?? []) as OutlineTemplateAnswer[];
-        if (savedAnswers.length > 0) {
-          setTemplateAnswers(savedAnswers);
-        }
+        const savedByItemId = new Map(savedAnswers.map((answer) => [answer.itemId, answer]));
+        const teacherItemIds = new Set(template.sections.flatMap((section) => section.items.map((item) => item.id)));
+        const teacherAnswers = template.sections.flatMap((section) => section.items.map((item) => (
+          savedByItemId.get(item.id) ?? {
+            section: section.key,
+            itemId: item.id,
+            label: item.label,
+            answer: "",
+          }
+        )));
+        const studentAddedAnswers = savedAnswers.filter((answer) => !teacherItemIds.has(answer.itemId));
+        const hasSavedSelection = savedAnswers.length > 0 || data.session_status === "done";
+
+        // 새 활동은 교사가 제시한 항목을 모두 펼친 채 시작한다. 완성본을 고치러 왔을 때는
+        // 저장 결과에 없던 교사 항목을 학생이 전에 뺀 것으로 복원해 같은 선택을 유지한다.
+        setTemplateAnswers([...teacherAnswers, ...studentAddedAnswers]);
+        setExcludedTemplateItemIds(editable && hasSavedSelection
+          ? teacherAnswers.filter((answer) => !savedByItemId.has(answer.itemId)).map((answer) => answer.itemId)
+          : []);
         setStep("outline_sections");
       }
       setPageLoading(false);
@@ -284,7 +303,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       if (prev.some((a) => a.itemId === itemId)) {
         return prev.map((a) => a.itemId === itemId ? { ...a, answer: value } : a);
       }
-      // 고정 틀에서는 `+ 쓸래요`로 항목을 여는 절차가 없다. 처음 적을 때 항목을 만들어 준다.
+      // 과거 저장본처럼 상태에 아직 없는 교사 항목도 처음 적을 때 안전하게 만들어 준다.
       const found = (outlineTemplate?.sections ?? []).flatMap((section) => (
         section.items.map((item) => ({ section: section.key, item }))
       )).find((entry) => entry.item.id === itemId);
@@ -299,14 +318,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  function toggleTemplateItem(item: { id: string; label: string }, section: "처음" | "가운데" | "끝") {
-    setTemplateAnswers((prev) => {
-      const existing = prev.find((a) => a.itemId === item.id);
-      if (existing) {
-        return prev.filter((a) => a.itemId !== item.id);
-      }
-      return [...prev, { section, itemId: item.id, label: item.label, answer: "" }];
-    });
+  function excludeTemplateItem(itemId: string) {
+    setExcludedTemplateItemIds((prev) => prev.includes(itemId) ? prev : [...prev, itemId]);
+  }
+
+  function restoreTemplateItem(item: { id: string; label: string }, section: OutlineSectionKey) {
+    setExcludedTemplateItemIds((prev) => prev.filter((itemId) => itemId !== item.id));
+    setTemplateAnswers((prev) => prev.some((answer) => answer.itemId === item.id)
+      ? prev
+      : [...prev, { section, itemId: item.id, label: item.label, answer: "" }]);
   }
 
   function addCustomTemplateItem(section: "처음" | "가운데" | "끝") {
@@ -359,7 +379,9 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     if (outlineSubmitting) return;
     setError("");
 
+    const excludedItemIds = new Set(excludedTemplateItemIds);
     const submittable = templateAnswers
+      .filter((answer) => !excludedItemIds.has(answer.itemId))
       .map((a) => ({ ...a, label: a.label.trim(), answer: a.answer.trim() }))
       .filter((a) => a.label && a.answer);
 
@@ -1335,8 +1357,11 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
   if (step === "outline_sections") {
     const sections = outlineTemplate?.sections ?? [];
-    const selectedCount = templateAnswers.length;
-    const answeredCount = templateAnswers.filter((a) => a.answer.trim()).length;
+    const excludedItemIds = new Set(excludedTemplateItemIds);
+    const selectedCount = templateAnswers.filter((answer) => !excludedItemIds.has(answer.itemId)).length;
+    const answeredCount = templateAnswers.filter((answer) => (
+      !excludedItemIds.has(answer.itemId) && answer.answer.trim()
+    )).length;
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
@@ -1350,8 +1375,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               )}
             </div>
             <div className="mt-4 rounded-2xl bg-orange-50 px-4 py-3 text-center">
-              <p className="text-xs text-orange-700 font-semibold">처음·가운데·끝 항목 중 쓰고 싶은 것만 골라서 써 보세요.</p>
-              <p className="text-xs text-orange-500 mt-1">고른 항목 {selectedCount}개 · 작성 완료 {answeredCount}개</p>
+              <p className="text-xs text-orange-700 font-semibold">
+                {outlineEditable
+                  ? "선생님이 준비한 항목에서 빼고 싶은 것은 빼고, 내 항목을 더해도 좋아요."
+                  : "선생님이 준비한 처음·가운데·끝 항목에 맞춰 내용을 써 보세요."}
+              </p>
+              <p className="text-xs text-orange-500 mt-1">남긴 항목 {selectedCount}개 · 작성 완료 {answeredCount}개</p>
             </div>
           </div>
 
@@ -1361,6 +1390,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             const customAnswers = templateAnswers.filter(
               (a) => a.section === key && !teacherItemIds.has(a.itemId)
             );
+            const excludedTeacherItems = items.filter((item) => excludedItemIds.has(item.id));
             return (
               <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
@@ -1370,29 +1400,15 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     </BadgeCircle>
                     {key}
                   </h2>
-                  <span className="text-xs font-semibold text-orange-400">{sectionSelectedCount}개 고름</span>
+                  <span className="text-xs font-semibold text-orange-400">
+                    {sectionSelectedCount - excludedTeacherItems.length}개 남김
+                  </span>
                 </div>
                 <div className="space-y-3">
                   {items.map((item) => {
-                    const selected = templateAnswers.some((a) => a.itemId === item.id);
                     const currentAnswer = templateAnswers.find((a) => a.itemId === item.id)?.answer ?? "";
 
-                    // 선생님 틀 그대로일 때는 고르고 말고가 없다 — 모든 항목을 바로 채운다.
-                    if (!selected && outlineEditable) {
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => toggleTemplateItem(item, key)}
-                          className="w-full text-left rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/40 px-4 py-3 hover:border-orange-300 hover:bg-orange-50 transition-colors"
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="rounded-full bg-orange-100 text-orange-600 px-2.5 py-1 text-xs font-bold shrink-0">+ 쓸래요</span>
-                            <p className="text-sm text-gray-700 flex-1 leading-relaxed">{item.label}</p>
-                          </div>
-                        </button>
-                      );
-                    }
+                    if (outlineEditable && excludedItemIds.has(item.id)) return null;
 
                     return (
                       <div key={item.id} className="rounded-2xl border-2 border-orange-300 bg-white p-3 space-y-2 shadow-sm">
@@ -1401,7 +1417,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                           {outlineEditable && (
                             <button
                               type="button"
-                              onClick={() => toggleTemplateItem(item, key)}
+                              onClick={() => excludeTemplateItem(item.id)}
+                              aria-label={`${item.label} 항목 빼기`}
                               className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                             >
                               × 빼기
@@ -1457,6 +1474,27 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       />
                     </div>
                   ))}
+
+                  {excludedTeacherItems.length > 0 && (
+                    <details className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-3">
+                      <summary className="cursor-pointer text-xs font-semibold text-gray-500">
+                        뺀 항목 {excludedTeacherItems.length}개 · 다시 넣기
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        {excludedTeacherItems.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => restoreTemplateItem(item, key)}
+                            className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-left text-sm text-gray-700 hover:border-orange-300 hover:bg-orange-50 transition-colors"
+                          >
+                            <span className="mr-2 font-bold text-orange-500">+ 다시 넣기</span>
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
 
                   {outlineEditable && (
                     <button

@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [studentActions, activityPage, roomActions] = await Promise.all([
+const [studentActions, activityPage, roomActions, guideSource] = await Promise.all([
   readFile("src/app/actions/student-actions.ts", "utf8"),
   readFile("src/app/room/[id]/activity/page.tsx", "utf8"),
   readFile("src/app/actions/room-actions.ts", "utf8"),
+  readFile("src/features/activities/guide.ts", "utf8"),
 ]);
 
 function actionSource(name, nextName) {
@@ -55,6 +56,17 @@ test("직접 추가하기를 눌렀을 때만 질문을 불러오고 선택한 �
   assert.match(activityPage, /친구들과 만든 질문/);
   assert.match(activityPage, /custom\.itemId\.startsWith\(SHARED_QUESTION_ITEM_PREFIX\) \? \(/);
   assert.match(activityPage, /친구 질문 없이 내 항목 직접 쓰기/);
+});
+
+test("학생이 교사 개요 항목을 빼면 질문을 숨기고 제출에서도 제외하며 되돌릴 수 있다", () => {
+  assert.match(activityPage, /const \[excludedTemplateItemIds, setExcludedTemplateItemIds\] = useState<string\[]>\(\[\]\)/);
+  assert.match(activityPage, /setTemplateAnswers\(\[\.\.\.teacherAnswers, \.\.\.studentAddedAnswers\]\)/);
+  assert.match(activityPage, /if \(outlineEditable && excludedItemIds\.has\(item\.id\)\) return null/);
+  assert.match(activityPage, /\.filter\(\(answer\) => !excludedItemIds\.has\(answer\.itemId\)\)/);
+  assert.match(activityPage, /뺀 항목 \{excludedTeacherItems\.length\}개 · 다시 넣기/);
+  assert.match(activityPage, /onClick=\{\(\) => restoreTemplateItem\(item, key\)\}/);
+  assert.doesNotMatch(activityPage, /\+ 쓸래요/);
+  assert.match(guideSource, /`빼기`로 숨기고 접힌 `뺀 항목`에서 다시 넣을 수 있습니다/);
 });
 
 test("후보 데이터는 교사가 포함 여부와 교정 문장을 확정한 sourceQuestions이다", () => {
