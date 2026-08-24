@@ -431,22 +431,46 @@ function QuestionResultsModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-7">
           {/*
-            * 네 칸이 각각 큰 카드라 화면 위쪽을 많이 먹었다(2026-08-24 지적).
-            * 여기는 **곁눈질로 보는 숫자**이지 화면의 주인공이 아니다. 한 줄 띠로 줄인다.
+            * 진행 현황 — 이 창은 **전자칠판에 띄워 학생들이 함께 본다**(2026-08-24).
+            * 그래서 곁눈질용 잔글씨가 아니라 **멀리서도 읽히는 크기**로, 가로 4등분해 나란히 둔다.
+            *
+            * `작성 중` 숫자에만 맥박을 준다. 지금 이 순간에도 누군가 쓰고 있다는 것이 이 화면의
+            * 핵심이라, 넷 모두 깜빡이면 어디를 봐야 할지 알 수 없다.
             */}
-          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-2xl bg-gray-50 px-4 py-2.5">
-            {[
-              { label: "제출 완료", value: `${results.length}명`, tone: "text-emerald-600", dot: "bg-emerald-400" },
-              { label: "작성 중", value: `${activeSessions.length}명`, tone: "text-amber-600", dot: "bg-amber-400" },
-              { label: "미접속", value: `${notConnectedCount}명`, tone: "text-gray-500", dot: "bg-gray-300" },
-              { label: "모인 질문", value: `${totalQuestions}개`, tone: "text-sky-600", dot: "bg-sky-400" },
-            ].map((stat) => (
-              <span key={stat.label} className="inline-flex items-center gap-1.5">
-                <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${stat.dot}`} />
-                <span className={`text-xs font-semibold ${stat.tone}`}>{stat.label}</span>
-                <b className="text-sm font-bold text-gray-800">{stat.value}</b>
-              </span>
-            ))}
+          <div className="mb-4">
+            <div className="grid grid-cols-4 divide-x divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+              {[
+                { label: "제출 완료", value: results.length, unit: "명", tone: "text-emerald-600", num: "text-emerald-700", live: false },
+                { label: "작성 중", value: activeSessions.length, unit: "명", tone: "text-amber-600", num: "text-amber-600", live: true },
+                { label: "미접속", value: notConnectedCount, unit: "명", tone: "text-gray-500", num: "text-gray-600", live: false },
+                { label: "모인 질문", value: totalQuestions, unit: "개", tone: "text-sky-600", num: "text-sky-700", live: false },
+              ].map((stat) => (
+                <div key={stat.label} className="px-3 py-3 text-center sm:py-4">
+                  <p className={`flex items-center justify-center gap-1.5 text-sm font-bold sm:text-base ${stat.tone}`}>
+                    {stat.live && stat.value > 0 && (
+                      <span aria-hidden="true" className="relative inline-flex h-2 w-2">
+                        <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-amber-400 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                      </span>
+                    )}
+                    {stat.label}
+                  </p>
+                  <p className={`mt-1 text-3xl font-black leading-none sm:text-4xl ${stat.num}`}>
+                    {stat.value}
+                    <span className="ml-0.5 text-lg font-bold sm:text-xl">{stat.unit}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+            {/* 얼마나 왔는지 한눈에 — 숫자만으로는 "거의 다 왔다"가 안 보인다. */}
+            {students.length > 0 && (
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
+                <div
+                  className="h-full bg-emerald-400 transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.round((results.length / students.length) * 100))}%` }}
+                />
+              </div>
+            )}
           </div>
 
           {activeSessions.length > 0 && (

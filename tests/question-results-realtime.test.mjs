@@ -90,9 +90,16 @@ test("큰 모달에서 학생 이름을 누르면 위 질문 칠판에 그 학�
 test("실시간 보기 요약은 한 줄이고 학생은 명단 카드로 골라 칠판에 띄운다", async () => {
   const panel = await readFile("src/app/dashboard/room/[id]/live-student-panel.tsx", "utf8");
 
-  // 요약은 곁눈질로 보는 숫자다. 큰 카드 넷으로 되돌아가면 걸린다.
-  assert.doesNotMatch(panel, /<p className="mt-1 text-xl font-bold text-emerald-900">\{results\.length\}명<\/p>/);
-  assert.match(panel, /label: "제출 완료", value: `\$\{results\.length\}명`/);
+  /*
+   * ⚠️ 이 창은 **전자칠판에 띄워 학생들이 함께 본다**(2026-08-24). 그래서 진행 현황은
+   *    곁눈질용 잔글씨가 아니라 멀리서도 읽히는 크기여야 하고, 가로 4등분으로 나란히 서야 한다.
+   */
+  assert.match(panel, /grid grid-cols-4 divide-x/);
+  assert.match(panel, /text-3xl font-black leading-none sm:text-4xl/);
+  assert.match(panel, /\{ label: "제출 완료", value: results\.length, unit: "명"/);
+  // 지금 쓰고 있다는 느낌은 `작성 중` 하나에만 준다. 넷 다 깜빡이면 어디를 볼지 알 수 없다.
+  assert.equal((panel.match(/animate-ping/g) ?? []).length, 1);
+  assert.match(panel, /\{ label: "작성 중", value: activeSessions\.length, unit: "명", tone: "text-amber-600", num: "text-amber-600", live: true \}/);
 
   // 명단은 격자 카드이고, 누르면 칠판에 뜬다.
   assert.match(panel, /학생 명단 · 누르면 칠판에 보여요/);
