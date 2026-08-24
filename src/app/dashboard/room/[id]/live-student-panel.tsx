@@ -430,23 +430,23 @@ function QuestionResultsModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-7">
-          <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-2xl bg-emerald-50 px-4 py-3">
-              <p className="text-xs font-semibold text-emerald-600">제출 완료</p>
-              <p className="mt-1 text-xl font-bold text-emerald-900">{results.length}명</p>
-            </div>
-            <div className="rounded-2xl bg-amber-50 px-4 py-3">
-              <p className="text-xs font-semibold text-amber-600">작성 중</p>
-              <p className="mt-1 text-xl font-bold text-amber-900">{activeSessions.length}명</p>
-            </div>
-            <div className="rounded-2xl bg-gray-100 px-4 py-3">
-              <p className="text-xs font-semibold text-gray-500">미접속</p>
-              <p className="mt-1 text-xl font-bold text-gray-800">{notConnectedCount}명</p>
-            </div>
-            <div className="rounded-2xl bg-sky-50 px-4 py-3">
-              <p className="text-xs font-semibold text-sky-600">모인 질문</p>
-              <p className="mt-1 text-xl font-bold text-sky-900">{totalQuestions}개</p>
-            </div>
+          {/*
+            * 네 칸이 각각 큰 카드라 화면 위쪽을 많이 먹었다(2026-08-24 지적).
+            * 여기는 **곁눈질로 보는 숫자**이지 화면의 주인공이 아니다. 한 줄 띠로 줄인다.
+            */}
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-2xl bg-gray-50 px-4 py-2.5">
+            {[
+              { label: "제출 완료", value: `${results.length}명`, tone: "text-emerald-600", dot: "bg-emerald-400" },
+              { label: "작성 중", value: `${activeSessions.length}명`, tone: "text-amber-600", dot: "bg-amber-400" },
+              { label: "미접속", value: `${notConnectedCount}명`, tone: "text-gray-500", dot: "bg-gray-300" },
+              { label: "모인 질문", value: `${totalQuestions}개`, tone: "text-sky-600", dot: "bg-sky-400" },
+            ].map((stat) => (
+              <span key={stat.label} className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${stat.dot}`} />
+                <span className={`text-xs font-semibold ${stat.tone}`}>{stat.label}</span>
+                <b className="text-sm font-bold text-gray-800">{stat.value}</b>
+              </span>
+            ))}
           </div>
 
           {activeSessions.length > 0 && (
@@ -589,6 +589,59 @@ function QuestionResultsModal({
                     {applyingCorrections ? "적용 중..." : `선택한 ${correctionSelected.size}개 적용`}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/*
+            * 칠판 아래 학생 명단.
+            *
+            * 예전에는 학생마다 질문을 모두 펼친 큰 카드가 세로로 쌓여 있었다. 30명이면 원하는 학생을
+            * 고르려고 한참 내려야 했다(2026-08-24 지적). 이름만 담은 작은 카드를 격자로 깔아,
+            * **한 화면에서 골라 칠판에 띄운다**. 자세한 내용과 고치기는 아래 목록에 그대로 둔다.
+            */}
+          {results.length > 0 && (
+            <div className="mb-5">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <p className="text-xs font-bold text-gray-500">학생 명단 · 누르면 칠판에 보여요</p>
+                {boardSessionId && (
+                  <button
+                    type="button"
+                    onClick={() => setBoardSessionId(null)}
+                    className="text-xs font-semibold text-gray-400 hover:text-gray-600"
+                  >
+                    칠판 비우기
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+                {results.map((result) => {
+                  const isOnBoard = boardSessionId === result.sessionId;
+                  const isNew = newSessionIds.has(result.sessionId);
+                  return (
+                    <button
+                      key={result.sessionId}
+                      type="button"
+                      onClick={() => showStudentOnBoard(result.sessionId)}
+                      aria-pressed={isOnBoard}
+                      aria-label={`${result.studentNumber}번 ${result.studentName} 질문 ${result.selections.length}개를 칠판에서 보기`}
+                      className={`min-w-0 rounded-2xl border px-2.5 py-2 text-left transition-colors ${
+                        isOnBoard
+                          ? "border-amber-400 bg-amber-50 ring-2 ring-amber-200"
+                          : isNew
+                          ? "border-emerald-300 bg-emerald-50 hover:border-emerald-400"
+                          : "border-sky-100 bg-white hover:border-sky-300 hover:bg-sky-50"
+                      }`}
+                    >
+                      <span className="block truncate text-sm font-bold text-gray-800">
+                        {result.studentNumber}번 {result.studentName}
+                      </span>
+                      <span className={`mt-0.5 block text-[11px] font-semibold ${isNew ? "text-emerald-600" : "text-sky-500"}`}>
+                        {isNew ? "새 질문 " : ""}질문 {result.selections.length}개
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

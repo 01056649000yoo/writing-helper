@@ -880,12 +880,18 @@ export async function getQuestionGeneratorRoomResults(roomId: string): Promise<Q
 
 type QuestionUpdate = { sessionId: string; selectionId: string; newText: string };
 
+/*
+ * ⚠️ `applied`(실제로 글자가 바뀐 수)와 `matched`(고칠 질문을 찾은 수)를 **따로 돌려준다**.
+ *    예전에는 `applied` 하나만 돌려줬는데, 교사가 **고치지 않고 그대로 저장**하면 `applied` 가 0이라
+ *    "수정할 질문을 찾지 못했습니다" 라는 엉뚱한 오류가 떴다(2026-08-24 지적).
+ *    질문을 찾았는데 내용이 같은 것은 오류가 아니라 **할 일이 없는 것**이다.
+ */
 async function applyQuestionUpdatesForRoom(
   roomId: string,
   teacherId: string,
   updates: QuestionUpdate[],
-): Promise<{ applied: number; error?: string }> {
-  if (updates.length === 0) return { applied: 0 };
+): Promise<{ applied: number; matched: number; error?: string }> {
+  if (updates.length === 0) return { applied: 0, matched: 0 };
 
   const admin = createSupabaseAdminClient();
 
@@ -896,7 +902,7 @@ async function applyQuestionUpdatesForRoom(
     .eq("id", roomId)
     .maybeSingle();
   if (!room || room.teacher_id !== teacherId || room.activity_type !== "question_generator") {
-    return { applied: 0, error: "수정 권한이 없습니다." };
+    return { applied: 0, matched: 0, error: "수정 권한이 없습니다." };
   }
 
   const updatesBySession = new Map<string, Map<string, string>>();
@@ -909,7 +915,7 @@ async function applyQuestionUpdatesForRoom(
     updatesBySession.get(update.sessionId)!.set(update.selectionId, trimmed);
   }
 
-  if (updatesBySession.size === 0) return { applied: 0 };
+  if (updatesBySession.size === 0) return { applied: 0, matched: 0 };
 
   const sessionIds = Array.from(updatesBySession.keys());
   const { data: sessions } = await admin
@@ -920,6 +926,7 @@ async function applyQuestionUpdatesForRoom(
     .eq("room_id", roomId);
 
   let applied = 0;
+  let matched = 0;
   const updatedAt = new Date().toISOString();
 
   for (const session of sessions ?? []) {
@@ -932,6 +939,7 @@ async function applyQuestionUpdatesForRoom(
     let sessionChanged = false;
     const nextSelections = submission.selections.map((selection) => {
       const nextText = sessionUpdates.get(selection.id);
+      if (nextText) matched += 1;
       if (nextText && nextText !== selection.remixedQuestion) {
         sessionChanged = true;
         applied += 1;
@@ -955,10 +963,10 @@ async function applyQuestionUpdatesForRoom(
       })
       .eq("id", session.id)
       .eq("room_id", roomId);
-    if (error) return { applied, error: "질문 수정 저장에 실패했습니다." };
+    if (error) return { applied, matched, error: "질문 수정 저장에 실패했습니다." };
   }
 
-  return { applied };
+  return { applied, matched };
 }
 
 export async function updateQuestionGeneratorSelection(
@@ -974,7 +982,8 @@ export async function updateQuestionGeneratorSelection(
     { sessionId, selectionId, newText },
   ]);
   if (result.error) return { error: result.error };
-  if (result.applied === 0) return { error: "수정할 질문을 찾지 못했습니다." };
+  // 찾았는데 내용이 같으면 고칠 것이 없을 뿐이다. 오류로 알리지 않는다.
+  if (result.matched === 0) return { error: "수정할 질문을 찾지 못했습니다." };
   return {};
 }
 

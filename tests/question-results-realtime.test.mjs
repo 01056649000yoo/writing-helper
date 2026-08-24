@@ -82,3 +82,24 @@ test("큰 모달에서 학생 이름을 누르면 위 질문 칠판에 그 학�
     "학생 이름 버튼의 용도가 두 보기 방식에 모두 표시되어야 합니다.",
   );
 });
+
+/*
+ * 2026-08-24: 전체 질문 실시간 보기의 위쪽 요약이 큰 카드 넷이라 화면을 많이 먹었고,
+ * 칠판 아래 학생 목록은 학생마다 질문을 모두 펼친 카드가 세로로 쌓여 30명이면 한참 내려야 했다.
+ */
+test("실시간 보기 요약은 한 줄이고 학생은 명단 카드로 골라 칠판에 띄운다", async () => {
+  const panel = await readFile("src/app/dashboard/room/[id]/live-student-panel.tsx", "utf8");
+
+  // 요약은 곁눈질로 보는 숫자다. 큰 카드 넷으로 되돌아가면 걸린다.
+  assert.doesNotMatch(panel, /<p className="mt-1 text-xl font-bold text-emerald-900">\{results\.length\}명<\/p>/);
+  assert.match(panel, /label: "제출 완료", value: `\$\{results\.length\}명`/);
+
+  // 명단은 격자 카드이고, 누르면 칠판에 뜬다.
+  assert.match(panel, /학생 명단 · 누르면 칠판에 보여요/);
+  assert.match(panel, /grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6/);
+  assert.match(panel, /aria-label=\{`\$\{result\.studentNumber\}번 \$\{result\.studentName\} 질문 \$\{result\.selections\.length\}개를 칠판에서 보기`\}/);
+
+  // 고른 학생을 알 수 있어야 하고, 칠판을 비울 수도 있어야 한다.
+  assert.match(panel, /aria-pressed=\{isOnBoard\}/);
+  assert.match(panel, /칠판 비우기/);
+});

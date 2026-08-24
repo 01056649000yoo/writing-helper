@@ -101,3 +101,27 @@ test("교사는 활동을 만들다가 그 자리에서 질문 카드를 만들 
   // 저장은 교사 설정과 같은 액션을 쓴다(보관함에도 남는다).
   assert.match(teacherForm, /saveQuestionCardSetting\(\{/);
 });
+
+/*
+ * 2026-08-24: 교사가 학생 질문을 고치면 "수정할 질문을 찾지 못했습니다" 가 떴다.
+ *
+ * ⚠️ 원인은 **고친 수와 찾은 수를 하나로 셌던 것**이다. `applied` 는 글자가 실제로 달라졌을 때만
+ *    올라가는데, 호출부가 `applied === 0` 을 "못 찾았다" 로 바꿨다. 그래서 교사가 고치지 않고
+ *    그대로 저장하거나 같은 글로 다시 저장하면 멀쩡한데도 오류가 떴다.
+ *    찾았는데 내용이 같은 것은 오류가 아니라 **할 일이 없는 것**이다.
+ */
+test("교사가 질문을 고치지 않고 저장해도 오류로 알리지 않는다", async () => {
+  const source = await readFile("src/app/actions/room-actions.ts", "utf8");
+
+  // 찾은 수와 고친 수를 따로 센다.
+  assert.match(source, /Promise<\{ applied: number; matched: number; error\?: string \}>/);
+  assert.match(source, /if \(nextText\) matched \+= 1;/);
+
+  // 오류는 **찾지 못했을 때만** 낸다.
+  assert.match(source, /if \(result\.matched === 0\) return \{ error: "수정할 질문을 찾지 못했습니다\." \}/);
+  assert.doesNotMatch(source, /if \(result\.applied === 0\) return \{ error: "수정할 질문을 찾지 못했습니다\." \}/);
+
+  // 저장은 여전히 실제로 달라졌을 때만 한다 — 같은 글로 DB를 두드리지 않는다.
+  assert.match(source, /if \(nextText && nextText !== selection\.remixedQuestion\) \{/);
+  assert.match(source, /if \(!sessionChanged\) continue;/);
+});
