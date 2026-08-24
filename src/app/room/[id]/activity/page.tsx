@@ -99,6 +99,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   // 교사 항목을 빼도 답변은 잠시 보존한다. 실수로 뺐다가 다시 넣으면 작성하던 내용이 돌아온다.
   const [excludedTemplateItemIds, setExcludedTemplateItemIds] = useState<string[]>([]);
   const [outlineSubmitting, setOutlineSubmitting] = useState(false);
+  // 끌어서 옮기는 중인 항목. 태블릿에서는 끌기가 어려워 ▲▼ 단추도 함께 둔다.
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
   const [sharedQuestionPickerSection, setSharedQuestionPickerSection] = useState<OutlineSectionKey | null>(null);
   const [sharedQuestionRooms, setSharedQuestionRooms] = useState<OutlineSharedQuestionRoom[]>([]);
   const [sharedQuestionLoading, setSharedQuestionLoading] = useState(false);
@@ -254,7 +256,17 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
         // 새 활동은 교사가 제시한 항목을 모두 펼친 채 시작한다. 완성본을 고치러 왔을 때는
         // 저장 결과에 없던 교사 항목을 학생이 전에 뺀 것으로 복원해 같은 선택을 유지한다.
-        setTemplateAnswers([...teacherAnswers, ...studentAddedAnswers]);
+        //
+        // ⚠️ 학생이 갈래 안에서 순서를 바꿀 수 있으므로(2026-08-24) **저장된 순서를 그대로 이어야
+        //    한다**. 교사 틀 순서로 다시 세우면 다음에 들어왔을 때 학생이 옮긴 순서가 사라진다.
+        //    저장본에 없던 항목(학생이 뺐던 교사 항목)은 뒤로 보낸다 — 정렬이 안정적이라
+        //    저장본이 없을 때는 교사 틀 순서가 그대로 남는다.
+        const savedOrder = new Map(savedAnswers.map((answer, index) => [answer.itemId, index]));
+        const orderedAnswers = [...teacherAnswers, ...studentAddedAnswers].sort((left, right) => (
+          (savedOrder.get(left.itemId) ?? Number.MAX_SAFE_INTEGER)
+          - (savedOrder.get(right.itemId) ?? Number.MAX_SAFE_INTEGER)
+        ));
+        setTemplateAnswers(orderedAnswers);
         setExcludedTemplateItemIds(editable && hasSavedSelection
           ? teacherAnswers.filter((answer) => !savedByItemId.has(answer.itemId)).map((answer) => answer.itemId)
           : []);
@@ -332,6 +344,54 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   function addCustomTemplateItem(section: "처음" | "가운데" | "끝") {
     const itemId = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setTemplateAnswers((prev) => [...prev, { section, itemId, label: "", answer: "" }]);
+  }
+
+  /*
+   * 갈래(처음·가운데·끝) 안에서 항목 순서를 바꾼다(2026-08-24 요청).
+   *
+   * 불러온 질문이 늘 갈래 맨 뒤에 붙어, 하고 싶은 자리에 둘 수 없었다.
+   *
+   * ⚠️ 순서의 원본은 `templateAnswers` 배열 **하나**다. 화면이 교사 항목과 학생 항목을 각각
+   *    다른 곳에서 순서를 받아 그리면, 옮겨도 화면이 안 따라오거나 저장된 순서와 어긋난다.
+   * ⚠️ 뺀 항목은 화면에 없다. 화면에 보이는 것끼리 자리를 바꿔야 학생 눈에 한 칸씩 움직인다.
+   *    그래서 전체 배열이 아니라 **보이는 항목만** 골라 그 안에서 자리를 맞바꾼다.
+   */
+  function moveTemplateItem(itemId: string, direction: -1 | 1) {
+    setTemplateAnswers((prev) => {
+      const current = prev.find((answer) => answer.itemId === itemId);
+      if (!current) return prev;
+
+      const excluded = new Set(excludedTemplateItemIds);
+      const visibleIndexes = prev
+        .map((answer, index) => ({ answer, index }))
+        .filter(({ answer }) => answer.section === current.section && !excluded.has(answer.itemId))
+        .map(({ index }) => index);
+
+      const at = visibleIndexes.indexOf(prev.indexOf(current));
+      const target = visibleIndexes[at + direction];
+      if (at < 0 || target === undefined) return prev;
+
+      const next = [...prev];
+      const from = visibleIndexes[at];
+      [next[from], next[target]] = [next[target], next[from]];
+      return next;
+    });
+  }
+
+  /** 끌어서 놓기로 옮길 때, 놓은 자리 **앞**에 끼워 넣는다(자리 맞바꾸기가 아니다). */
+  function dropTemplateItem(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    setTemplateAnswers((prev) => {
+      const from = prev.findIndex((answer) => answer.itemId === draggedId);
+      const to = prev.findIndex((answer) => answer.itemId === targetId);
+      if (from < 0 || to < 0) return prev;
+      // 갈래를 넘어가는 이동은 하지 않는다. 처음·가운데·끝은 글의 구조라 뜻이 달라진다.
+      if (prev[from].section !== prev[to].section) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(next.findIndex((answer) => answer.itemId === targetId), 0, moved);
+      return next;
+    });
   }
 
   function buildSharedQuestionItemId(
@@ -1386,11 +1446,16 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
           {sections.map(({ key, items }) => {
             const sectionSelectedCount = templateAnswers.filter((a) => a.section === key).length;
-            const teacherItemIds = new Set(items.map((i) => i.id));
-            const customAnswers = templateAnswers.filter(
-              (a) => a.section === key && !teacherItemIds.has(a.itemId)
-            );
+            const teacherItemsById = new Map(items.map((item) => [item.id, item]));
             const excludedTeacherItems = items.filter((item) => excludedItemIds.has(item.id));
+            /*
+             * ⚠️ 예전에는 교사 항목과 학생 항목을 **따로 그렸다**. 그래서 불러온 질문이 늘 갈래 맨
+             *    뒤에 붙었다. 이제 `templateAnswers` 한 줄에서 순서를 받아 한 목록으로 그린다
+             *    (2026-08-24 요청). 옮기기는 `moveTemplateItem`·`dropTemplateItem` 이 맡는다.
+             */
+            const sectionAnswers = templateAnswers.filter(
+              (a) => a.section === key && !excludedItemIds.has(a.itemId)
+            );
             return (
               <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
@@ -1404,76 +1469,122 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     {sectionSelectedCount - excludedTeacherItems.length}개 남김
                   </span>
                 </div>
+                {outlineEditable && sectionAnswers.length > 1 && (
+                  <p className="mb-3 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                    ↕ 손잡이를 끌거나 ▲▼ 단추로 <b>{key}</b> 안에서 순서를 바꿀 수 있어요.
+                  </p>
+                )}
                 <div className="space-y-3">
-                  {items.map((item) => {
-                    const currentAnswer = templateAnswers.find((a) => a.itemId === item.id)?.answer ?? "";
+                  {sectionAnswers.map((answer, orderIndex) => {
+                    const teacherItem = teacherItemsById.get(answer.itemId);
+                    const isTeacherItem = Boolean(teacherItem);
+                    const isSharedQuestion = answer.itemId.startsWith(SHARED_QUESTION_ITEM_PREFIX);
+                    const isDragging = draggingItemId === answer.itemId;
+                    const cardTone = isTeacherItem
+                      ? "border-orange-300 bg-white"
+                      : "border-amber-300 bg-amber-50/40";
+                    const focusTone = isTeacherItem ? "focus:border-orange-400" : "focus:border-amber-400";
 
-                    if (outlineEditable && excludedItemIds.has(item.id)) return null;
+                    const reorderControls = outlineEditable && sectionAnswers.length > 1 ? (
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <span
+                          aria-hidden="true"
+                          className="cursor-grab select-none px-1 text-gray-300"
+                          title={`${key} 안에서 끌어서 옮기기`}
+                        >
+                          ⠿
+                        </span>
+                        {/* 끌기는 태블릿·키보드에서 어렵다. 같은 일을 하는 단추를 반드시 함께 둔다. */}
+                        <button
+                          type="button"
+                          disabled={orderIndex === 0}
+                          onClick={() => moveTemplateItem(answer.itemId, -1)}
+                          aria-label={`${answer.label || "이 항목"} 위로 옮기기`}
+                          className="rounded-lg px-1.5 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          disabled={orderIndex === sectionAnswers.length - 1}
+                          onClick={() => moveTemplateItem(answer.itemId, 1)}
+                          aria-label={`${answer.label || "이 항목"} 아래로 옮기기`}
+                          className="rounded-lg px-1.5 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    ) : null;
 
                     return (
-                      <div key={item.id} className="rounded-2xl border-2 border-orange-300 bg-white p-3 space-y-2 shadow-sm">
+                      <div
+                        key={answer.itemId}
+                        draggable={outlineEditable && sectionAnswers.length > 1}
+                        onDragStart={() => setDraggingItemId(answer.itemId)}
+                        onDragEnd={() => setDraggingItemId(null)}
+                        onDragOver={(event) => { if (draggingItemId) event.preventDefault(); }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (draggingItemId) dropTemplateItem(draggingItemId, answer.itemId);
+                          setDraggingItemId(null);
+                        }}
+                        className={`rounded-2xl border-2 p-3 space-y-2 shadow-sm transition-opacity ${cardTone} ${isDragging ? "opacity-50" : ""}`}
+                      >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-gray-800 flex-1 leading-relaxed">{item.label}</p>
+                          {isTeacherItem ? (
+                            <p className="text-sm font-semibold text-gray-800 flex-1 leading-relaxed">{answer.label}</p>
+                          ) : isSharedQuestion ? (
+                            <span className="rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold shrink-0">
+                              친구들과 만든 질문
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold shrink-0">
+                              내가 추가
+                            </span>
+                          )}
+                          {reorderControls}
                           {outlineEditable && (
                             <button
                               type="button"
-                              onClick={() => excludeTemplateItem(item.id)}
-                              aria-label={`${item.label} 항목 빼기`}
+                              onClick={() => (isTeacherItem
+                                ? excludeTemplateItem(answer.itemId)
+                                : removeTemplateItem(answer.itemId))}
+                              aria-label={`${answer.label || "이 항목"} 항목 빼기`}
                               className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                             >
                               × 빼기
                             </button>
                           )}
                         </div>
+
+                        {!isTeacherItem && (isSharedQuestion ? (
+                          <p className="rounded-xl border-2 border-amber-100 bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-gray-800">
+                            {answer.label}
+                          </p>
+                        ) : (
+                          <input
+                            type="text"
+                            value={answer.label}
+                            onChange={(e) => handleTemplateLabelChange(answer.itemId, e.target.value)}
+                            placeholder="항목 이름 (예: 친구 이야기)"
+                            className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
+                          />
+                        ))}
+
                         <StudentSpellingTextarea
-                          value={currentAnswer}
-                          onValueChange={(nextValue) => handleTemplateAnswerChange(item.id, nextValue)}
+                          value={answer.answer}
+                          onValueChange={(nextValue) => handleTemplateAnswerChange(answer.itemId, nextValue)}
                           rows={2}
-                          placeholder={item.placeholder ?? `${item.label} 답을 써봐요`}
-                          className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400 resize-none transition-colors"
+                          placeholder={isTeacherItem
+                            ? (teacherItem?.placeholder ?? `${answer.label} 답을 써봐요`)
+                            : isSharedQuestion
+                              ? "이 질문에 답하며 글에 넣을 생각을 적어봐요"
+                              : "내가 쓸 내용을 적어봐요"}
+                          className={`w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none ${focusTone} resize-none transition-colors`}
                         />
                       </div>
                     );
                   })}
-
-                  {customAnswers.map((custom) => (
-                    <div key={custom.itemId} className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-3 space-y-2 shadow-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold shrink-0">
-                          {custom.itemId.startsWith(SHARED_QUESTION_ITEM_PREFIX) ? "친구들과 만든 질문" : "내가 추가"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeTemplateItem(custom.itemId)}
-                          className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                        >
-                          × 빼기
-                        </button>
-                      </div>
-                      {custom.itemId.startsWith(SHARED_QUESTION_ITEM_PREFIX) ? (
-                        <p className="rounded-xl border-2 border-amber-100 bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-gray-800">
-                          {custom.label}
-                        </p>
-                      ) : (
-                        <input
-                          type="text"
-                          value={custom.label}
-                          onChange={(e) => handleTemplateLabelChange(custom.itemId, e.target.value)}
-                          placeholder="항목 이름 (예: 친구 이야기)"
-                          className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
-                        />
-                      )}
-                      <StudentSpellingTextarea
-                        value={custom.answer}
-                        onValueChange={(nextValue) => handleTemplateAnswerChange(custom.itemId, nextValue)}
-                        rows={2}
-                        placeholder={custom.itemId.startsWith(SHARED_QUESTION_ITEM_PREFIX)
-                          ? "이 질문에 답하며 글에 넣을 생각을 적어봐요"
-                          : "내가 쓸 내용을 적어봐요"}
-                        className="w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 resize-none transition-colors"
-                      />
-                    </div>
-                  ))}
 
                   {excludedTeacherItems.length > 0 && (
                     <details className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-3">

@@ -16,7 +16,9 @@ test("학생 활동 화면은 아지트 글쓰기와 같은 1200px 폭 계약을
 });
 
 test("다섯 학생 글 입력란은 공용 아지트 맞춤법 입력 컴포넌트를 쓴다", () => {
-  assert.equal((activityPage.match(/<StudentSpellingTextarea/g) ?? []).length, 5);
+  // 2026-08-24: 개요의 교사 항목·학생 항목을 **한 목록으로 합치면서** 입력란도 한 벌이 됐다
+  // (5 → 4). 화면에 뜨는 입력란 수는 그대로이고 코드가 한 벌로 준 것이다.
+  assert.equal((activityPage.match(/<StudentSpellingTextarea/g) ?? []).length, 4);
   assert.match(spellingEditor, /elementary-detection-v1\.json/);
   assert.match(spellingEditor, /elementary-lookup-v1\.json/);
   assert.match(spellingEditor, /get_student_spelling_entries_v1/);
