@@ -10,6 +10,7 @@ import {
   QuestionVotingCompactList,
   QuestionVotingTopThree,
 } from "@/components/question-voting-ranking-summary";
+import { QuestionCardVisibilityButton } from "@/components/question-generator-result-cards";
 import type {
   ActivityType,
   HanjaWritingBoardEntry,
@@ -32,6 +33,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const [roomId, setRoomId] = useState("");
   const [activityType, setActivityType] = useState<ActivityType>("outline_builder");
   const [questionSubmission, setQuestionSubmission] = useState<QuestionGeneratorSubmission | null>(null);
+  const [showQuestionCards, setShowQuestionCards] = useState(false);
   const [anonymousPeerQuestions, setAnonymousPeerQuestions] = useState<Array<{ id: string; order: number; questionOrder: number; text: string }>>([]);
   const [questionVotingSubmission, setQuestionVotingSubmission] = useState<QuestionVotingSubmission | null>(null);
   const [questionVotingConfig, setQuestionVotingConfig] = useState<QuestionVotingConfig | null>(null);
@@ -112,6 +114,10 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
     }
     return outlineText;
   }, [activityType, outlineText, questionSubmission]);
+
+  const hasQuestionSourceCards = questionSubmission?.selections.some(
+    (selection) => Boolean(selection.originalPrompt),
+  ) ?? false;
 
   const selectedVotingQuestions = useMemo(() => {
     if (!questionVotingSubmission || !questionVotingConfig) return [];
@@ -225,12 +231,20 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
               {/* 제출 뒤 고치는 길을 맨 위에 둔다 — 결과를 보고 바로 고치고 싶어진다. */}
-              <Link
-                href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
-                className="rounded-2xl bg-sky-500 px-6 py-3 text-center font-bold text-white transition-colors hover:bg-sky-600"
-              >
-                ✏️ 질문 고치기
-              </Link>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {hasQuestionSourceCards && (
+                  <QuestionCardVisibilityButton
+                    showQuestionCards={showQuestionCards}
+                    onToggle={() => setShowQuestionCards((current) => !current)}
+                  />
+                )}
+                <Link
+                  href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+                  className="rounded-2xl bg-sky-500 px-6 py-3 text-center font-bold text-white transition-colors hover:bg-sky-600"
+                >
+                  ✏️ 질문 고치기
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -252,7 +266,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                 </span>
               </div>
 
-              {selection.originalPrompt && (
+              {showQuestionCards && selection.originalPrompt && (
                 <div className="rounded-2xl bg-gray-50 p-4">
                   <p className="text-xs font-semibold text-gray-500 mb-2">고른 질문 카드</p>
                   <p className="text-sm text-gray-800 leading-relaxed">{selection.originalPrompt}</p>

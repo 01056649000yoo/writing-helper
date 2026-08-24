@@ -18,6 +18,7 @@ import {
 } from "@/lib/question-voting";
 import { normalizeHanjaWritingConfig } from "@/lib/hanja-writing";
 import { isIntegratedLab } from "@/lib/lab-roster";
+import { TeacherQuestionGeneratorResultList } from "@/components/question-generator-result-cards";
 
 export default async function TeacherResultPage({
   params,
@@ -127,39 +128,7 @@ export default async function TeacherResultPage({
           </div>
 
           {isQuestionGenerator && questionSubmission && (
-            <div className="grid gap-4">
-              {questionSubmission.selections.map((selection, index) => (
-                <div key={selection.id} className="bg-sky-50 rounded-2xl p-6 space-y-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-sky-600 uppercase tracking-wide">
-                        질문 {index + 1}
-                      </p>
-                      <h2 className="text-lg font-bold text-gray-800 mt-1">{selection.cardSetLabel}</h2>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {selection.method === "direct" ? "직접 질문 만들기" : "질문 카드로 바꾸기"}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700">
-                      질문 완성
-                    </span>
-                  </div>
-
-                  {selection.originalPrompt && (
-                    <div className="rounded-2xl bg-white/80 p-4">
-                      <p className="text-xs font-semibold text-gray-500 mb-2">고른 질문 카드</p>
-                      <p className="text-sm text-gray-800 leading-relaxed">{selection.originalPrompt}</p>
-                    </div>
-                  )}
-
-                  <div className="rounded-2xl bg-white p-4">
-                    <p className="text-xs font-semibold text-sky-700 mb-2">학생이 만든 질문</p>
-                    <p className="text-base font-medium text-sky-950 leading-relaxed">{selection.remixedQuestion}</p>
-                  </div>
-
-                </div>
-              ))}
-            </div>
+            <TeacherQuestionGeneratorResultList selections={questionSubmission.selections} />
           )}
 
           {isQuestionVoting && questionVotingSubmission && questionVotingConfig && (

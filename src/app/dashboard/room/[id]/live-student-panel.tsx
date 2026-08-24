@@ -20,6 +20,7 @@ import {
   QuestionVotingCompactList,
   QuestionVotingTopThree,
 } from "@/components/question-voting-ranking-summary";
+import { QuestionCardVisibilityButton } from "@/components/question-generator-result-cards";
 
 type Student = { id: string; student_number: number; student_name: string };
 type Session = {
@@ -180,6 +181,7 @@ function QuestionResultsModal({
   const [editingText, setEditingText] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [showQuestionCards, setShowQuestionCards] = useState(false);
 
   const [correctionMode, setCorrectionMode] = useState<"idle" | "loading" | "review">("idle");
   const [correctionCandidates, setCorrectionCandidates] = useState<SpellingCorrectionCandidate[]>([]);
@@ -196,6 +198,7 @@ function QuestionResultsModal({
       selection,
     }))
   );
+  const hasQuestionSourceCards = flattenedQuestions.some(({ selection }) => Boolean(selection.originalPrompt));
 
   function buildKey(sessionId: string, selectionId: string) {
     return `${sessionId}::${selectionId}`;
@@ -368,6 +371,12 @@ function QuestionResultsModal({
                 질문만 모아보기
               </button>
             </div>
+            {hasQuestionSourceCards && (
+              <QuestionCardVisibilityButton
+                showQuestionCards={showQuestionCards}
+                onToggle={() => setShowQuestionCards((current) => !current)}
+              />
+            )}
             {viewMode === "questions" && results.length > 0 && correctionMode === "idle" && (
               <button
                 type="button"
@@ -455,6 +464,12 @@ function QuestionResultsModal({
                         </label>
                       )}
                     </div>
+                    {showQuestionCards && selection.originalPrompt && (
+                      <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2">
+                        <p className="text-xs font-semibold text-gray-500">고른 질문 카드</p>
+                        <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
+                      </div>
+                    )}
                     {candidate ? (
                       <div className="mt-3 space-y-2">
                         <div className="rounded-xl bg-gray-50 px-3 py-2">
@@ -537,7 +552,7 @@ function QuestionResultsModal({
                             )}
                           </div>
 
-                          {selection.originalPrompt && (
+                          {showQuestionCards && selection.originalPrompt && (
                             <div className="mt-3 rounded-2xl bg-gray-50 p-3">
                               <p className="text-xs font-semibold text-gray-500">고른 질문 카드</p>
                               <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
@@ -678,6 +693,10 @@ function StudentSessionResultModal({
 }) {
   const currentQuestionResult = questionResults.find((r) => r.sessionId === session.id);
   const currentOneLine = oneLineShareResults.find((e) => e.sessionId === session.id);
+  const [showQuestionCards, setShowQuestionCards] = useState(false);
+  const hasQuestionSourceCards = currentQuestionResult?.selections.some(
+    (selection) => Boolean(selection.originalPrompt),
+  ) ?? false;
 
   return (
     <div
@@ -711,13 +730,22 @@ function StudentSessionResultModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-gray-100 px-3.5 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-200"
-          >
-            닫기
-          </button>
+          <div className="flex items-center gap-2">
+            {activityType === "question_generator" && hasQuestionSourceCards && (
+              <QuestionCardVisibilityButton
+                showQuestionCards={showQuestionCards}
+                onToggle={() => setShowQuestionCards((current) => !current)}
+                className="px-3.5 py-1.5 text-xs"
+              />
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-gray-100 px-3.5 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-200"
+            >
+              닫기
+            </button>
+          </div>
         </div>
 
         {/* 모달 본문 */}
@@ -739,7 +767,7 @@ function StudentSessionResultModal({
                         {selection.method === "direct" ? "직접 작성" : selection.cardSetLabel}
                       </span>
                     </div>
-                    {selection.originalPrompt && (
+                    {showQuestionCards && selection.originalPrompt && (
                       <p className="text-xs text-gray-500 mb-1.5 bg-white/70 p-2 rounded-lg">
                         💡 {selection.originalPrompt}
                       </p>
