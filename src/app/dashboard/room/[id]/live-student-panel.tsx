@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import { BadgeCircle } from "@/components/badge-circle";
@@ -21,6 +21,7 @@ import {
   QuestionVotingTopThree,
 } from "@/components/question-voting-ranking-summary";
 import { QuestionCardVisibilityButton } from "@/components/question-generator-result-cards";
+import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 
 type Student = { id: string; student_number: number; student_name: string };
 type Session = {
@@ -47,6 +48,7 @@ type QuestionResult = {
     originalRemixedQuestion?: string;
   }>;
 };
+type QuestionLiveState = "idle" | "connecting" | "live" | "fallback";
 type QuestionVotingRanking = Array<{
   questionId: string;
   text: string;
@@ -166,16 +168,38 @@ function StudentQrModal({
 
 function QuestionResultsModal({
   results,
+  sessions,
+  students,
   roomId,
+  liveState,
+  isRefreshing,
   onResultsChange,
   onClose,
 }: {
   results: QuestionResult[];
+  sessions: Session[];
+  students: Student[];
   roomId: string;
+  liveState: QuestionLiveState;
+  isRefreshing: boolean;
   onResultsChange: (next: QuestionResult[]) => void;
   onClose: () => void;
 }) {
   const totalQuestions = results.reduce((sum, result) => sum + result.selections.length, 0);
+  const submittedSessionIds = new Set(results.map((result) => result.sessionId));
+  const activeSessions = sessions.filter((session) => (
+    session.status === "in_progress" && !submittedSessionIds.has(session.id)
+  ));
+  const connectedStudentIds = new Set(
+    sessions.flatMap((session) => session.agit_student_id ? [session.agit_student_id] : []),
+  );
+  const connectedLegacyNumbers = new Set(
+    sessions.flatMap((session) => session.agit_student_id ? [] : [session.student_number]),
+  );
+  const notConnectedCount = students.filter((student) => (
+    !connectedStudentIds.has(student.id)
+    && !connectedLegacyNumbers.has(student.student_number)
+  )).length;
   const [viewMode, setViewMode] = useState<"students" | "questions">("students");
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
@@ -188,6 +212,42 @@ function QuestionResultsModal({
   const [correctionSelected, setCorrectionSelected] = useState<Set<string>>(new Set());
   const [correctionError, setCorrectionError] = useState<string | null>(null);
   const [applyingCorrections, setApplyingCorrections] = useState(false);
+  const knownSessionIdsRef = useRef(new Set(results.map((result) => result.sessionId)));
+  const newSessionTimeoutsRef = useRef(new Map<string, number>());
+  const [newSessionIds, setNewSessionIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const addedIds = results
+      .map((result) => result.sessionId)
+      .filter((sessionId) => !knownSessionIdsRef.current.has(sessionId));
+    results.forEach((result) => knownSessionIdsRef.current.add(result.sessionId));
+    if (addedIds.length === 0) return;
+
+    setNewSessionIds((current) => new Set([...current, ...addedIds]));
+    addedIds.forEach((sessionId) => {
+      const timeout = window.setTimeout(() => {
+        newSessionTimeoutsRef.current.delete(sessionId);
+        setNewSessionIds((current) => {
+          const next = new Set(current);
+          next.delete(sessionId);
+          return next;
+        });
+      }, 5000);
+      newSessionTimeoutsRef.current.set(sessionId, timeout);
+    });
+  }, [results]);
+
+  useEffect(() => () => {
+    newSessionTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+    newSessionTimeoutsRef.current.clear();
+  }, []);
+
+  const liveStatus = {
+    idle: { label: "결과 보기", className: "bg-gray-100 text-gray-600", dot: "bg-gray-400" },
+    connecting: { label: "연결 중", className: "bg-amber-50 text-amber-700", dot: "bg-amber-500 animate-pulse" },
+    live: { label: "실시간 연결", className: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500 animate-pulse" },
+    fallback: { label: "5초 자동 갱신", className: "bg-orange-50 text-orange-700", dot: "bg-orange-500 animate-pulse" },
+  }[liveState];
 
   const flattenedQuestions = results.flatMap((result) =>
     result.selections.map((selection, index) => ({
@@ -327,13 +387,27 @@ function QuestionResultsModal({
       <div
         className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden"
         onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="question-results-live-title"
       >
         <div className="flex items-center justify-between gap-4 border-b border-sky-100 px-6 py-5">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-500">질문 만들기 결과</p>
-            <h3 className="text-2xl font-bold text-gray-800 mt-1">학생 질문 모아보기</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-500">질문 만들기 결과</p>
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${liveStatus.className}`}
+                role="status"
+                aria-live="polite"
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${liveStatus.dot}`} />
+                {liveStatus.label}
+              </span>
+              {isRefreshing && <span className="text-[11px] font-medium text-gray-400">갱신 중...</span>}
+            </div>
+            <h3 id="question-results-live-title" className="text-2xl font-bold text-gray-800 mt-1">전체 질문 실시간 보기</h3>
             <p className="text-sm text-gray-500 mt-1">
-              {results.length}명의 학생이 만든 질문 {totalQuestions}개를 한 번에 확인할 수 있어요.
+              제출이 끝난 학생의 질문만 자동으로 올라오며, 작성 중 내용은 공개되지 않아요.
             </p>
           </div>
           <button
@@ -346,6 +420,33 @@ function QuestionResultsModal({
         </div>
 
         <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
+          <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+              <p className="text-xs font-semibold text-emerald-600">제출 완료</p>
+              <p className="mt-1 text-xl font-bold text-emerald-900">{results.length}명</p>
+            </div>
+            <div className="rounded-2xl bg-amber-50 px-4 py-3">
+              <p className="text-xs font-semibold text-amber-600">작성 중</p>
+              <p className="mt-1 text-xl font-bold text-amber-900">{activeSessions.length}명</p>
+            </div>
+            <div className="rounded-2xl bg-gray-100 px-4 py-3">
+              <p className="text-xs font-semibold text-gray-500">미접속</p>
+              <p className="mt-1 text-xl font-bold text-gray-800">{notConnectedCount}명</p>
+            </div>
+            <div className="rounded-2xl bg-sky-50 px-4 py-3">
+              <p className="text-xs font-semibold text-sky-600">모인 질문</p>
+              <p className="mt-1 text-xl font-bold text-sky-900">{totalQuestions}개</p>
+            </div>
+          </div>
+
+          {activeSessions.length > 0 && (
+            <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
+              <p className="text-xs font-semibold text-amber-700">
+                작성 중 · {activeSessions.map((session) => `${session.student_number}번 ${session.student_name}`).join(", ")}
+              </p>
+            </div>
+          )}
+
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex rounded-2xl bg-sky-50 p-1">
               <button
@@ -431,7 +532,7 @@ function QuestionResultsModal({
           {results.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/70 p-10 text-center">
               <p className="text-base font-semibold text-sky-800">아직 제출된 질문이 없어요.</p>
-              <p className="mt-2 text-sm text-sky-600">학생이 질문 만들기를 완료하면 여기에 모아볼 수 있습니다.</p>
+              <p className="mt-2 text-sm text-sky-600">학생이 제출하면 이 창에 자동으로 올라옵니다.</p>
             </div>
           ) : viewMode === "questions" ? (
             <div className="grid gap-3">
@@ -442,7 +543,11 @@ function QuestionResultsModal({
                   : null;
                 const isSelected = candidate ? correctionSelected.has(key) : false;
                 return (
-                  <div key={key} className={`rounded-2xl border bg-white p-4 shadow-sm ${candidate ? "border-violet-200" : "border-sky-100"}`}>
+                  <div key={key} className={`rounded-2xl border bg-white p-4 shadow-sm transition-colors ${
+                    newSessionIds.has(sessionId)
+                      ? "border-emerald-300 bg-emerald-50/40 ring-2 ring-emerald-100"
+                      : candidate ? "border-violet-200" : "border-sky-100"
+                  }`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold text-sky-500">
@@ -462,6 +567,11 @@ function QuestionResultsModal({
                           />
                           <span className="text-xs font-semibold text-violet-700">교정 적용</span>
                         </label>
+                      )}
+                      {!candidate && newSessionIds.has(sessionId) && (
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                          새 질문
+                        </span>
                       )}
                     </div>
                     {showQuestionCards && selection.originalPrompt && (
@@ -512,7 +622,14 @@ function QuestionResultsModal({
           ) : (
             <div className="space-y-4">
               {results.map((result) => (
-                <div key={result.sessionId} className="rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
+                <div
+                  key={result.sessionId}
+                  className={`rounded-3xl border p-5 transition-colors ${
+                    newSessionIds.has(result.sessionId)
+                      ? "border-emerald-300 bg-emerald-50/70 ring-2 ring-emerald-100"
+                      : "border-sky-100 bg-sky-50/70"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold text-sky-500">학생</p>
@@ -521,7 +638,7 @@ function QuestionResultsModal({
                       </h4>
                     </div>
                     <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700">
-                      질문 {result.selections.length}개
+                      {newSessionIds.has(result.sessionId) ? "새 질문 · " : ""}질문 {result.selections.length}개
                     </span>
                   </div>
 
@@ -1112,6 +1229,33 @@ export default function LiveStudentPanel({
   const [questionVotingResults, setQuestionVotingResults] = useState<QuestionVotingRanking>(initialQuestionVotingResults);
   const [oneLineShareResults, setOneLineShareResults] = useState<OneLineShareResults>(initialOneLineShareResults);
   const [hanjaWritingResults, setHanjaWritingResults] = useState<HanjaWritingResults>(initialHanjaWritingResults);
+  const [questionLiveState, setQuestionLiveState] = useState<QuestionLiveState>("idle");
+  const [questionResultsRefreshing, setQuestionResultsRefreshing] = useState(false);
+  const questionRefreshInFlightRef = useRef(false);
+  const questionRefreshQueuedRef = useRef(false);
+
+  const refreshQuestionResults = useCallback(async () => {
+    if (activityType !== "question_generator") return;
+    if (questionRefreshInFlightRef.current) {
+      questionRefreshQueuedRef.current = true;
+      return;
+    }
+
+    questionRefreshInFlightRef.current = true;
+    setQuestionResultsRefreshing(true);
+    try {
+      do {
+        questionRefreshQueuedRef.current = false;
+        const questionData = await getQuestionGeneratorRoomResults(roomId);
+        setQuestionResults((questionData as QuestionResult[]) ?? []);
+      } while (questionRefreshQueuedRef.current);
+    } catch {
+      console.error("[question-generator-live] result refresh failed");
+    } finally {
+      questionRefreshInFlightRef.current = false;
+      setQuestionResultsRefreshing(false);
+    }
+  }, [activityType, roomId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1121,11 +1265,7 @@ export default function LiveStudentPanel({
       if (cancelled) return;
       setSessions((data as Session[]) ?? []);
 
-      if (activityType === "question_generator") {
-        const questionData = await getQuestionGeneratorRoomResults(roomId);
-        if (cancelled) return;
-        setQuestionResults((questionData as QuestionResult[]) ?? []);
-      } else if (activityType === "question_voting") {
+      if (activityType === "question_voting") {
         const votingData = await getQuestionVotingRoomResults(roomId);
         if (cancelled) return;
         setQuestionVotingResults(votingData ?? []);
@@ -1148,6 +1288,85 @@ export default function LiveStudentPanel({
       clearInterval(interval);
     };
   }, [roomId, isActive, activityType]);
+
+  useEffect(() => {
+    if (activityType !== "question_generator" || !isQuestionResultsOpen) {
+      setQuestionLiveState("idle");
+      return;
+    }
+
+    void refreshQuestionResults();
+    if (!isActive) {
+      setQuestionLiveState("idle");
+      return;
+    }
+
+    const supabase = createSupabaseBrowserClient();
+    let disposed = false;
+    let connectionMode: "connecting" | "live" | "fallback" = "connecting";
+    let eventDebounceTimer: number | null = null;
+    let lastBackupRefreshAt = Date.now();
+
+    const scheduleEventRefresh = () => {
+      if (eventDebounceTimer) window.clearTimeout(eventDebounceTimer);
+      eventDebounceTimer = window.setTimeout(() => {
+        lastBackupRefreshAt = Date.now();
+        void refreshQuestionResults();
+      }, 1000);
+    };
+
+    setQuestionLiveState("connecting");
+    const channel = supabase
+      .channel(`teacher-question-results:${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "writing_helper",
+          table: "activity_events",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          const event = payload.new as { event_type?: unknown };
+          if (event.event_type === "question_generator_submitted") scheduleEventRefresh();
+        },
+      )
+      .subscribe((status) => {
+        if (disposed) return;
+        if (status === "SUBSCRIBED") {
+          connectionMode = "live";
+          setQuestionLiveState("live");
+          return;
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          connectionMode = "fallback";
+          setQuestionLiveState("fallback");
+        }
+      });
+
+    const backupTimer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      const refreshInterval = connectionMode === "live" ? 30000 : 5000;
+      if (Date.now() - lastBackupRefreshAt < refreshInterval) return;
+      lastBackupRefreshAt = Date.now();
+      void refreshQuestionResults();
+    }, 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      lastBackupRefreshAt = Date.now();
+      void refreshQuestionResults();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      disposed = true;
+      if (eventDebounceTimer) window.clearTimeout(eventDebounceTimer);
+      window.clearInterval(backupTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      void supabase.removeChannel(channel);
+    };
+  }, [activityType, isActive, isQuestionResultsOpen, refreshQuestionResults, roomId]);
 
   const doneSessions = sessions.filter(s => s.status === "done");
   const activeSessions = sessions.filter(s => s.status === "in_progress");
@@ -1174,7 +1393,11 @@ export default function LiveStudentPanel({
       {isQuestionResultsOpen && (
         <QuestionResultsModal
           results={questionResults}
+          sessions={sessions}
+          students={students}
           roomId={roomId}
+          liveState={questionLiveState}
+          isRefreshing={questionResultsRefreshing}
           onResultsChange={setQuestionResults}
           onClose={() => setIsQuestionResultsOpen(false)}
         />
@@ -1232,10 +1455,9 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsQuestionResultsOpen(true)}
-                className="rounded-xl bg-sky-500 hover:bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-sky-200"
-                disabled={questionResults.length === 0}
+                className="rounded-xl bg-sky-500 hover:bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95"
               >
-                📊 질문 결과 모아보기
+                📡 전체 질문 실시간 보기
               </button>
             )}
             {activityType === "question_voting" && (

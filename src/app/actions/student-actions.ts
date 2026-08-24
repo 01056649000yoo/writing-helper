@@ -706,6 +706,22 @@ export async function submitQuestionGenerator(
   if (!await persistPortableResult(admin, sessionId, roomId)) {
     return { error: "질문 결과를 아지트에 연결하지 못했습니다. 다시 제출해주세요." };
   }
+
+  // Realtime에는 질문 원문을 싣지 않고, 교사 화면이 권한 검사를 거친 결과 조회를
+  // 다시 실행할 수 있는 최소 신호만 보낸다. 이벤트 기록 실패 시에도 제출 결과는
+  // 이미 저장되었으며 교사 화면의 보완 폴링이 회수한다.
+  const { error: eventError } = await admin
+    .schema("writing_helper")
+    .from("activity_events")
+    .insert({
+      room_id: roomId,
+      session_id: sessionId,
+      event_type: "question_generator_submitted",
+      payload: { version: 1 },
+    });
+  if (eventError) {
+    console.error("[question-generator-live] submission signal failed", eventError.code ?? "unknown");
+  }
   return {};
 }
 

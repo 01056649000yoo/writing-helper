@@ -853,7 +853,8 @@ export async function getQuestionGeneratorRoomResults(roomId: string): Promise<Q
     .select("id, student_number, student_name, submission")
     .eq("room_id", roomId)
     .eq("status", "done")
-    .order("student_number");
+    .order("student_number")
+    .limit(100);
 
   const results: QuestionGeneratorRoomResultSummary[] = (data ?? []).flatMap((session) => {
       const submission = normalizeQuestionGeneratorSubmission(session.submission);
