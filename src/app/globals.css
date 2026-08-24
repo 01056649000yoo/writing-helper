@@ -69,8 +69,38 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--ui-primary);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-ui-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+/*
+ * 글자 계단 — 아지트와 같은 값으로 맞춘다(2026-08-24).
+ *
+ * 연구소는 Tailwind 기본 크기를 그대로 쓰고 있었는데, 아지트가 2026-08-24에 세운 계단과
+ * 어긋났다(가장 많이 쓰는 `text-xs` 가 0.75rem = 12px 이라 아지트에서 고친 "너무 작다"와 같은 문제).
+ *
+ * ⚠️ 화면마다 `text-[13px]` 처럼 직접 적으면 또 흩어진다. Tailwind 의 기본 크기 자체를 여기서
+ *    다시 정의해, 이미 쓰고 있는 `text-*` 클래스 869곳이 **한 곳을 따라오게** 한다.
+ *    아지트 원본은 `vibe_agit/src/styles/design-system.css` 의 `--ui-text-*` 이며,
+ *    두 앱이 어긋나지 않는지는 `tests/design-contract.test.mjs` 가 한꺼번에 본다.
+ *
+ * `text-xs` 는 뱃지·꼬리표 전용이다. 읽어야 하는 문장에는 `text-sm` 아래를 쓰지 않는다.
+ */
+@theme {
+  --text-xs: 0.8rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.9rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1.15rem;
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.35rem;
+  --text-xl--line-height: 1.4;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.35;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 1.3;
 }
 
 * {
@@ -85,7 +115,7 @@ body {
   min-width: 320px;
   background: var(--ui-page);
   color: var(--ui-ink);
-  font-family: var(--font-geist-sans), "Noto Sans KR", Pretendard, Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-ui-sans), "Noto Sans KR", Pretendard, Inter, system-ui, sans-serif;
 }
 
 a,

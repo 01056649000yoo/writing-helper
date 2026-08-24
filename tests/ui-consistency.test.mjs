@@ -99,3 +99,44 @@ test("도움말은 새로 만들 수 있는 네 활동을 활동 폴더 한 곳�
   assert.doesNotMatch(guide, /연동할 예정/);
   await assert.rejects(access("src/app/dashboard/manual-modal.tsx"));
 });
+
+/*
+ * 2026-08-24: 색·간격·모서리는 이미 아지트와 같았는데 **글자만 달랐다**.
+ * 연구소는 Tailwind 기본 크기를 그대로 썼고(가장 많이 쓰는 `text-xs` 가 0.75rem = 12px),
+ * 본문 글꼴은 Geist 를 앞에 둬서 한글은 같아 보여도 숫자·영문이 두 앱에서 달라 보였다.
+ *
+ * ⚠️ 두 앱은 저장소가 달라 서로의 파일을 읽을 수 없다. 그래서 **같은 숫자를 양쪽에 적어 두고**
+ *    각자 검사한다. 아지트 원본은 `vibe_agit/src/styles/design-system.css` 의 `--ui-text-*` 이고
+ *    저쪽 검사는 `vibe_agit/tests/teacherTypeScale.test.mjs` 다. 한쪽을 바꾸면 다른 쪽도 같이 바꾼다.
+ */
+const AGIT_TYPE_SCALE = Object.freeze([
+  ["xs", "0.8rem"],
+  ["sm", "0.9rem"],
+  ["base", "1rem"],
+  ["lg", "1.15rem"],
+  ["xl", "1.35rem"],
+  ["2xl", "1.5rem"],
+  ["3xl", "2rem"],
+]);
+
+test("연구소 글자 크기는 아지트 계단과 같다", () => {
+  for (const [step, size] of AGIT_TYPE_SCALE) {
+    const rule = new RegExp(`--text-${step.replace("2xl", "2xl")}:\\s*${size.replace(".", "\\.")};`);
+    assert.match(globals, rule, `--text-${step} 가 아지트 계단(${size})과 다르다`);
+  }
+  // Tailwind 기본 크기를 다시 정의해야 이미 쓰고 있는 `text-*` 클래스가 한 곳을 따라온다.
+  assert.match(globals, /@theme\s*\{[\s\S]*--text-xs:/);
+});
+
+test("연구소 본문 글꼴은 아지트와 같은 한글 글꼴을 앞에 둔다", async () => {
+  const layoutSource = await readFile("src/app/layout.tsx", "utf8");
+
+  // Geist 에는 한글 글리프가 없다. 앞에 두면 숫자·영문만 아지트와 다르게 보인다.
+  assert.match(layoutSource, /Noto_Sans_KR/);
+  assert.doesNotMatch(layoutSource, /const\s+geistSans/);
+  // 아지트가 쓰는 굵기를 그대로 받아야 같은 900 이 같은 모양으로 나온다.
+  for (const weight of ["400", "500", "700", "800", "900"]) {
+    assert.ok(layoutSource.includes(`"${weight}"`), `본문 글꼴에 ${weight} 굵기가 없다`);
+  }
+  assert.match(globals, /font-family: var\(--font-ui-sans\), "Noto Sans KR"/);
+});
