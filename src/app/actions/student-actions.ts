@@ -433,7 +433,8 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
   const { data: submissionData } = await admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("submission, status, answers, gpt_call_count, result")
+    // `updated_at` 은 이 단말의 임시본과 서버 저장본 중 어느 쪽이 최신인지 가리는 데 쓴다(2026-08-24).
+    .select("submission, status, answers, gpt_call_count, result, updated_at")
     .eq("id", sessionId)
     .eq("room_id", roomId)
     .maybeSingle();
@@ -484,6 +485,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
     outline_template: outlineTemplate,
     is_legacy_outline_room: isLegacyRoom,
     existing_outline_answers: existingOutlineAnswers,
+    existing_answers_saved_at: typeof submissionData?.updated_at === "string" ? submissionData.updated_at : null,
     outline_gpt_call_count: typeof submissionData?.gpt_call_count === "number" ? submissionData.gpt_call_count : 0,
     existing_submission: normalizeQuestionGeneratorSubmission(submissionData?.submission),
     existing_voting_submission: normalizeQuestionVotingSubmission(submissionData?.submission),

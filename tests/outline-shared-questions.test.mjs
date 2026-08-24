@@ -65,7 +65,9 @@ test("학생이 교사 개요 항목을 빼면 질문을 숨기고 제출에서�
   // 2026-08-24: 학생이 옮긴 순서를 지키려고 저장 순서로 정렬해 넣는다. 교사 항목이 모두
   // 목록에 들어온다는 계약은 그대로다(뺀 항목도 목록에 남아 있어야 다시 넣을 수 있다).
   assert.match(activityPage, /\[\.\.\.teacherAnswers, \.\.\.studentAddedAnswers\]\.sort\(/);
-  assert.match(activityPage, /setTemplateAnswers\(orderedAnswers\)/);
+  // 2026-08-24: 단말 임시본이 서버보다 새것이면 그것으로 잇는다. 어느 쪽이든 저장 순서를 지킨다.
+  assert.match(activityPage, /setTemplateAnswers\(restored\)/);
+  assert.match(activityPage, /let restored = orderedAnswers;/);
   // 뺀 항목은 한 목록에서 걸러 낸다.
   assert.match(activityPage, /a\.section === key && !excludedItemIds\.has\(a\.itemId\)/);
   assert.match(activityPage, /\.filter\(\(answer\) => !excludedItemIds\.has\(answer\.itemId\)\)/);
@@ -110,9 +112,61 @@ test("개요 항목은 갈래 안에서 순서를 바꿀 수 있고 순서의 �
 test("학생이 바꾼 개요 순서는 다시 들어와도 남는다", () => {
   // 교사 틀 순서로 다시 세우면 학생이 옮긴 순서가 사라진다. 저장된 순서를 먼저 따른다.
   assert.match(activityPage, /const savedOrder = new Map\(savedAnswers\.map\(\(answer, index\) => \[answer\.itemId, index\]\)\)/);
-  assert.match(activityPage, /setTemplateAnswers\(orderedAnswers\)/);
+  // 2026-08-24: 단말 임시본이 서버보다 새것이면 그것으로 잇는다. 어느 쪽이든 저장 순서를 지킨다.
+  assert.match(activityPage, /setTemplateAnswers\(restored\)/);
+  assert.match(activityPage, /let restored = orderedAnswers;/);
   assert.doesNotMatch(activityPage, /setTemplateAnswers\(\[\.\.\.teacherAnswers, \.\.\.studentAddedAnswers\]\)/);
 
   // 저장도 화면과 같은 배열 순서를 그대로 보내야 결과 화면 순서가 맞는다.
   assert.match(activityPage, /const submittable = templateAnswers\s*\n\s*\.filter/);
+});
+
+/*
+ * 2026-08-24: 개요는 `개요 완성하기` 를 눌러야 처음 저장됐다. 20분 적다가 태블릿이 꺼지거나
+ * 뒤로 가기를 누르면 전부 사라졌다. 아지트 학생 글쓰기와 **같은 값·같은 자리**로 임시 저장을 넣었다.
+ */
+test("개요는 아지트와 같은 간격으로 자동 저장하고 임시 저장 단추도 함께 둔다", () => {
+  // ⚠️ 간격은 아지트 `StudentWriting.jsx` 와 같아야 한다. 한쪽만 바꾸면 두 화면이 다르게 움직인다.
+  assert.match(activityPage, /const LOCAL_DRAFT_DEBOUNCE_MS = 3000;/);
+  assert.match(activityPage, /const DB_BACKUP_INTERVAL_MS = 120000;/);
+
+  // 저장하는 곳이 둘이다 — 이 단말과 서버.
+  assert.match(activityPage, /window\.localStorage\.setItem\(outlineDraftStorageKey\(id\)/);
+  assert.match(activityPage, /const result = await saveAnswers\(id, answers\)/);
+
+  // 자동 저장만 두면 학생이 저장됐는지 알 수 없다. 직접 누르는 단추와 상태 표시가 함께 있어야 한다.
+  assert.match(activityPage, /async function handleOutlineManualSave\(\)/);
+  assert.match(activityPage, /임시 저장 💾/);
+  assert.match(activityPage, /임시 저장 완료/);
+
+  // 화면을 덮거나 떠날 때 마지막으로 한 번 남긴다 — 태블릿에서 가장 흔한 유실 경로다.
+  assert.match(activityPage, /window\.addEventListener\("pagehide", flush\)/);
+  assert.match(activityPage, /document\.visibilityState === "hidden"/);
+
+  // 내용이 그대로면 보내지 않는다. 가만히 있는 학생이 2분마다 서버를 두드리면 안 된다.
+  assert.match(activityPage, /snapshot === lastServerDraftRef\.current/);
+  assert.match(activityPage, /snapshot === lastLocalDraftRef\.current/);
+});
+
+/*
+ * ⚠️ 임시 저장에 **제출용 목록을 그대로 쓰면 안 된다.** 제출은 `label && answer` 가 있는 것만 보내는데,
+ *    그 목록으로 임시 저장하면 아직 안 쓴 교사 항목이 저장본에서 빠진다. 다시 들어올 때 저장본에 없는
+ *    교사 항목은 **학생이 뺀 것**으로 되살아나므로, 반쯤 쓰다 만 개요에서 안 쓴 항목이 통째로
+ *    `뺀 항목` 으로 사라진다. 이 검사가 그 되돌아감을 막는다.
+ */
+test("임시 저장은 아직 안 쓴 항목도 담는다", () => {
+  const draftBuilder = activityPage.slice(
+    activityPage.indexOf("const buildOutlineDraftAnswers"),
+    activityPage.indexOf("const outlineDraftRef"),
+  );
+  assert.ok(draftBuilder.length > 0, "임시 저장 목록을 만드는 곳을 찾지 못했다");
+
+  // 뺀 항목만 걸러 낸다.
+  assert.match(draftBuilder, /\.filter\(\(answer\) => !excluded\.has\(answer\.itemId\)\)/);
+  // 빈 항목을 걸러 내면 안 된다.
+  assert.doesNotMatch(draftBuilder, /a\.label && a\.answer/);
+  assert.doesNotMatch(draftBuilder, /answer\.label && answer\.answer/);
+
+  // 완성했으면 단말 임시본을 지운다. 남기면 다음에 낡은 것이 되살아난다.
+  assert.match(activityPage, /window\.localStorage\.removeItem\(outlineDraftStorageKey\(sessionId\)\)/);
 });

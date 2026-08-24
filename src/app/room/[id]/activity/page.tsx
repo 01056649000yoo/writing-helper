@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   saveAnswers,
@@ -70,6 +70,22 @@ type OutlineSharedQuestionRoom = {
 
 const SHARED_QUESTION_ITEM_PREFIX = "shared-question:";
 
+/*
+ * 개요 임시 저장 — 아지트 학생 글쓰기(`StudentWriting.jsx`)와 **같은 값·같은 자리**를 쓴다(2026-08-24).
+ *
+ * 예전에는 `개요 완성하기` 를 눌러야 처음 저장됐다. 20분 적다가 태블릿이 꺼지거나 뒤로 가기를 누르면
+ * 전부 사라졌다.
+ *
+ * 저장하는 곳이 둘이다 — 이 단말(`localStorage`)과 서버. 단말 저장은 빠르지만 그 기기에만 남고,
+ * 서버 저장은 어디서든 이어 쓸 수 있지만 자주 보내면 한 반 30명이 동시에 몰린다.
+ * 그래서 단말은 자주(3초), 서버는 드물게(2분) 저장한다. 아지트와 같은 간격이다.
+ *
+ * ⚠️ 내용이 그대로면 보내지 않는다. 그래야 가만히 있는 학생이 2분마다 서버를 두드리지 않는다.
+ */
+const LOCAL_DRAFT_DEBOUNCE_MS = 3000;
+const DB_BACKUP_INTERVAL_MS = 120000;
+const outlineDraftStorageKey = (sessionId: string) => `writing_helper_outline_draft:${sessionId}`;
+
 /** 카드 묶음 이름을 학생 화면 표기(`상상 카드`)로 맞춘다. */
 function buildCardSetLabel(cardSet: QuestionCardSet) {
   const normalized = cardSet.label.trim();
@@ -101,6 +117,11 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [outlineSubmitting, setOutlineSubmitting] = useState(false);
   // 끌어서 옮기는 중인 항목. 태블릿에서는 끌기가 어려워 ▲▼ 단추도 함께 둔다.
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
+  // 자동 저장 시각·수동 저장 확인. 아지트와 같이 자동과 수동을 구분해 보여 준다.
+  const [outlineSavedAt, setOutlineSavedAt] = useState<Date | null>(null);
+  const [outlineManualSavedAt, setOutlineManualSavedAt] = useState<Date | null>(null);
+  const [outlineSaveError, setOutlineSaveError] = useState("");
+  const [outlineManualSaving, setOutlineManualSaving] = useState(false);
   const [sharedQuestionPickerSection, setSharedQuestionPickerSection] = useState<OutlineSectionKey | null>(null);
   const [sharedQuestionRooms, setSharedQuestionRooms] = useState<OutlineSharedQuestionRoom[]>([]);
   const [sharedQuestionLoading, setSharedQuestionLoading] = useState(false);
@@ -266,7 +287,30 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           (savedOrder.get(left.itemId) ?? Number.MAX_SAFE_INTEGER)
           - (savedOrder.get(right.itemId) ?? Number.MAX_SAFE_INTEGER)
         ));
-        setTemplateAnswers(orderedAnswers);
+        /*
+         * 이 단말에 서버보다 **새로운** 임시본이 있으면 그것으로 잇는다.
+         * 서버 저장은 2분 간격이라, 그 사이에 화면이 꺼졌다면 단말 쪽이 최신이다.
+         * ⚠️ 무조건 단말을 우선하면 다른 기기에서 이어 쓴 내용을 덮어쓴다. 시각을 비교해야 한다.
+         */
+        const serverSavedAt = typeof data.existing_answers_saved_at === "string"
+          ? Date.parse(data.existing_answers_saved_at)
+          : 0;
+        let restored = orderedAnswers;
+        try {
+          const raw = window.localStorage.getItem(outlineDraftStorageKey(sessionId));
+          const localDraft = raw ? JSON.parse(raw) : null;
+          const localSavedAt = localDraft?.savedAt ? Date.parse(localDraft.savedAt) : 0;
+          if (Array.isArray(localDraft?.answers) && localDraft.answers.length > 0
+              && localSavedAt > serverSavedAt) {
+            restored = localDraft.answers as OutlineTemplateAnswer[];
+            setOutlineSavedAt(new Date(localSavedAt));
+          } else if (serverSavedAt > 0 && savedAnswers.length > 0) {
+            setOutlineSavedAt(new Date(serverSavedAt));
+          }
+        } catch {
+          // 임시본을 못 읽어도 서버 저장본으로 이어 쓸 수 있다. 화면은 그대로 진행한다.
+        }
+        setTemplateAnswers(restored);
         setExcludedTemplateItemIds(editable && hasSavedSelection
           ? teacherAnswers.filter((answer) => !savedByItemId.has(answer.itemId)).map((answer) => answer.itemId)
           : []);
@@ -279,6 +323,137 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       active = false;
     };
   }, [editMode, roomId, sessionId]);
+
+  /*
+   * 임시 저장에 담을 항목을 만든다.
+   *
+   * ⚠️ **제출과 달리 빈 항목도 담는다.** 제출은 `label && answer` 가 있는 것만 보내는데, 그 목록을
+   *    임시 저장에 그대로 쓰면 아직 안 쓴 교사 항목이 저장본에서 빠진다. 다시 들어올 때 저장본에
+   *    없는 교사 항목은 **학생이 뺀 것**으로 되살아나므로, 반쯤 쓰다 만 개요에서 안 쓴 항목이
+   *    통째로 `뺀 항목` 으로 사라진다. 그래서 뺀 것만 걸러 내고 나머지는 모두 담는다.
+   */
+  const buildOutlineDraftAnswers = useCallback(() => {
+    const excluded = new Set(excludedTemplateItemIds);
+    return templateAnswers
+      .filter((answer) => !excluded.has(answer.itemId))
+      .map((answer) => ({ ...answer, label: answer.label.trim(), answer: answer.answer.trim() }));
+  }, [excludedTemplateItemIds, templateAnswers]);
+
+  const outlineDraftRef = useRef<OutlineTemplateAnswer[]>([]);
+  const lastLocalDraftRef = useRef<string | null>(null);
+  const lastServerDraftRef = useRef<string | null>(null);
+  const serverSavingRef = useRef(false);
+  const outlineDraftStateRef = useRef({ sessionId: "", step, outlineSubmitting });
+
+  outlineDraftRef.current = buildOutlineDraftAnswers();
+  outlineDraftStateRef.current = { sessionId, step, outlineSubmitting };
+
+  /** 이 단말에만 남긴다. 빠르지만 다른 기기에서는 보이지 않는다. */
+  const saveLocalOutlineDraft = useCallback(() => {
+    const { sessionId: id, step: currentStep } = outlineDraftStateRef.current;
+    if (!id || currentStep !== "outline_sections") return;
+
+    const answers = outlineDraftRef.current;
+    const snapshot = JSON.stringify(answers);
+    if (answers.length === 0 || snapshot === lastLocalDraftRef.current) return;
+
+    try {
+      const savedAt = new Date().toISOString();
+      window.localStorage.setItem(outlineDraftStorageKey(id), JSON.stringify({ savedAt, answers }));
+      lastLocalDraftRef.current = snapshot;
+      setOutlineSavedAt(new Date(savedAt));
+      setOutlineSaveError("");
+    } catch {
+      setOutlineSaveError("이 단말의 임시저장 공간이 부족해요. 선생님께 알려 주세요.");
+    }
+  }, []);
+
+  /** 서버에 남긴다. 다른 기기에서도 이어 쓸 수 있지만 자주 보내지 않는다. */
+  const backupOutlineDraftToServer = useCallback(async () => {
+    const { sessionId: id, step: currentStep, outlineSubmitting: submitting } = outlineDraftStateRef.current;
+    if (!id || currentStep !== "outline_sections" || submitting || serverSavingRef.current) return;
+
+    const answers = outlineDraftRef.current;
+    const snapshot = JSON.stringify(answers);
+    if (answers.length === 0 || snapshot === lastServerDraftRef.current) return;
+
+    serverSavingRef.current = true;
+    try {
+      const result = await saveAnswers(id, answers);
+      if (!result.error) {
+        lastServerDraftRef.current = snapshot;
+        setOutlineSavedAt(new Date());
+        setOutlineSaveError("");
+      }
+    } finally {
+      serverSavingRef.current = false;
+    }
+  }, []);
+
+  /** 학생이 `임시 저장` 을 직접 눌렀을 때. 단말과 서버에 한꺼번에 남기고 눈에 보이게 알린다. */
+  async function handleOutlineManualSave() {
+    if (outlineManualSaving) return;
+    const answers = outlineDraftRef.current;
+    if (answers.length === 0) {
+      setOutlineSaveError("아직 적은 것이 없어요.");
+      return;
+    }
+
+    setOutlineManualSaving(true);
+    try {
+      const result = await saveAnswers(sessionId, answers);
+      if (result.error) {
+        setOutlineSaveError(result.error);
+        return;
+      }
+      lastServerDraftRef.current = JSON.stringify(answers);
+      saveLocalOutlineDraft();
+      setOutlineSavedAt(new Date());
+      setOutlineSaveError("");
+      // 화면 안에서 잠깐만 알린다. 키보드를 닫지 않아 학생이 바로 이어 쓸 수 있다.
+      setOutlineManualSavedAt(new Date());
+      window.setTimeout(() => setOutlineManualSavedAt(null), 4000);
+    } finally {
+      setOutlineManualSaving(false);
+    }
+  }
+
+  /* 단말 저장 — 손을 멈추면 3초 뒤에 조용히 남긴다. */
+  useEffect(() => {
+    if (step !== "outline_sections") return undefined;
+    const timer = window.setTimeout(() => saveLocalOutlineDraft(), LOCAL_DRAFT_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [templateAnswers, excludedTemplateItemIds, step, saveLocalOutlineDraft]);
+
+  /* 서버 저장 — 2분마다. 내용이 그대로면 보내지 않는다. */
+  useEffect(() => {
+    if (step !== "outline_sections") return undefined;
+    const timer = window.setInterval(() => {
+      saveLocalOutlineDraft();
+      void backupOutlineDraftToServer();
+    }, DB_BACKUP_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [step, saveLocalOutlineDraft, backupOutlineDraftToServer]);
+
+  /*
+   * 화면을 덮거나 떠날 때 마지막으로 한 번 남긴다.
+   * ⚠️ 여기가 없으면 "쓰다가 홈 버튼을 눌렀다"가 그대로 유실이 된다. 태블릿에서 가장 흔한 경우다.
+   */
+  useEffect(() => {
+    const flush = () => {
+      if (outlineDraftStateRef.current.step !== "outline_sections") return;
+      saveLocalOutlineDraft();
+      void backupOutlineDraftToServer();
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      flush();
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [saveLocalOutlineDraft, backupOutlineDraftToServer]);
 
   if (pageLoading) {
     return (
@@ -464,6 +639,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       setError(result.error);
       setOutlineSubmitting(false);
       return;
+    }
+    // 완성했으면 이 단말의 임시본을 지운다. 남겨 두면 다시 들어올 때 낡은 것이 되살아난다.
+    try {
+      window.localStorage.removeItem(outlineDraftStorageKey(sessionId));
+    } catch {
+      // 못 지워도 서버 저장본이 더 새것이라 복원에서 밀린다.
     }
     router.push(`/room/${roomId}/result?session=${sessionId}`);
   }
@@ -1620,6 +1801,30 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               </div>
             );
           })}
+
+          {/* 저장 상태와 임시 저장 — 아지트 학생 글쓰기와 같은 자리(제출 버튼 바로 위)에 둔다. */}
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-500">
+                {outlineManualSavedAt && !outlineSaveError ? "임시 저장 완료" : "자동 저장"}
+              </p>
+              <p className={`truncate text-sm font-bold ${outlineSaveError ? "text-red-500" : "text-gray-700"}`}>
+                {outlineSaveError || (outlineManualSavedAt
+                  ? `저장했어요 ✓ ${outlineManualSavedAt.toLocaleTimeString()}`
+                  : outlineSavedAt
+                    ? outlineSavedAt.toLocaleTimeString()
+                    : "아직 저장 전이에요")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleOutlineManualSave}
+              disabled={outlineManualSaving || outlineSubmitting}
+              className="shrink-0 rounded-2xl border-2 border-orange-200 bg-white px-4 py-2.5 text-sm font-bold text-orange-500 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-40 transition-colors"
+            >
+              {outlineManualSaving ? "저장 중..." : "임시 저장 💾"}
+            </button>
+          </div>
 
           <div className="pb-4">
             <button
