@@ -64,3 +64,21 @@ test("제출 전에도 전체 보기 창을 열고 진행 상황과 새 질문�
   assert.match(livePanel, /학생이 제출하면 이 창에 자동으로 올라옵니다/);
   assert.match(livePanel, /작성 중 내용은 공개되지 않아요/);
 });
+
+test("큰 모달에서 학생 이름을 누르면 위 질문 칠판에 그 학생 질문을 모아 보여 준다", () => {
+  assert.match(livePanel, /h-\[92vh\][^\n]*max-w-7xl/);
+  assert.match(livePanel, /aria-label="선택 학생 질문 칠판"/);
+  assert.match(livePanel, /const \[boardSessionId, setBoardSessionId\] = useState<string \| null>\(null\)/);
+  assert.match(livePanel, /const selectedBoardResult = results\.find/);
+  assert.match(livePanel, /selectedBoardResult\.selections\.map/);
+  assert.match(livePanel, /selection\.remixedQuestion/);
+  assert.match(livePanel, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/);
+  assert.ok(
+    (livePanel.match(/aria-pressed=\{boardSessionId ===/g) ?? []).length >= 2,
+    "학생별 보기와 질문만 보기 양쪽 이름이 모두 칠판 선택 버튼이어야 합니다.",
+  );
+  assert.ok(
+    (livePanel.match(/칠판에서 보기/g) ?? []).length >= 2,
+    "학생 이름 버튼의 용도가 두 보기 방식에 모두 표시되어야 합니다.",
+  );
+});
