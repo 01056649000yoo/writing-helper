@@ -100,6 +100,28 @@ test("도움말은 새로 만들 수 있는 네 활동을 활동 폴더 한 곳�
   await assert.rejects(access("src/app/dashboard/manual-modal.tsx"));
 });
 
+test("도움말은 최신 아지트 참고함과 개요 고정 흐름을 정확히 설명한다", async () => {
+  const guideSource = await readFile("src/features/activities/guide.ts", "utf8");
+
+  // 개요는 본문에 한 번 복사하는 자료가 아니라 과제에 고정해 학생·교사가 최신본을 함께 본다.
+  for (const phrase of [
+    "과제명과 개요 전체를 다시 확인",
+    "이 기기와 서버에 자동 저장",
+    "그 과제에 고정",
+    "최종 승인 전에는 다른 개요로 바꿀 수 있고",
+    "선생님 글 확인 화면에 최신 저장 내용",
+  ]) {
+    assert.ok(guideSource.includes(phrase), `최신 개요 흐름 안내가 빠졌습니다: ${phrase}`);
+  }
+
+  // 질문 만들기 원문과 학생이 실제로 고른 질문을 혼동하면 참고함에서 보이지 않는 자료를 안내하게 된다.
+  assert.match(guideSource, /질문 만들기 원문을 참고함에 바로 넣는 것이 아니라/);
+  assert.match(guideSource, /직접 고른 좋은 질문/);
+  assert.match(guideSource, /전체 질문 실시간 보기/);
+  assert.match(guideSource, /연결은 기본으로 켜져 있으며 교사 설정에서 끌 수도 있습니다/);
+  assert.doesNotMatch(guideSource, /본문에 바로 넣어 글의 뼈대로 씁니다/);
+});
+
 /*
  * 2026-08-24: 색·간격·모서리는 이미 아지트와 같았는데 **글자만 달랐다**.
  * 연구소는 Tailwind 기본 크기를 그대로 썼고(가장 많이 쓰는 `text-xs` 가 0.75rem = 12px),
