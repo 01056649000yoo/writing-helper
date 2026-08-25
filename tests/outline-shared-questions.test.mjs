@@ -170,3 +170,33 @@ test("임시 저장은 아직 안 쓴 항목도 담는다", () => {
   // 완성했으면 단말 임시본을 지운다. 남기면 다음에 낡은 것이 되살아난다.
   assert.match(activityPage, /window\.localStorage\.removeItem\(outlineDraftStorageKey\(sessionId\)\)/);
 });
+
+/*
+ * 2026-08-25: 개요 짜기 화면이 "글이 너무 작다"는 지적을 받았다.
+ *
+ * ⚠️ 계단은 이미 아지트와 맞춰 뒀는데도 작았다. 원인은 계단이 아니라 **어느 단을 골랐나** 였다 —
+ *    화면 전체가 `text-sm`(0.9rem)·`text-xs`(0.8rem)뿐이고 본문 크기(`text-base`)가 두 곳뿐이었다.
+ *    여기는 **초등학생이 읽고 직접 쓰는 화면**이다. 읽는 글과 쓰는 칸은 본문 크기 이상이어야 한다.
+ */
+test("개요 짜기에서 학생이 읽고 쓰는 곳은 본문 크기 이상이다", () => {
+  const outline = activityPage.slice(
+    activityPage.indexOf('step === "outline_sections"'),
+    activityPage.indexOf('sharedQuestionPickerSection && ('),
+  );
+  assert.ok(outline.length > 0, "개요 화면을 찾지 못했다");
+
+  // 학생이 답할 질문(교사 항목·불러온 친구 질문)은 보조 글자가 아니다.
+  assert.match(outline, /text-base font-semibold text-gray-800 flex-1 leading-relaxed/);
+  assert.match(outline, /text-base font-semibold leading-relaxed text-gray-800/);
+
+  // 직접 쓰는 칸 — 자기가 쓴 글이 잘 보여야 한다. 여기가 이 화면의 핵심이다.
+  assert.match(outline, /rounded-2xl text-base text-gray-900 placeholder/);
+  assert.match(outline, /rounded-xl text-base font-semibold text-gray-800 placeholder/);
+
+  // 제목은 화면·구역 단계를 지킨다.
+  assert.match(outline, /<h1 className="text-2xl font-bold text-gray-800 mt-1">주제:/);
+  assert.match(outline, /<h2 className="text-xl font-bold text-orange-500/);
+
+  // ⚠️ 읽는 문장을 꼬리표 크기(text-xs)로 되돌리면 걸린다.
+  assert.doesNotMatch(outline, /text-xs text-orange-700 font-semibold/);
+});

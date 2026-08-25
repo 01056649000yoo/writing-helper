@@ -1610,13 +1610,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           <div className="bg-white rounded-3xl shadow-xl p-6 mb-4">
             <div className="text-center">
               <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">개요 짜기</p>
-              <h1 className="text-lg font-bold text-gray-800 mt-1">주제: {topic}</h1>
+              <h1 className="text-2xl font-bold text-gray-800 mt-1">주제: {topic}</h1>
               {topicDescription && (
                 <p className="text-sm text-gray-500 mt-1">{topicDescription}</p>
               )}
             </div>
             <div className="mt-4 rounded-2xl bg-orange-50 px-4 py-3 text-center">
-              <p className="text-xs text-orange-700 font-semibold">
+              <p className="text-sm text-orange-700 font-semibold">
                 {outlineEditable
                   ? "선생님이 준비한 항목에서 빼고 싶은 것은 빼고, 내 항목을 더해도 좋아요."
                   : "선생님이 준비한 처음·가운데·끝 항목에 맞춰 내용을 써 보세요."}
@@ -1640,7 +1640,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             return (
               <div key={key} className="bg-white rounded-3xl shadow-lg p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-base font-bold text-orange-500 flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-orange-500 flex items-center gap-2">
                     <BadgeCircle className="bg-orange-100 text-orange-500">
                       {key === "처음" ? "1" : key === "가운데" ? "2" : "3"}
                     </BadgeCircle>
@@ -1651,7 +1651,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                   </span>
                 </div>
                 {outlineEditable && sectionAnswers.length > 1 && (
-                  <p className="mb-3 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                  <p className="mb-3 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-500">
                     ↕ 손잡이를 끌거나 ▲▼ 단추로 <b>{key}</b> 안에서 순서를 바꿀 수 있어요.
                   </p>
                 )}
@@ -1713,7 +1713,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       >
                         <div className="flex items-start justify-between gap-2">
                           {isTeacherItem ? (
-                            <p className="text-sm font-semibold text-gray-800 flex-1 leading-relaxed">{answer.label}</p>
+                            <p className="text-base font-semibold text-gray-800 flex-1 leading-relaxed">{answer.label}</p>
                           ) : isSharedQuestion ? (
                             <span className="rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-bold shrink-0">
                               친구들과 만든 질문
@@ -1739,7 +1739,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                         </div>
 
                         {!isTeacherItem && (isSharedQuestion ? (
-                          <p className="rounded-xl border-2 border-amber-100 bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-gray-800">
+                          <p className="rounded-xl border-2 border-amber-100 bg-white px-4 py-3 text-base font-semibold leading-relaxed text-gray-800">
                             {answer.label}
                           </p>
                         ) : (
@@ -1748,7 +1748,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                             value={answer.label}
                             onChange={(e) => handleTemplateLabelChange(answer.itemId, e.target.value)}
                             placeholder="항목 이름 (예: 친구 이야기)"
-                            className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
+                            className="w-full bg-white px-4 py-2 border-2 border-gray-200 rounded-xl text-base font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-amber-400 transition-colors"
                           />
                         ))}
 
@@ -1761,7 +1761,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                             : isSharedQuestion
                               ? "이 질문에 답하며 글에 넣을 생각을 적어봐요"
                               : "내가 쓸 내용을 적어봐요"}
-                          className={`w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none ${focusTone} resize-none transition-colors`}
+                          className={`w-full bg-white px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none ${focusTone} resize-none transition-colors`}
                         />
                       </div>
                     );
@@ -1778,7 +1778,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                             key={item.id}
                             type="button"
                             onClick={() => restoreTemplateItem(item, key)}
-                            className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-left text-sm text-gray-700 hover:border-orange-300 hover:bg-orange-50 transition-colors"
+                            className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-left text-base text-gray-700 hover:border-orange-300 hover:bg-orange-50 transition-colors"
                           >
                             <span className="mr-2 font-bold text-orange-500">+ 다시 넣기</span>
                             {item.label}
