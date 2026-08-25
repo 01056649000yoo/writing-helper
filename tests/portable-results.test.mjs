@@ -38,7 +38,7 @@ test("활동 완료는 활동별 RPC 대신 하나의 공통 결과 저장 RPC�
   assert.doesNotMatch(adapter, /rpc\("(?:outline|question|one_line|hanja)/);
 
   const persistCalls = studentActions.match(/await persistPortableResult\(/g) ?? [];
-  assert.equal(persistCalls.length, 5);
+  assert.equal(persistCalls.length, 6);
 });
 
 test("표준 결과 저장은 진행·완료 통합 세션만 허용하고 입력 크기를 제한한다", () => {
@@ -47,4 +47,16 @@ test("표준 결과 저장은 진행·완료 통합 세션만 허용하고 입�
   assert.match(adapter, /slice\(0, 10000\)/);
   assert.match(adapter, /p_activity_version: definition\.version/);
   assert.match(adapter, /p_schema_version: definition\.integration\.schemaVersion/);
+});
+
+test("완성한 개요의 자동·수동 저장은 같은 표준 결과를 최신화한다", () => {
+  const saveAnswersBlock = studentActions.slice(
+    studentActions.indexOf("export async function saveAnswers"),
+    studentActions.indexOf("export async function requestOutline"),
+  );
+
+  assert.match(saveAnswersBlock, /\.select\("room_id, status"\)/);
+  assert.match(saveAnswersBlock, /savedSession\.status === "done"/);
+  assert.match(saveAnswersBlock, /await persistPortableResult\(admin, sessionId, savedSession\.room_id\)/);
+  assert.match(adapter, /p_session_id: sessionId/);
 });

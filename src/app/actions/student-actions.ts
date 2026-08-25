@@ -317,13 +317,29 @@ export async function saveAnswers(
     return { error: "내 활동만 수정할 수 있습니다." };
   }
 
-  const { error } = await admin
+  const { data: savedSession, error } = await admin
     .schema("writing_helper")
     .from("student_sessions")
     .update({ answers, updated_at: new Date().toISOString() })
-    .eq("id", sessionId);
+    .eq("id", sessionId)
+    .select("room_id, status")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!savedSession) return { error: "세션을 찾을 수 없습니다." };
+
+  // 완성한 개요를 다시 고치는 중에는 자동 저장·수동 저장도 아지트가 읽는
+  // 같은 portable_results 행을 갱신해야 한다. session_id가 유일 키라 결과 ID는
+  // 유지되고, 글쓰기창에 고정된 포인터는 최신 chunks를 계속 따라간다.
+  if (savedSession.status === "done") {
+    if (!savedSession.room_id
+        || !await persistPortableResult(admin, sessionId, savedSession.room_id)) {
+      return {
+        error: "개요는 저장했지만 아지트 참고 개요를 최신화하지 못했어요. 잠시 후 다시 저장해주세요.",
+      };
+    }
+  }
+
   return {};
 }
 
