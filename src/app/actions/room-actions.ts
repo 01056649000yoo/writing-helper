@@ -339,6 +339,15 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
     topic = promptTitle;
     topicDescription = promptDescription;
 
+    /*
+     * ⚠️ 핵심단어 없이도 방이 만들어졌다(2026-08-25 확인). 이 활동은 **핵심단어를 넣어 문장을
+     *    만드는 것**이 전부라, 핵심단어가 없으면 학생 화면에 목표가 사라지고 무엇을 써도 통과한다.
+     *    화면 쪽 `required` 만으로는 못 막는다(자동 채움·옛 초안·직접 호출). 서버에서 막는다.
+     */
+    if (coreKeywords.length === 0) {
+      return { error: "핵심단어를 한 개 이상 적어주세요. 이 활동은 핵심단어를 넣어 문장을 만드는 활동입니다." };
+    }
+
     activityConfig = {
       promptTitle,
       promptDescription,

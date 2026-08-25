@@ -1993,6 +1993,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
             </label>
             <textarea
               name="core_keywords"
+              required
               rows={4}
               value={draft.core_keywords}
               onChange={(event) => setDraft((prev) => ({ ...prev, core_keywords: event.target.value }))}

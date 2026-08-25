@@ -118,12 +118,20 @@ function normalizeKeywords(value: unknown) {
   return [];
 }
 
-const KOREAN_PARTICLE_SUFFIXES = [
-  "은", "는", "이", "가", "을", "를", "와", "과", "도", "만",
-  "에", "에서", "에게", "께", "한테", "으로", "로", "보다", "처럼",
-  "만큼", "부터", "까지", "랑", "이나", "나", "의",
-];
-
+/*
+ * 핵심단어가 글 안에 쓰였는지 본다.
+ *
+ * ⚠️ 예전에는 **띄어쓰기로 자른 낱말이 핵심단어와 정확히 같거나, 정해 둔 조사 하나가 붙은 경우**만
+ *    인정했다. 그래서 이런 것들이 모두 실패했다(2026-08-25 확인):
+ *      `온난화가심각하다`   — 아이들이 띄어쓰기를 자주 빠뜨린다
+ *      `지구온난화가 …`     — 핵심단어가 다른 말과 붙은 합성어
+ *      `온난화때문에`       — 목록에 없는 조사·어미
+ *    조사 목록을 늘려도 끝이 없다. 한국어는 붙는 말이 너무 많고 아이 글은 띄어쓰기가 고르지 않다.
+ *
+ * 그래서 **글 안에 그 낱말이 들어 있으면 인정**한다. 교사가 묻는 것은 "이 낱말을 썼는가"이지
+ * "문법에 맞게 썼는가"가 아니다. 다른 말에 우연히 섞여 통과하는 경우가 생길 수 있지만,
+ * **쓴 아이를 못 썼다고 하는 쪽이 훨씬 나쁘다.**
+ */
 function keywordMatchesContent(content: string, keyword: string) {
   const normalizedKeyword = normalizeSearchText(keyword);
   if (!normalizedKeyword) return false;
@@ -131,19 +139,7 @@ function keywordMatchesContent(content: string, keyword: string) {
   const normalizedContent = normalizeSearchText(content);
   if (!normalizedContent) return false;
 
-  if (normalizedKeyword.includes(" ")) {
-    return normalizedContent.includes(normalizedKeyword);
-  }
-
-  const tokens = content
-    .split(/[\s,.;:!?()[\]{}"'“”‘’/\\|<>]+/u)
-    .map((token) => normalizeSearchText(token))
-    .filter(Boolean);
-
-  return tokens.some((token) => {
-    if (token === normalizedKeyword) return true;
-    return KOREAN_PARTICLE_SUFFIXES.some((suffix) => token === `${normalizedKeyword}${suffix}`);
-  });
+  return normalizedContent.includes(normalizedKeyword);
 }
 
 function normalizeSearchText(value: string) {
