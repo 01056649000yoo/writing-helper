@@ -226,3 +226,38 @@ test("개요 짜기 머리말은 가로를 쓰고 진행 숫자를 제목 줄에
   // 학생이 읽는 안내라 본문 크기여야 한다.
   assert.match(header, /text-base font-semibold text-orange-700/);
 });
+
+/*
+ * 2026-08-25: 개요는 처음·가운데·끝으로 흩어져 있어 **다 쓴 뒤 전체를 한눈에 못 봤다.**
+ * 아지트 학생 글쓰기의 `제출 전 검토하기` 와 같은 자리·같은 뜻으로 검토 창을 넣었다.
+ */
+test("개요를 내기 전에 전체를 한 화면에서 확인할 수 있다", () => {
+  const preview = activityPage.slice(
+    activityPage.indexOf("outlinePreviewOpen && ("),
+    activityPage.indexOf("sharedQuestionPickerSection && ("),
+  );
+  assert.ok(preview.length > 0, "검토 창을 찾지 못했다");
+
+  // 여는 통로와 창으로 읽히는 표시.
+  assert.match(activityPage, /내가 짠 개요 보기/);
+  assert.match(preview, /aria-modal="true"/);
+
+  /*
+   * ⚠️ 여기서 **고치게 하지 않는다.** 고치는 곳이 두 군데가 되면 어느 쪽이 원본인지 흐려진다.
+   *    읽기 전용이어야 하므로 입력칸이 들어오면 걸린다.
+   */
+  assert.doesNotMatch(preview, /<textarea|<input|StudentSpellingTextarea/);
+
+  // ⚠️ 아직 안 쓴 항목도 보여 줘야 빠뜨린 것을 안다. 빈 것을 감추면 "다 썼네" 하고 그냥 낸다.
+  assert.match(preview, /아직 안 썼어요/);
+
+  // 확인한 뒤 바로 낼 수 있고, 고칠 것이 있으면 닫고 돌아간다.
+  assert.match(preview, /이대로 완성하기/);
+  assert.match(preview, /더 고칠래요/);
+  assert.match(preview, /void handleOutlineSectionSubmit\(\)/);
+
+  // 창은 Esc 로도 닫고, 열린 동안 뒤 화면이 따라 움직이지 않는다.
+  assert.match(activityPage, /if \(!outlinePreviewOpen\) return undefined;/);
+  assert.match(activityPage, /document\.body\.style\.overflow = "hidden";/);
+  assert.match(activityPage, /document\.body\.style\.overflow = previousOverflow;/);
+});

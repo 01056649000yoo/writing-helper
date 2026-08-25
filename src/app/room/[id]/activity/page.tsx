@@ -117,6 +117,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [outlineSubmitting, setOutlineSubmitting] = useState(false);
   // 끌어서 옮기는 중인 항목. 태블릿에서는 끌기가 어려워 ▲▼ 단추도 함께 둔다.
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
+  /*
+   * 제출 전 검토 창. 아지트 학생 글쓰기의 `제출 전 검토하기` 와 같은 자리·같은 뜻이다(2026-08-25).
+   * 개요는 처음·가운데·끝으로 흩어져 있어 **다 쓴 뒤 전체를 한눈에 못 본다.** 내기 전에 한 화면에서
+   * 훑어보고 빠진 곳을 찾게 한다.
+   */
+  const [outlinePreviewOpen, setOutlinePreviewOpen] = useState(false);
   // 자동 저장 시각·수동 저장 확인. 아지트와 같이 자동과 수동을 구분해 보여 준다.
   const [outlineSavedAt, setOutlineSavedAt] = useState<Date | null>(null);
   const [outlineManualSavedAt, setOutlineManualSavedAt] = useState<Date | null>(null);
@@ -417,6 +423,24 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       setOutlineManualSaving(false);
     }
   }
+
+  /*
+   * 검토 창은 Esc 로도 닫고, 열린 동안 뒤 화면이 따라 움직이지 않게 몸통 스크롤을 잠근다.
+   * ⚠️ 잠근 뒤 반드시 되돌린다. 안 되돌리면 창을 닫아도 화면이 굳은 것처럼 보인다.
+   */
+  useEffect(() => {
+    if (!outlinePreviewOpen) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOutlinePreviewOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [outlinePreviewOpen]);
 
   /* 단말 저장 — 손을 멈추면 3초 뒤에 조용히 남긴다. */
   useEffect(() => {
@@ -1835,7 +1859,16 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             </button>
           </div>
 
-          <div className="pb-4">
+          {/* 내기 전에 전체를 한 번 훑어본다. 아지트 글쓰기의 `제출 전 검토하기` 와 같은 자리다. */}
+          <div className="grid gap-2 pb-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+            <button
+              type="button"
+              onClick={() => setOutlinePreviewOpen(true)}
+              disabled={answeredCount === 0}
+              className="w-full rounded-3xl border-2 border-orange-300 bg-white py-4 text-base font-bold text-orange-600 hover:border-orange-400 hover:bg-orange-50 disabled:opacity-40 transition-colors"
+            >
+              내가 짠 개요 보기 👀
+            </button>
             <button
               onClick={handleOutlineSectionSubmit}
               disabled={outlineSubmitting || answeredCount === 0}
@@ -1843,9 +1876,114 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             >
               {outlineSubmitting ? "개요 만드는 중..." : "개요 완성하기 →"}
             </button>
-            {error && <p className="text-red-500 text-sm text-center mt-3">{error}</p>}
+            {error && <p className="text-red-500 text-sm text-center mt-3 sm:col-span-2">{error}</p>}
           </div>
         </div>
+
+        {/*
+          * 제출 전 검토 창.
+          *
+          * ⚠️ 여기서 **고치게 하지 않는다.** 고치는 곳이 두 군데가 되면 어느 쪽이 원본인지 흐려진다.
+          *    읽고 확인만 하고, 고칠 것이 보이면 닫고 원래 자리에서 고친다.
+          * ⚠️ 아직 안 쓴 항목도 **빠뜨렸다고 알려 주려고** 함께 보여 준다. 빈 것을 감추면
+          *    "다 썼네" 하고 그냥 내게 된다.
+          */}
+        {outlinePreviewOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 p-0 sm:items-center sm:p-4"
+            role="presentation"
+            onMouseDown={(event) => { if (event.target === event.currentTarget) setOutlinePreviewOpen(false); }}
+          >
+            <div
+              className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="outline-preview-title"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-orange-100 px-5 py-5 sm:px-6">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-orange-500">내기 전에 한 번 더</p>
+                  <h2 id="outline-preview-title" className="text-2xl font-bold text-gray-800">내가 짠 개요</h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    빠뜨린 곳이 없는지 보고, 고칠 것이 있으면 창을 닫고 고쳐요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOutlinePreviewOpen(false)}
+                  aria-label="내가 짠 개요 닫기"
+                  className="shrink-0 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+                <p className="mb-4 rounded-2xl bg-orange-50 px-4 py-2.5 text-base font-semibold text-orange-700">
+                  주제: {topic}
+                </p>
+                {sections.map(({ key }) => {
+                  const rows = templateAnswers.filter(
+                    (a) => a.section === key && !excludedItemIds.has(a.itemId)
+                  );
+                  if (rows.length === 0) return null;
+                  return (
+                    <section key={key} className="mb-5 last:mb-0">
+                      <h3 className="mb-2 flex items-center gap-2 text-xl font-bold text-orange-500">
+                        <BadgeCircle className="bg-orange-100 text-orange-500">
+                          {key === "처음" ? "1" : key === "가운데" ? "2" : "3"}
+                        </BadgeCircle>
+                        {key}
+                      </h3>
+                      <ol className="space-y-2">
+                        {rows.map((row) => {
+                          const written = row.answer.trim();
+                          return (
+                            <li
+                              key={row.itemId}
+                              className={`rounded-2xl border-2 p-3 ${written ? "border-orange-200 bg-white" : "border-dashed border-gray-300 bg-gray-50"}`}
+                            >
+                              <p className="text-base font-semibold text-gray-800">{row.label || "이름 없는 항목"}</p>
+                              {written ? (
+                                <p className="mt-1 whitespace-pre-wrap text-base leading-relaxed text-gray-700">{written}</p>
+                              ) : (
+                                <p className="mt-1 text-sm font-semibold text-gray-400">아직 안 썼어요</p>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </section>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 sm:px-6">
+                <p className="text-sm font-bold text-gray-500">
+                  남긴 항목 <b className="text-gray-800">{selectedCount}</b>개 · 작성 완료{" "}
+                  <b className="text-orange-600">{answeredCount}</b>개
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOutlinePreviewOpen(false)}
+                    className="rounded-2xl border-2 border-gray-200 bg-white px-5 py-2.5 text-base font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    더 고칠래요
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setOutlinePreviewOpen(false); void handleOutlineSectionSubmit(); }}
+                    disabled={outlineSubmitting || answeredCount === 0}
+                    className="rounded-2xl bg-orange-400 px-5 py-2.5 text-base font-bold text-white hover:bg-orange-500 disabled:opacity-40 transition-colors"
+                  >
+                    {outlineSubmitting ? "개요 만드는 중..." : "이대로 완성하기 →"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {sharedQuestionPickerSection && (
           <div
