@@ -1607,22 +1607,31 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-4">
         <div className="max-w-[1200px] mx-auto">
-          <div className="bg-white rounded-3xl shadow-xl p-6 mb-4">
-            <div className="text-center">
-              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">개요 짜기</p>
-              <h1 className="text-2xl font-bold text-gray-800 mt-1">주제: {topic}</h1>
-              {topicDescription && (
-                <p className="text-sm text-gray-500 mt-1">{topicDescription}</p>
-              )}
-            </div>
-            <div className="mt-4 rounded-2xl bg-orange-50 px-4 py-3 text-center">
-              <p className="text-sm text-orange-700 font-semibold">
-                {outlineEditable
-                  ? "선생님이 준비한 항목에서 빼고 싶은 것은 빼고, 내 항목을 더해도 좋아요."
-                  : "선생님이 준비한 처음·가운데·끝 항목에 맞춰 내용을 써 보세요."}
+          {/*
+            * 상단 머리말 — 예전에는 전부 가운데 정렬이라 **넓은 화면에서 양옆이 휑했고**, 진행 숫자가
+            * 따로 한 줄을 먹었다(2026-08-25 지적). 왼쪽 정렬로 바꿔 가로를 쓰고, 숫자는 안내 문장
+            * 오른쪽 끝으로 보내 한 줄로 합쳤다. 좁은 화면에서는 `flex-wrap` 으로 자연스럽게 접힌다.
+            */}
+          <div className="bg-white rounded-3xl shadow-xl px-5 py-4 mb-4 sm:px-6">
+            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">개요 짜기</p>
+                <h1 className="text-2xl font-bold text-gray-800">주제: {topic}</h1>
+              </div>
+              {/* 진행 숫자는 곁눈질로 보는 것이라 제목 줄 오른쪽 끝에 붙인다. */}
+              <p className="shrink-0 text-sm font-bold text-gray-500">
+                남긴 항목 <b className="text-gray-800">{selectedCount}</b>개 · 작성 완료{" "}
+                <b className="text-orange-600">{answeredCount}</b>개
               </p>
-              <p className="text-xs text-orange-500 mt-1">남긴 항목 {selectedCount}개 · 작성 완료 {answeredCount}개</p>
             </div>
+            {topicDescription && (
+              <p className="mt-1 text-sm text-gray-500">{topicDescription}</p>
+            )}
+            <p className="mt-3 rounded-2xl bg-orange-50 px-4 py-2.5 text-base font-semibold text-orange-700">
+              {outlineEditable
+                ? "선생님이 준비한 항목에서 빼고 싶은 것은 빼고, 내 항목을 더해도 좋아요."
+                : "선생님이 준비한 처음·가운데·끝 항목에 맞춰 내용을 써 보세요."}
+            </p>
           </div>
 
           {sections.map(({ key, items }) => {

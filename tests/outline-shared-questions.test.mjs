@@ -194,9 +194,35 @@ test("개요 짜기에서 학생이 읽고 쓰는 곳은 본문 크기 이상이
   assert.match(outline, /rounded-xl text-base font-semibold text-gray-800 placeholder/);
 
   // 제목은 화면·구역 단계를 지킨다.
-  assert.match(outline, /<h1 className="text-2xl font-bold text-gray-800 mt-1">주제:/);
+  // 여백은 머리말 재배치에서 바뀔 수 있다. 크기 단계만 못 박는다.
+  assert.match(outline, /<h1 className="text-2xl font-bold text-gray-800[^"]*">주제:/);
   assert.match(outline, /<h2 className="text-xl font-bold text-orange-500/);
 
   // ⚠️ 읽는 문장을 꼬리표 크기(text-xs)로 되돌리면 걸린다.
   assert.doesNotMatch(outline, /text-xs text-orange-700 font-semibold/);
+});
+
+/*
+ * 2026-08-25: 개요 짜기 상단이 **전부 가운데 정렬**이라 넓은 화면에서 양옆이 휑했고,
+ * `남긴 항목 N개 · 작성 완료 N개` 가 따로 한 줄을 먹어 위쪽 여백이 컸다.
+ *
+ * ⚠️ 가운데 정렬은 짧은 글에만 어울린다. 최대 1200px 폭에서 제목 한 줄을 가운데 두면
+ *    양옆이 통째로 빈다. 왼쪽 정렬로 가로를 쓰고, 곁눈질로 보는 숫자는 같은 줄 오른쪽 끝에 붙인다.
+ */
+test("개요 짜기 머리말은 가로를 쓰고 진행 숫자를 제목 줄에 붙인다", () => {
+  const header = activityPage.slice(
+    activityPage.indexOf('step === "outline_sections"'),
+    activityPage.indexOf("sections.map"),
+  );
+
+  // 제목 묶음이 가운데로 몰리면 안 된다.
+  assert.doesNotMatch(header, /<div className="text-center">/);
+  assert.match(header, /flex flex-wrap items-end justify-between/);
+
+  // 진행 숫자는 따로 줄을 먹지 않고 제목 줄 오른쪽에 붙는다.
+  assert.match(header, /shrink-0 text-sm font-bold text-gray-500/);
+  assert.match(header, /남긴 항목 <b className="text-gray-800">\{selectedCount\}<\/b>개/);
+
+  // 학생이 읽는 안내라 본문 크기여야 한다.
+  assert.match(header, /text-base font-semibold text-orange-700/);
 });
