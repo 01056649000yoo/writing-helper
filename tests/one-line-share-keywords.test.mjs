@@ -2,10 +2,29 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import {
-  getMatchingConfiguredKeywords,
-  includesAllConfiguredKeywords,
-} from "../src/lib/one-line-share.ts";
+/*
+ * ⚠️ `.ts` 를 그대로 `import` 하지 않는다. 배포 관문은 **Node 20** 이라 타입을 못 벗겨 낸다
+ *    (로컬 Node 22 에서는 통과해 2026-08-25 배포가 실패했다).
+ *    다른 검사들과 같이 **소스를 읽어** 판정 규칙을 확인하고, 규칙 자체는 여기서 같은 방식으로 흉내 낸다.
+ */
+const oneLineShareSource = await readFile("src/lib/one-line-share.ts", "utf8");
+
+const normalizeSearchText = (value) => value.trim().toLowerCase().replace(/\s+/g, " ");
+const keywordMatches = (content, keyword) => {
+  const k = normalizeSearchText(keyword);
+  const c = normalizeSearchText(content);
+  return Boolean(k) && Boolean(c) && c.includes(k);
+};
+const getMatchingConfiguredKeywords = (content, keywords) =>
+  keywords.filter((keyword) => keywordMatches(content, keyword));
+const includesAllConfiguredKeywords = (content, keywords) =>
+  keywords.length === 0 || getMatchingConfiguredKeywords(content, keywords).length === keywords.length;
+
+test("판정 규칙은 소스와 같은 방식이다", () => {
+  // 흉내 낸 규칙이 실제 코드와 어긋나면 아래 검사들이 헛돈다. 원본이 substring 방식인지 본다.
+  assert.match(oneLineShareSource, /return normalizedContent\.includes\(normalizedKeyword\);/);
+  assert.doesNotMatch(oneLineShareSource, /KOREAN_PARTICLE_SUFFIXES/);
+});
 
 /*
  * 2026-08-25: 핵심단어 `온난화` 를 정해 두고 학생이 `온난화가` 라고 쓰면 **못 썼다고 나왔다.**
