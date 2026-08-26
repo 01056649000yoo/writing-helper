@@ -21,7 +21,11 @@ test("다섯 학생 글 입력란은 공용 아지트 맞춤법 입력 컴포넌
   assert.equal((activityPage.match(/<StudentSpellingTextarea/g) ?? []).length, 4);
   assert.match(spellingEditor, /elementary-detection-v1\.json/);
   assert.match(spellingEditor, /elementary-lookup-v1\.json/);
-  assert.match(spellingEditor, /get_student_spelling_entries_v1/);
+  // 아지트가 쓰는 판과 같은 것을 부른다. `_v1` 은 배열, `_v2` 는 `{version, entries}` 라
+  // 이름만 바꾸면 목록이 조용히 빈다 — 읽는 자리까지 함께 못 박는다.
+  assert.match(spellingEditor, /rpc\("get_student_spelling_entries_v2"\)/);
+  assert.match(spellingEditor, /\)\?\.entries/);
+  assert.doesNotMatch(spellingEditor, /get_student_spelling_entries_v1/);
   assert.match(spellingEditor, /SCAN_DELAY_MS = 350/);
   assert.match(spellingEditor, /MAX_ISSUES = 50/);
   assert.match(spellingEditor, /spellingSourcesPromise/);

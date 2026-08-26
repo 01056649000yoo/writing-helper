@@ -178,12 +178,20 @@ async function loadSpellingSources(): Promise<SpellingSources> {
           return compileCatalog(catalog);
         })
         .catch(() => null),
-      Promise.resolve(createSupabaseBrowserClient().rpc("get_student_spelling_entries_v1"))
+      // `_v2` 는 배열이 아니라 `{ version, entries }` 를 준다. 같은 표현이 공통·학급 양쪽에 있으면
+      // 공통 것 하나만 남겨 주므로 아지트 화면과 같은 목록을 본다.
+      Promise.resolve(createSupabaseBrowserClient().rpc("get_student_spelling_entries_v2"))
         .then(({ data, error }) => {
           if (error) throw error;
-          return Array.isArray(data) ? data as ClassSpellingEntry[] : [];
+          const entries = (data as { entries?: unknown } | null)?.entries;
+          return Array.isArray(entries) ? entries as ClassSpellingEntry[] : [];
         })
-        .catch(() => [] as ClassSpellingEntry[]),
+        // 맞춤법 도움말은 있으면 좋은 것이라 실패해도 글쓰기를 막지 않는다.
+        // 다만 조용히 비면 아무도 못 알아채므로 콘솔에는 남긴다.
+        .catch((error: unknown) => {
+          console.warn("학급 맞춤법 자료를 불러오지 못했습니다:", error);
+          return [] as ClassSpellingEntry[];
+        }),
     ]).then(([catalog, classEntries]) => ({ catalog, classEntries }));
   }
   return spellingSourcesPromise;
