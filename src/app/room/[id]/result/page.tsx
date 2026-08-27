@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getStudentResult, toggleHanjaWritingReaction, toggleOneLineReaction } from "@/app/actions/student-actions";
-import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
+import { OneLineShareBoard, OneLineShareTopRanks } from "@/components/one-line-share-board";
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import {
   QuestionVotingCompactList,
-  QuestionVotingTopThree,
+  QuestionVotingTopRanks,
 } from "@/components/question-voting-ranking-summary";
 import { QuestionCardVisibilityButton } from "@/components/question-generator-result-cards";
 import type {
@@ -374,7 +374,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                   활동 종료
                 </span>
               </div>
-              <QuestionVotingTopThree ranking={questionVotingRanking} />
+              <QuestionVotingTopRanks ranking={questionVotingRanking} />
               <QuestionVotingCompactList ranking={questionVotingRanking} />
             </div>
           )}
@@ -436,7 +436,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 내 한 줄은 위에서 확인하고, 여기서는 친구들 문장만 편하게 읽으면서 좋아요를 남길 수 있어요.
               </div>
-              <OneLineShareTopThree entries={peerOneLineEntries} />
+              <OneLineShareTopRanks entries={peerOneLineEntries} />
               <OneLineShareBoard
                 entries={peerOneLineEntries}
                 interactive

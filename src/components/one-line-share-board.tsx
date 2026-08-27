@@ -1,31 +1,41 @@
 import type { OneLineShareBoardEntry } from "@/features/activities/types";
+import { pickOneLineSharePodium, rankOneLineShare } from "@/lib/one-line-share";
+import { rankLabel } from "@/lib/ranking";
 
-export function OneLineShareTopThree({
+/**
+ * 등수별 색. 4·5위는 앞의 셋보다 눈에 덜 띄게 두어 시상대의 무게를 유지한다.
+ * 자리(index)가 아니라 **등수**로 고르므로 공동 1위 둘은 같은 색을 받는다.
+ */
+const PODIUM_STYLES = [
+  "border-rose-200 bg-rose-50",
+  "border-slate-200 bg-slate-50",
+  "border-orange-200 bg-orange-50",
+  "border-violet-200 bg-violet-50",
+  "border-sky-200 bg-sky-50",
+] as const;
+
+export function OneLineShareTopRanks({
   entries,
   showStudentName = false,
 }: {
   entries: OneLineShareBoardEntry[];
   showStudentName?: boolean;
 }) {
-  const topThree = entries.slice(0, 3);
+  const podium = pickOneLineSharePodium(rankOneLineShare(entries));
 
-  if (topThree.length === 0) return null;
+  if (podium.length === 0) return null;
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
-      {topThree.map((entry, index) => (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      {podium.map((entry) => (
         <div
           key={entry.entryId}
           className={`rounded-3xl border p-5 shadow-sm ${
-            index === 0
-              ? "border-rose-200 bg-rose-50"
-              : index === 1
-                ? "border-slate-200 bg-slate-50"
-                : "border-orange-200 bg-orange-50"
+            PODIUM_STYLES[entry.rank - 1] ?? PODIUM_STYLES[PODIUM_STYLES.length - 1]
           }`}
         >
           <div className="flex items-start justify-between gap-3">
-            <span className="text-sm font-bold text-gray-700">{index + 1}위</span>
+            <span className="text-sm font-bold text-gray-700">{rankLabel(entry)}</span>
             <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-rose-700">
               ❤️ {entry.likeCount}
             </span>
@@ -80,7 +90,7 @@ export function OneLineShareBoard({
       )}
 
       <div className="grid gap-3 md:grid-cols-2">
-        {entries.map((entry, index) => {
+        {rankOneLineShare(entries).map((entry, index) => {
           const blocked = interactive
             && !closed
             && !entry.isMine
@@ -93,7 +103,7 @@ export function OneLineShareBoard({
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold uppercase tracking-wide text-rose-500">
                     {showStudentName
-                      ? `${index + 1}위 · ${entry.studentNumber}번 ${entry.studentName}`
+                      ? `${rankLabel(entry)} · ${entry.studentNumber}번 ${entry.studentName}`
                       : entry.isMine
                         ? "내 문장"
                         : `친구 문장 ${index + 1}`}

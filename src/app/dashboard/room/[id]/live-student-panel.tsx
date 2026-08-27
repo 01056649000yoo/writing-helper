@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
+import { OneLineShareBoard, OneLineShareTopRanks } from "@/components/one-line-share-board";
 import { BadgeCircle } from "@/components/badge-circle";
 import {
   getHanjaWritingRoomResults,
@@ -16,7 +16,7 @@ import {
 import type { ActivityType } from "@/features/activities/types";
 import {
   QuestionVotingCompactList,
-  QuestionVotingTopThree,
+  QuestionVotingTopRanks,
 } from "@/components/question-voting-ranking-summary";
 import { QuestionCardVisibilityButton } from "@/components/question-generator-result-cards";
 import { QuestionBoardFullscreen } from "@/components/question-board-fullscreen";
@@ -910,7 +910,7 @@ function QuestionVotingResultsModal({
             </div>
           ) : (
             <div className="space-y-4">
-              <QuestionVotingTopThree ranking={ranking} />
+              <QuestionVotingTopRanks ranking={ranking} />
               <QuestionVotingCompactList ranking={ranking} />
             </div>
           )}
@@ -1203,7 +1203,7 @@ function OneLineShareResultsModal({
 
         <div className="max-h-[calc(85vh-112px)] overflow-y-auto px-6 py-5">
           <div className="space-y-4">
-            <OneLineShareTopThree entries={entries} showStudentName />
+            <OneLineShareTopRanks entries={entries} showStudentName />
             <OneLineShareBoard entries={entries} showStudentName />
           </div>
         </div>

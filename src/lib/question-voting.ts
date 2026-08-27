@@ -1,3 +1,4 @@
+import { pickPodium, rankByScore, type Ranked } from "@/lib/ranking";
 import type {
   QuestionVotingConfig,
   QuestionVotingRoomResult,
@@ -91,8 +92,31 @@ export function buildQuestionVotingRanking(
     }))
     .sort((left, right) => {
       if (right.votes !== left.votes) return right.votes - left.votes;
+      // 표가 같으면 순서를 정할 근거가 없다. 화면이 이 순서를 등수로 읽지 않도록
+      // `rankQuestionVoting` 이 같은 표에 같은 등수를 매긴다. 여기서는 다시 열어도
+      // 목록이 흔들리지 않게 안정적인 순서만 만든다.
       return left.questionId.localeCompare(right.questionId, "ko");
     });
+}
+
+/**
+ * 등수·시상대 규칙은 활동 공용이다. 한 줄 나눔도 같은 규칙을 쓴다.
+ * 여기서는 "점수가 무엇인지"(표 수)만 알려 준다.
+ */
+export type RankedQuestionVotingItem = Ranked<QuestionVotingRoomResult["ranking"][number]>;
+
+const votesOf = (item: { votes: number }) => item.votes;
+
+export function rankQuestionVoting(
+  ranking: QuestionVotingRoomResult["ranking"],
+): RankedQuestionVotingItem[] {
+  return rankByScore(ranking, votesOf);
+}
+
+export function pickQuestionVotingPodium(
+  ranked: RankedQuestionVotingItem[],
+): RankedQuestionVotingItem[] {
+  return pickPodium(ranked, votesOf);
 }
 
 function isQuestion(value: unknown): value is { id: string; text: string } {

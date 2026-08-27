@@ -3,13 +3,13 @@ import { notFound } from "next/navigation";
 import type { OutlineTemplateAnswer } from "@/features/activities/types";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/app/actions/auth-actions";
-import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
+import { OneLineShareBoard, OneLineShareTopRanks } from "@/components/one-line-share-board";
 import { StudentResultQr } from "./student-result-qr";
 import { buildOneLineShareBoard } from "@/lib/one-line-share";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import {
   QuestionVotingCompactList,
-  QuestionVotingTopThree,
+  QuestionVotingTopRanks,
 } from "@/components/question-voting-ranking-summary";
 import {
   buildQuestionVotingRanking,
@@ -164,7 +164,7 @@ export default async function TeacherResultPage({
                 <div className="bg-white rounded-2xl border border-violet-100 p-6">
                   <h2 className="font-bold text-violet-800 mb-4">📊 현재 좋은 질문 득표 결과</h2>
                   <div className="space-y-4">
-                    <QuestionVotingTopThree ranking={questionVotingRanking} />
+                    <QuestionVotingTopRanks ranking={questionVotingRanking} />
                     <QuestionVotingCompactList ranking={questionVotingRanking} />
                   </div>
                 </div>
@@ -194,7 +194,7 @@ export default async function TeacherResultPage({
               {oneLineShareEntries.length > 0 && (
                 <div className="bg-white rounded-2xl border border-rose-100 p-6 space-y-4">
                   <h2 className="font-bold text-rose-800">💬 현재 한줄모아 반응 결과</h2>
-                  <OneLineShareTopThree entries={oneLineShareEntries} showStudentName />
+                  <OneLineShareTopRanks entries={oneLineShareEntries} showStudentName />
                   <OneLineShareBoard entries={oneLineShareEntries} showStudentName />
                 </div>
               )}

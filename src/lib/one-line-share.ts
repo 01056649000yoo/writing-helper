@@ -1,3 +1,4 @@
+import { pickPodium, rankByScore, type Ranked } from "@/lib/ranking";
 import type {
   OneLineShareBoardEntry,
   OneLineShareConfig,
@@ -99,8 +100,28 @@ export function buildOneLineShareBoard(
         return right.likeCount - left.likeCount;
       }
 
+      // 좋아요가 같으면 순서를 정할 근거가 없다. 먼저 낸 순으로 두어 목록이 흔들리지 않게만 하고,
+      // 등수는 `rankOneLineShare` 가 같은 좋아요에 같은 등수를 준다.
       return left.createdAt.localeCompare(right.createdAt);
     });
+}
+
+/**
+ * 등수·시상대 규칙은 활동 공용이다. 좋은 질문 고르기와 같은 규칙을 쓴다.
+ * 여기서는 "점수가 무엇인지"(좋아요 수)만 알려 준다.
+ */
+export type RankedOneLineShareEntry = Ranked<OneLineShareBoardEntry>;
+
+const likesOf = (entry: { likeCount: number }) => entry.likeCount;
+
+export function rankOneLineShare(entries: OneLineShareBoardEntry[]): RankedOneLineShareEntry[] {
+  return rankByScore(entries, likesOf);
+}
+
+export function pickOneLineSharePodium(
+  ranked: RankedOneLineShareEntry[],
+): RankedOneLineShareEntry[] {
+  return pickPodium(ranked, likesOf);
 }
 
 function normalizeKeywords(value: unknown) {
