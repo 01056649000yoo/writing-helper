@@ -14,6 +14,8 @@ const [ranking, voting, oneLine, votingBoard, oneLineBoard, resultPage, livePane
     readFile("src/app/dashboard/room/[id]/result/[sessionId]/page.tsx", "utf8"),
   ]);
 
+const guide = await readFile("src/features/activities/guide.ts", "utf8");
+
 test("점수가 같으면 같은 등수를 주고 다음 등수를 건너뛴다", () => {
   // 자리(index)를 등수로 쓰면 5표가 나란히 둘일 때 한쪽이 금색 1위, 다른 쪽이 은색 2위가 된다.
   // 등수는 점수에서만 나와야 한다.
@@ -66,4 +68,13 @@ test("순위를 보여 주는 화면이 모두 같은 컴포넌트를 쓴다", (
     assert.match(source, /OneLineShareTopRanks/);
     assert.doesNotMatch(source, /TopThree/);
   }
+});
+
+test("도움말이 동률 규칙과 보여 주는 등수를 설명한다", () => {
+  // 화면에 `공동 3위`가 뜨는데 안내에 한 줄도 없으면 선생님이 아이에게 설명할 근거가 없다.
+  assert.match(guide, /표가 같으면 `공동 3위`처럼 같은 등수/);
+  assert.match(guide, /하트 수가 같으면 `공동 1위`처럼 같은 등수/);
+  assert.match(guide, /다섯 등수까지/);
+  // 규칙(1, 2, 2, 4)을 말로 적어 두면 다음 사람이 코드를 열지 않아도 안다.
+  assert.match(guide, /공동 2위가 둘이면 다음은 3위가 아니라 4위/);
 });
