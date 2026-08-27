@@ -86,11 +86,39 @@ export async function generateAiRolesAndQuestions(
 export type SpellCorrectionInput = { id: string; text: string };
 export type SpellCorrectionResult = { id: string; corrected: string };
 
+/**
+ * 한 번에 보낼 문장 수.
+ *
+ * 아지트 AI 는 교사 요청에 **출력 1000토큰**을 준다(vibe-ai/index.ts). 질문을 전부 한 번에
+ * 보내면 응답이 중간에 잘려 JSON 이 안 닫히고, 교사에게 `Expected ',' or ']' ...` 같은
+ * 날것의 오류가 그대로 보였다(2026-08-27). 그래서 나눠 보낸다.
+ * 문장 하나가 되돌아올 때 대략 45토큰이므로 15개면 700토큰 안쪽이다.
+ */
+const SPELL_CORRECTION_BATCH_SIZE = 15;
+
 export async function correctKoreanSpelling(
   labActorId: string,
   inputs: SpellCorrectionInput[],
 ): Promise<SpellCorrectionResult[]> {
   if (inputs.length === 0) return [];
+
+  const results: SpellCorrectionResult[] = [];
+  for (let start = 0; start < inputs.length; start += SPELL_CORRECTION_BATCH_SIZE) {
+    const batch = inputs.slice(start, start + SPELL_CORRECTION_BATCH_SIZE);
+    results.push(...await correctKoreanSpellingBatch(labActorId, batch));
+  }
+  return results;
+}
+
+async function correctKoreanSpellingBatch(
+  labActorId: string,
+  inputs: SpellCorrectionInput[],
+): Promise<SpellCorrectionResult[]> {
+  // AI 에게는 짧은 번호만 준다. 원래 id 는 UUID 두 개(74자)라 그대로 주고받으면
+  // 입력도 응답도 몇 배로 길어져 잘릴 위험만 커진다.
+  const byShortId = new Map(inputs.map((input, index) => [String(index + 1), input.id]));
+  const compact = inputs.map((input, index) => ({ id: String(index + 1), text: input.text }));
+
   const prompt = `초등학생이 만든 한국어 질문 문장들의 맞춤법·띄어쓰기·문장부호·조사 오류만 교정해 주세요.
 
 규칙:
@@ -105,9 +133,17 @@ export async function correctKoreanSpelling(
 - corrected는 원문이든 교정문이든 빈 문자열 없이 반드시 채워주세요.
 
 입력:
-${JSON.stringify(inputs)}`;
+${JSON.stringify(compact)}`;
 
-  const parsed = parseAiJsonObject(await callAgitAi(labActorId, prompt)) as { results?: unknown };
+  const answer = await callAgitAi(labActorId, prompt);
+
+  let parsed: { results?: unknown };
+  try {
+    parsed = parseAiJsonObject(answer) as { results?: unknown };
+  } catch {
+    // 응답이 잘리면 JSON 이 안 닫힌다. 날것의 파서 오류를 교사에게 그대로 보이지 않는다.
+    throw new Error("AI가 보낸 교정 결과를 읽지 못했어요. 잠시 뒤 다시 눌러 주세요.");
+  }
   if (!Array.isArray(parsed.results)) return [];
 
   return parsed.results
@@ -117,7 +153,9 @@ ${JSON.stringify(inputs)}`;
         && typeof (entry as { id?: unknown }).id === "string"
         && typeof (entry as { corrected?: unknown }).corrected === "string";
     })
-    .map((entry) => ({ id: entry.id, corrected: entry.corrected }));
+    // 짧은 번호를 원래 id 로 되돌린다. 모르는 번호는 버린다.
+    .map((entry) => ({ id: byShortId.get(entry.id) ?? "", corrected: entry.corrected }))
+    .filter((entry) => entry.id);
 }
 
 export type GeneratedHanjaCard = {
