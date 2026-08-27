@@ -683,10 +683,17 @@ export async function submitQuestionGenerator(
   if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
   if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
 
-  const configMaxSelections = Number((roomRes.data.activity_config as { maxSelections?: unknown } | null)?.maxSelections);
+  const activityConfig = roomRes.data.activity_config as { minSelections?: unknown; maxSelections?: unknown } | null;
+  const configMaxSelections = Number(activityConfig?.maxSelections);
   const maxSelections = Number.isFinite(configMaxSelections)
     ? Math.min(Math.max(Math.trunc(configMaxSelections), 1), 4)
     : 4;
+  // 하한이 없어 선생님이 3개로 정해도 1개만 쓰고 제출되던 것을 막는다.
+  // 예전에 만든 방에는 minSelections 가 없으므로 1로 읽어 지금까지와 똑같이 둔다.
+  const configMinSelections = Number(activityConfig?.minSelections);
+  const minSelections = Number.isFinite(configMinSelections)
+    ? Math.min(Math.max(Math.trunc(configMinSelections), 1), maxSelections)
+    : 1;
 
   const sanitizedSelections = submission.selections.map((selection, index) => ({
     id: typeof selection.id === "string" && selection.id.trim()
@@ -703,6 +710,15 @@ export async function submitQuestionGenerator(
 
   if (sanitizedSelections.length === 0) {
     return { error: "바꾼 질문을 입력해주세요." };
+  }
+
+  if (sanitizedSelections.length < minSelections) {
+    const shortage = minSelections - sanitizedSelections.length;
+    return {
+      error: minSelections === maxSelections
+        ? `질문을 ${minSelections}개 만들어야 해요. ${shortage}개 더 만들어 주세요.`
+        : `질문을 ${minSelections}개 이상 만들어야 해요. ${shortage}개 더 만들어 주세요.`,
+    };
   }
 
   if (sanitizedSelections.length > maxSelections) {

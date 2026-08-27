@@ -149,6 +149,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
   const [oneLineContent, setOneLineContent] = useState("");
 
   const maxSelections = questionGeneratorConfig?.maxSelections ?? 1;
+  // 예전 방에는 minSelections 가 없으므로 1로 읽어 지금까지와 똑같이 둔다.
+  const minSelections = Math.min(questionGeneratorConfig?.minSelections ?? 1, maxSelections);
   const questionMode: QuestionGeneratorMode = questionGeneratorConfig?.mode ?? "card_remix";
   const questionModeMeta = QUESTION_GENERATOR_MODE_META[questionMode];
 
@@ -749,8 +751,13 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         : [...questionSelections, selection].slice(0, maxSelections);
     }
 
-    if (nextSelections.length === 0) {
-      setError("질문을 한 개 이상 만들어 주세요.");
+    // 선생님이 정한 개수를 채워야 낼 수 있다. 서버도 같은 값으로 막지만,
+    // 여기서 먼저 알려 줘야 학생이 왜 안 되는지 안다.
+    if (nextSelections.length < minSelections) {
+      const shortage = minSelections - nextSelections.length;
+      setError(minSelections === maxSelections
+        ? `질문을 ${minSelections}개 만들어야 해요. ${shortage}개 더 만들어 주세요.`
+        : `질문을 ${minSelections}개 이상 만들어야 해요. ${shortage}개 더 만들어 주세요.`);
       return;
     }
 
@@ -1094,15 +1101,29 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={submitQuestionSelections}
-                    disabled={questionSelections.length === 0 && !remixedQuestion.trim()}
-                    className="mt-4 w-full rounded-2xl bg-emerald-500 py-4 text-lg font-bold text-white transition-colors hover:bg-emerald-600 disabled:opacity-40"
-                  >
-                    제출하기
-                  </button>
-                  <p className="mt-2 text-center text-xs text-gray-400">제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요.</p>
+                  {(() => {
+                    // 지금 쓰고 있는 질문도 한 개로 친다 — 누르는 순간 목록에 들어가기 때문이다.
+                    const pendingCount = questionSelections.length + (editingSelectionId || !remixedQuestion.trim() ? 0 : 1);
+                    const shortage = Math.max(minSelections - pendingCount, 0);
+
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          onClick={submitQuestionSelections}
+                          disabled={shortage > 0}
+                          className="mt-4 w-full rounded-2xl bg-emerald-500 py-4 text-lg font-bold text-white transition-colors hover:bg-emerald-600 disabled:opacity-40"
+                        >
+                          {shortage > 0 ? `${shortage}개 더 만들어야 해요` : "제출하기"}
+                        </button>
+                        <p className="mt-2 text-center text-xs text-gray-400">
+                          {minSelections < maxSelections
+                            ? `${minSelections}개 이상 만들면 낼 수 있어요. 제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요.`
+                            : "제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요."}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

@@ -161,6 +161,12 @@ export type QuestionGeneratorConfig = {
   mode: QuestionGeneratorMode;
   enabledCardSetIds: string[];
   cardSets: QuestionCardSet[];
+  /**
+   * 학생이 **적어도** 만들어야 하는 질문 수.
+   * 예전에는 maxSelections(상한)만 있어서, 선생님이 3개로 정해도 1개만 쓰고 제출됐다.
+   * minSelections === maxSelections 면 "정확히 N개", 다르면 "N개 이상"이다.
+   */
+  minSelections: number;
   maxSelections: number;
   guidance: string;
 };

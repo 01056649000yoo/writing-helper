@@ -44,6 +44,7 @@ export const questionGeneratorDefinition: ActivityDefinition<
     mode: "card_remix",
     enabledCardSetIds: QUESTION_CARD_SETS.map((set) => set.id),
     cardSets: QUESTION_CARD_SETS,
+    minSelections: 1,
     maxSelections: 1,
     guidance: DEFAULT_QUESTION_GENERATOR_GUIDANCE.card_remix,
   }),

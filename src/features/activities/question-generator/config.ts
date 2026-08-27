@@ -84,11 +84,15 @@ export function normalizeQuestionGeneratorConfig(value: unknown): QuestionGenera
 
   const enabledIdSet = new Set(enabledCardSetIds);
 
+  const maxSelections = clampNumber(raw.maxSelections, 1, 4, 1);
+
   return {
     mode,
     enabledCardSetIds,
     cardSets: mode === "direct" ? [] : cardSets.filter((cardSet) => enabledIdSet.has(cardSet.id)),
-    maxSelections: clampNumber(raw.maxSelections, 1, 4, 1),
+    // 예전 방에는 minSelections 가 없다. 그때는 1로 읽어 지금까지와 똑같이 둔다.
+    minSelections: clampNumber(raw.minSelections, 1, maxSelections, 1),
+    maxSelections,
     guidance: typeof raw.guidance === "string" && raw.guidance.trim()
       ? raw.guidance.trim()
       : DEFAULT_QUESTION_GENERATOR_GUIDANCE[mode],
@@ -101,6 +105,8 @@ export type QuestionGeneratorSetupInput = {
   selectedCardSetIds: string[];
   /** 선생님 추천 질문 방식에서 실제로 학생에게 보낼 질문 */
   customQuestions: string[];
+  /** 고른 개수를 다 채워야 하면 "exact", 그 이상이면 되면 "at_least". */
+  countRule: "exact" | "at_least";
   maxSelections: number;
   guidance: string;
 };
@@ -120,7 +126,10 @@ export function buildQuestionGeneratorConfig(input: {
   teacherCardSets: QuestionCardSet[];
 }): QuestionGeneratorBuildResult {
   const { setup, teacherCardSets } = input;
-  const maxSelections = clampNumber(setup.maxSelections, 1, 4, 1);
+  const count = clampNumber(setup.maxSelections, 1, 4, 1);
+  // `정확히 N개`는 하한과 상한을 같게, `N개 이상`은 상한을 허용 최대치로 연다.
+  const minSelections = count;
+  const maxSelections = setup.countRule === "at_least" ? 4 : count;
   const guidance = setup.guidance.trim() || DEFAULT_QUESTION_GENERATOR_GUIDANCE[setup.mode];
 
   if (setup.mode === "direct") {
@@ -130,6 +139,7 @@ export function buildQuestionGeneratorConfig(input: {
         mode: "direct",
         enabledCardSetIds: [],
         cardSets: [],
+        minSelections,
         maxSelections,
         guidance,
       },
@@ -159,6 +169,7 @@ export function buildQuestionGeneratorConfig(input: {
         mode: "ai_custom",
         enabledCardSetIds: [cardSet.id],
         cardSets: [cardSet],
+        minSelections,
         maxSelections,
         guidance,
       },
@@ -180,6 +191,7 @@ export function buildQuestionGeneratorConfig(input: {
       mode: "card_remix",
       enabledCardSetIds,
       cardSets: teacherCardSets.filter((cardSet) => enabledIdSet.has(cardSet.id)),
+      minSelections,
       maxSelections,
       guidance,
     },

@@ -471,10 +471,16 @@ function parseQuestionGeneratorSetupPayload(formData: FormData): QuestionGenerat
     ? raw.guidance
     : String(formData.get("guidance") ?? "");
 
+  // 값이 없으면 `정확히 N개`로 읽는다 — 선생님이 정한 개수를 채우게 하는 것이 기본이다.
+  const rawCountRule = raw.countRule !== undefined
+    ? String(raw.countRule)
+    : String(formData.get("count_rule") ?? "");
+
   return {
     mode: parseQuestionGeneratorMode(raw.mode),
     selectedCardSetIds,
     customQuestions,
+    countRule: rawCountRule === "at_least" ? "at_least" : "exact",
     maxSelections: Number.isFinite(maxSelections) ? maxSelections : 1,
     guidance,
   };

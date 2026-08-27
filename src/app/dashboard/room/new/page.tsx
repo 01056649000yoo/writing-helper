@@ -62,6 +62,8 @@ type QuestionGeneratorDraft = {
   topic_description: string;
   mode: QuestionGeneratorMode;
   max_selections: string;
+  /** 고른 개수를 다 채워야 하면 "exact", 그 이상이면 되면 "at_least". */
+  count_rule: "exact" | "at_least";
   guidance: string;
   selectedCardSetIds: string[];
   customAiQuestions: Array<{ id: string; text: string; included: boolean }>;
@@ -774,6 +776,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     topic_description: "",
     mode: "direct",
     max_selections: "3",
+    count_rule: "exact",
     guidance: "",
     selectedCardSetIds: [],
     customAiQuestions: [],
@@ -885,6 +888,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
       JSON.stringify({
         mode: draft.mode,
         enabledCardSetIds: draft.mode === "card_remix" ? draft.selectedCardSetIds : [],
+        countRule: draft.count_rule,
         maxSelections: Number(draft.max_selections) || 1,
         guidance: draft.guidance.trim(),
         customAiQuestions: draft.mode === "ai_custom"
@@ -1321,6 +1325,37 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                     className="sr-only"
                   />
                   {count}개
+                </label>
+              ))}
+            </div>
+
+            {/* 예전에는 이 숫자가 상한일 뿐이라, 3개로 정해도 학생이 1개만 쓰고 제출됐다.
+                여기서 "정확히"인지 "이상"인지 골라야 하한이 정해진다. */}
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {([
+                { rule: "exact", label: `정확히 ${draft.max_selections}개`, hint: "이 개수를 다 채워야 제출됩니다" },
+                { rule: "at_least", label: `${draft.max_selections}개 이상`, hint: "더 만들고 싶은 학생은 4개까지 낼 수 있어요" },
+              ] as const).map((option) => (
+                <label
+                  key={option.rule}
+                  className={`flex items-start gap-2 rounded-xl border-2 px-3 py-2.5 cursor-pointer transition-all ${
+                    draft.count_rule === option.rule
+                      ? "border-sky-500 bg-sky-50"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="count_rule"
+                    value={option.rule}
+                    checked={draft.count_rule === option.rule}
+                    onChange={() => setDraft((p) => ({ ...p, count_rule: option.rule }))}
+                    className="sr-only"
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-gray-800">{option.label}</span>
+                    <span className="block text-xs text-gray-500">{option.hint}</span>
+                  </span>
                 </label>
               ))}
             </div>
