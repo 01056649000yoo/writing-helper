@@ -1307,11 +1307,11 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
               <p className="text-xs text-gray-500 mt-0.5">학생 화면에 이만큼 칸이 생깁니다.</p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {QUESTION_SELECTION_CHOICES.map((count) => (
                 <label
                   key={count}
-                  className={`px-4 py-2 rounded-xl border-2 text-sm font-bold cursor-pointer transition-all ${
+                  className={`px-3.5 py-2 rounded-xl border-2 text-sm font-bold cursor-pointer transition-all ${
                     draft.max_selections === String(count)
                       ? "border-sky-500 bg-sky-50 text-sky-700 shadow-2xs"
                       : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
@@ -1344,14 +1344,14 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
               </p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {QUESTION_SELECTION_CHOICES.map((count) => {
                 const goal = Number(draft.max_selections) || 1;
                 const disabled = count > goal;
                 return (
                   <label
                     key={count}
-                    className={`px-4 py-2 rounded-xl border-2 text-sm font-bold transition-all ${
+                    className={`px-3.5 py-2 rounded-xl border-2 text-sm font-bold transition-all ${
                       disabled
                         ? "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed"
                         : draft.min_selections === String(count)

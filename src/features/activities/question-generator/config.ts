@@ -63,7 +63,7 @@ export const MAX_AI_CUSTOM_QUESTION_LENGTH = 200;
  * 만들었다고 생각하는데 서버가 4로 깎아 4개짜리 방이 된다.
  * 늘리려면 이 값 하나만 고친다. 화면의 선택지도 아래 목록에서 나온다.
  */
-export const QUESTION_SELECTION_MAX = 4;
+export const QUESTION_SELECTION_MAX = 5;
 
 /** 교사 화면이 쓰는 선택지(1 … 상한). 상한을 바꾸면 화면도 따라온다. */
 export const QUESTION_SELECTION_CHOICES: readonly number[] =
