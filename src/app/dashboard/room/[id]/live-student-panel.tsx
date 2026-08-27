@@ -494,9 +494,23 @@ function QuestionResultsModal({
                     >
                       {index + 1}
                     </BadgeCircle>
-                    <p className="text-base font-medium leading-relaxed text-white sm:text-lg">
+                    <p className="min-w-0 flex-1 text-base font-medium leading-relaxed text-white sm:text-lg">
                       {selection.remixedQuestion}
                     </p>
+                    {/* 칠판에 띄운 채로 학생들과 읽으면서 바로 담는다. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleVotingPick(selectedBoardResult.sessionId, selection.id, !selection.pickedForVoting)}
+                      aria-pressed={selection.pickedForVoting}
+                      title={selection.pickedForVoting ? "고르기 후보에서 빼기" : "고르기 후보로 담기"}
+                      className={`shrink-0 self-start rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                        selection.pickedForVoting
+                          ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
+                          : "border border-white/30 bg-white/10 text-white hover:bg-white/20"
+                      }`}
+                    >
+                      {selection.pickedForVoting ? "★ 담음" : "☆ 담기"}
+                    </button>
                   </li>
                 ))}
               </ol>
@@ -547,10 +561,10 @@ function QuestionResultsModal({
             )}
           </div>
 
-          {viewMode === "questions" && results.length > 0 && (
+          {results.length > 0 && (
             <p className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
               질문 옆 <b>☆ 담기</b>를 눌러 두면, <b>좋은 질문 고르기</b> 활동을 만들 때 담아 둔 질문이
-              이미 골라진 채로 올라와요. 학생들과 함께 읽으면서 미리 담아 보세요.
+              이미 골라진 채로 올라와요. 칠판·학생별 보기·질문만 모아보기 어디서나 담을 수 있어요.
             </p>
           )}
 
@@ -746,13 +760,28 @@ function QuestionResultsModal({
                               </p>
                             </div>
                             {!isEditing && (
-                              <button
-                                type="button"
-                                onClick={() => startEdit(result.sessionId, selection.id, selection.remixedQuestion)}
-                                className="rounded-xl bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
-                              >
-                                ✏️ 수정
-                              </button>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleVotingPick(result.sessionId, selection.id, !selection.pickedForVoting)}
+                                  aria-pressed={selection.pickedForVoting}
+                                  title={selection.pickedForVoting ? "고르기 후보에서 빼기" : "고르기 후보로 담기"}
+                                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
+                                    selection.pickedForVoting
+                                      ? "bg-amber-400 text-white hover:bg-amber-500"
+                                      : "bg-gray-100 text-gray-500 hover:bg-amber-100 hover:text-amber-700"
+                                  }`}
+                                >
+                                  {selection.pickedForVoting ? "★ 담음" : "☆ 담기"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(result.sessionId, selection.id, selection.remixedQuestion)}
+                                  className="rounded-xl bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                                >
+                                  ✏️ 수정
+                                </button>
+                              </div>
                             )}
                           </div>
 
@@ -832,6 +861,8 @@ function QuestionResultsModal({
           studentName={selectedBoardResult.studentName}
           selections={selectedBoardResult.selections}
           onClose={() => setBoardExpanded(false)}
+          onTogglePick={(selectionId, nextPicked) =>
+            toggleVotingPick(selectedBoardResult.sessionId, selectionId, nextPicked)}
         />
       )}
     </div>

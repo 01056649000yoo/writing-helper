@@ -5,6 +5,7 @@ import { useEffect } from "react";
 export type QuestionBoardSelection = {
   id: string;
   remixedQuestion: string;
+  pickedForVoting?: boolean;
 };
 
 type Props = {
@@ -12,6 +13,8 @@ type Props = {
   studentName: string;
   selections: QuestionBoardSelection[];
   onClose: () => void;
+  /** 없으면 담기 단추를 숨긴다. */
+  onTogglePick?: (selectionId: string, nextPicked: boolean) => void;
 };
 
 /**
@@ -24,7 +27,7 @@ type Props = {
  * 스크롤 없이 한 화면에 담는다. 폭(vw)과 높이(vh) 중 작은 쪽을 따르므로
  * 낮은 화면(노트북·720p 프로젝터)에서도 넘치지 않는다.
  */
-export function QuestionBoardFullscreen({ studentNumber, studentName, selections, onClose }: Props) {
+export function QuestionBoardFullscreen({ studentNumber, studentName, selections, onClose, onTogglePick }: Props) {
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -87,11 +90,27 @@ export function QuestionBoardFullscreen({ studentNumber, studentName, selections
               {index + 1}
             </span>
             <p
-              className="font-medium leading-[1.45] text-white [word-break:keep-all]"
+              className="min-w-0 flex-1 font-medium leading-[1.45] text-white [word-break:keep-all]"
               style={{ fontSize: questionSize }}
             >
               {selection.remixedQuestion}
             </p>
+            {onTogglePick && (
+              // 교실에 띄운 채로 학생들과 읽으면서 바로 담는다.
+              <button
+                type="button"
+                onClick={() => onTogglePick(selection.id, !selection.pickedForVoting)}
+                aria-pressed={selection.pickedForVoting}
+                title={selection.pickedForVoting ? "고르기 후보에서 빼기" : "고르기 후보로 담기"}
+                className={`shrink-0 self-start rounded-full px-4 py-2 text-sm font-bold transition-colors ${
+                  selection.pickedForVoting
+                    ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
+                    : "border border-white/30 bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                {selection.pickedForVoting ? "★ 담음" : "☆ 담기"}
+              </button>
+            )}
           </li>
         ))}
       </ol>
