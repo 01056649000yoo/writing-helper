@@ -21,6 +21,7 @@ import {
   QuestionVotingTopThree,
 } from "@/components/question-voting-ranking-summary";
 import { QuestionCardVisibilityButton } from "@/components/question-generator-result-cards";
+import { QuestionBoardFullscreen } from "@/components/question-board-fullscreen";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 
 type Student = { id: string; student_number: number; student_name: string };
@@ -213,6 +214,8 @@ function QuestionResultsModal({
   const [correctionError, setCorrectionError] = useState<string | null>(null);
   const [applyingCorrections, setApplyingCorrections] = useState(false);
   const [boardSessionId, setBoardSessionId] = useState<string | null>(null);
+  /** 칠판을 교실 화면 가득 띄웠는가. 친구들과 함께 볼 때 쓴다. */
+  const [boardExpanded, setBoardExpanded] = useState(false);
   const boardRef = useRef<HTMLElement | null>(null);
   const knownSessionIdsRef = useRef(new Set(results.map((result) => result.sessionId)));
   const newSessionTimeoutsRef = useRef(new Map<string, number>());
@@ -497,13 +500,24 @@ function QuestionResultsModal({
                 </h4>
               </div>
               {selectedBoardResult && (
-                <button
-                  type="button"
-                  onClick={() => setBoardSessionId(null)}
-                  className="rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
-                >
-                  선택 해제
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* 칠판 글자는 교사 자리에서는 충분해도 교실 뒤에서는 안 읽힌다.
+                      친구들과 함께 볼 때는 화면 가득 띄운다. */}
+                  <button
+                    type="button"
+                    onClick={() => setBoardExpanded(true)}
+                    className="rounded-full border border-emerald-200/60 bg-emerald-400/20 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-400/30"
+                  >
+                    🔍 크게 보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setBoardSessionId(null); setBoardExpanded(false); }}
+                    className="rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                  >
+                    선택 해제
+                  </button>
+                </div>
               )}
             </div>
 
@@ -903,6 +917,16 @@ function QuestionResultsModal({
           )}
         </div>
       </div>
+
+      {/* 교실 화면 가득 띄운 칠판. 이 모달(z-50) 위에 떠야 하므로 z-[60] 이다. */}
+      {boardExpanded && selectedBoardResult && (
+        <QuestionBoardFullscreen
+          studentNumber={selectedBoardResult.studentNumber}
+          studentName={selectedBoardResult.studentName}
+          selections={selectedBoardResult.selections}
+          onClose={() => setBoardExpanded(false)}
+        />
+      )}
     </div>
   );
 }
