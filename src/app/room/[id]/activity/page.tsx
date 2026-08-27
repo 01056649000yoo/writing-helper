@@ -757,7 +757,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       const shortage = minSelections - nextSelections.length;
       setError(minSelections === maxSelections
         ? `질문을 ${minSelections}개 만들어야 해요. ${shortage}개 더 만들어 주세요.`
-        : `질문을 ${minSelections}개 이상 만들어야 해요. ${shortage}개 더 만들어 주세요.`);
+        : `적어도 ${minSelections}개는 만들어야 해요. ${shortage}개 더 만들어 주세요.`);
       return;
     }
 
@@ -1118,7 +1118,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                         </button>
                         <p className="mt-2 text-center text-xs text-gray-400">
                           {minSelections < maxSelections
-                            ? `${minSelections}개 이상 만들면 낼 수 있어요. 제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요.`
+                            ? `목표는 ${maxSelections}개예요. 시간이 모자라면 ${minSelections}개만 채워도 낼 수 있어요. 제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요.`
                             : "제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요."}
                         </p>
                       </>

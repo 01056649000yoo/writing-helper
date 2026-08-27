@@ -105,8 +105,11 @@ export type QuestionGeneratorSetupInput = {
   selectedCardSetIds: string[];
   /** 선생님 추천 질문 방식에서 실제로 학생에게 보낼 질문 */
   customQuestions: string[];
-  /** 고른 개수를 다 채워야 하면 "exact", 그 이상이면 되면 "at_least". */
-  countRule: "exact" | "at_least";
+  /**
+   * 제출에 필요한 **최소** 개수. 목표(maxSelections)보다 작으면 덜 채워도 낼 수 있다.
+   * 목표 3개 · 최소 2개처럼, 시간이 모자란 학생을 위해 따로 정한다.
+   */
+  minSelections: number;
   maxSelections: number;
   guidance: string;
 };
@@ -126,10 +129,9 @@ export function buildQuestionGeneratorConfig(input: {
   teacherCardSets: QuestionCardSet[];
 }): QuestionGeneratorBuildResult {
   const { setup, teacherCardSets } = input;
-  const count = clampNumber(setup.maxSelections, 1, 4, 1);
-  // `정확히 N개`는 하한과 상한을 같게, `N개 이상`은 상한을 허용 최대치로 연다.
-  const minSelections = count;
-  const maxSelections = setup.countRule === "at_least" ? 4 : count;
+  const maxSelections = clampNumber(setup.maxSelections, 1, 4, 1);
+  // 최소는 목표를 넘을 수 없다 — 넘으면 학생이 절대 낼 수 없는 방이 된다.
+  const minSelections = clampNumber(setup.minSelections, 1, maxSelections, maxSelections);
   const guidance = setup.guidance.trim() || DEFAULT_QUESTION_GENERATOR_GUIDANCE[setup.mode];
 
   if (setup.mode === "direct") {

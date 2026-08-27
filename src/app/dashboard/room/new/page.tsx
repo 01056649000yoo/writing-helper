@@ -62,8 +62,8 @@ type QuestionGeneratorDraft = {
   topic_description: string;
   mode: QuestionGeneratorMode;
   max_selections: string;
-  /** 고른 개수를 다 채워야 하면 "exact", 그 이상이면 되면 "at_least". */
-  count_rule: "exact" | "at_least";
+  /** 제출에 필요한 최소 개수. 목표(max_selections)보다 작으면 "덜 채워도 낼 수 있다"가 된다. */
+  min_selections: string;
   guidance: string;
   selectedCardSetIds: string[];
   customAiQuestions: Array<{ id: string; text: string; included: boolean }>;
@@ -776,7 +776,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     topic_description: "",
     mode: "direct",
     max_selections: "3",
-    count_rule: "exact",
+    min_selections: "3",
     guidance: "",
     selectedCardSetIds: [],
     customAiQuestions: [],
@@ -888,7 +888,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
       JSON.stringify({
         mode: draft.mode,
         enabledCardSetIds: draft.mode === "card_remix" ? draft.selectedCardSetIds : [],
-        countRule: draft.count_rule,
+        minSelections: Number(draft.min_selections) || 1,
         maxSelections: Number(draft.max_selections) || 1,
         guidance: draft.guidance.trim(),
         customAiQuestions: draft.mode === "ai_custom"
@@ -1296,14 +1296,14 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           )}
         </div>
 
-        {/* 3. 공통 설정 (질문 개수) */}
-        <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7">
+        {/* 3. 공통 설정 (질문 개수)
+            목표와 최소를 따로 정한다. 한 값으로 두면 "3개가 목표지만 시간이 모자라면 2개라도 인정"을
+            표현할 수 없다 — 그것이 실제 수업에서 필요한 경우다. */}
+        <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-7 space-y-5">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <label className="block text-sm font-bold text-gray-800">
-                학생당 완성할 질문 수
-              </label>
-              <p className="text-xs text-gray-500 mt-0.5">학생 한 명이 최종 제출해야 하는 질문 개수입니다.</p>
+              <label className="block text-sm font-bold text-gray-800">목표 질문 수</label>
+              <p className="text-xs text-gray-500 mt-0.5">학생 화면에 이만큼 칸이 생깁니다.</p>
             </div>
 
             <div className="flex gap-2">
@@ -1321,45 +1321,64 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                     name="max_selections"
                     value={count}
                     checked={draft.max_selections === String(count)}
-                    onChange={() => setDraft((p) => ({ ...p, max_selections: String(count) }))}
+                    onChange={() => setDraft((p) => {
+                      // 목표를 줄이면 최소가 목표를 넘을 수 있다. 함께 끌어내린다.
+                      const nextMax = count;
+                      const nextMin = Math.min(Number(p.min_selections) || 1, nextMax);
+                      return { ...p, max_selections: String(nextMax), min_selections: String(nextMin) };
+                    })}
                     className="sr-only"
                   />
                   {count}개
                 </label>
               ))}
             </div>
+          </div>
 
-            {/* 예전에는 이 숫자가 상한일 뿐이라, 3개로 정해도 학생이 1개만 쓰고 제출됐다.
-                여기서 "정확히"인지 "이상"인지 골라야 하한이 정해진다. */}
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {([
-                { rule: "exact", label: `정확히 ${draft.max_selections}개`, hint: "이 개수를 다 채워야 제출됩니다" },
-                { rule: "at_least", label: `${draft.max_selections}개 이상`, hint: "더 만들고 싶은 학생은 4개까지 낼 수 있어요" },
-              ] as const).map((option) => (
-                <label
-                  key={option.rule}
-                  className={`flex items-start gap-2 rounded-xl border-2 px-3 py-2.5 cursor-pointer transition-all ${
-                    draft.count_rule === option.rule
-                      ? "border-sky-500 bg-sky-50"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="count_rule"
-                    value={option.rule}
-                    checked={draft.count_rule === option.rule}
-                    onChange={() => setDraft((p) => ({ ...p, count_rule: option.rule }))}
-                    className="sr-only"
-                  />
-                  <span>
-                    <span className="block text-sm font-bold text-gray-800">{option.label}</span>
-                    <span className="block text-xs text-gray-500">{option.hint}</span>
-                  </span>
-                </label>
-              ))}
+          <div className="flex items-center justify-between gap-3 flex-wrap border-t border-gray-100 pt-5">
+            <div>
+              <label className="block text-sm font-bold text-gray-800">제출에 필요한 최소 개수</label>
+              <p className="text-xs text-gray-500 mt-0.5">
+                시간이 모자라 목표를 다 못 채워도 이만큼이면 낼 수 있습니다.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              {[1, 2, 3, 4].map((count) => {
+                const goal = Number(draft.max_selections) || 1;
+                const disabled = count > goal;
+                return (
+                  <label
+                    key={count}
+                    className={`px-4 py-2 rounded-xl border-2 text-sm font-bold transition-all ${
+                      disabled
+                        ? "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed"
+                        : draft.min_selections === String(count)
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-2xs cursor-pointer"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 cursor-pointer"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="min_selections"
+                      value={count}
+                      disabled={disabled}
+                      checked={draft.min_selections === String(count)}
+                      onChange={() => setDraft((p) => ({ ...p, min_selections: String(count) }))}
+                      className="sr-only"
+                    />
+                    {count}개
+                  </label>
+                );
+              })}
             </div>
           </div>
+
+          <p className="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            {Number(draft.min_selections) >= Number(draft.max_selections)
+              ? `학생은 ${draft.max_selections}개를 모두 만들어야 제출할 수 있어요.`
+              : `학생은 ${draft.max_selections}개를 목표로 만들고, ${draft.min_selections}개만 채워도 제출할 수 있어요.`}
+          </p>
         </div>
 
         {error && <p className="text-red-500 text-sm bg-red-50 p-4 rounded-xl font-medium">{error}</p>}

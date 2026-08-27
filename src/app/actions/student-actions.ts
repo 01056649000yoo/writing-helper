@@ -717,7 +717,7 @@ export async function submitQuestionGenerator(
     return {
       error: minSelections === maxSelections
         ? `질문을 ${minSelections}개 만들어야 해요. ${shortage}개 더 만들어 주세요.`
-        : `질문을 ${minSelections}개 이상 만들어야 해요. ${shortage}개 더 만들어 주세요.`,
+        : `적어도 ${minSelections}개는 만들어야 해요. ${shortage}개 더 만들어 주세요.`,
     };
   }
 
