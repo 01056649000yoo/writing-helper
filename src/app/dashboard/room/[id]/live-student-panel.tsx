@@ -5,15 +5,12 @@ import QRCode from "qrcode";
 import { OneLineShareBoard, OneLineShareTopThree } from "@/components/one-line-share-board";
 import { BadgeCircle } from "@/components/badge-circle";
 import {
-  applyQuestionGeneratorSpellingCorrections,
-  correctQuestionGeneratorSpelling,
   getHanjaWritingRoomResults,
   getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
   getRoomSessions,
   updateQuestionGeneratorSelection,
-  type SpellingCorrectionCandidate,
 } from "@/app/actions/room-actions";
 import type { ActivityType } from "@/features/activities/types";
 import {
@@ -208,11 +205,6 @@ function QuestionResultsModal({
   const [editError, setEditError] = useState<string | null>(null);
   const [showQuestionCards, setShowQuestionCards] = useState(false);
 
-  const [correctionMode, setCorrectionMode] = useState<"idle" | "loading" | "review">("idle");
-  const [correctionCandidates, setCorrectionCandidates] = useState<SpellingCorrectionCandidate[]>([]);
-  const [correctionSelected, setCorrectionSelected] = useState<Set<string>>(new Set());
-  const [correctionError, setCorrectionError] = useState<string | null>(null);
-  const [applyingCorrections, setApplyingCorrections] = useState(false);
   const [boardSessionId, setBoardSessionId] = useState<string | null>(null);
   /** 칠판을 교실 화면 가득 띄웠는가. 친구들과 함께 볼 때 쓴다. */
   const [boardExpanded, setBoardExpanded] = useState(false);
@@ -332,64 +324,6 @@ function QuestionResultsModal({
     }
     applyLocalUpdates([{ sessionId, selectionId, newText: trimmed }]);
     cancelEdit();
-  }
-
-  async function runCorrection() {
-    if (!window.confirm("AI로 모든 질문의 맞춤법을 확인합니다. 진행할까요?")) return;
-    setCorrectionMode("loading");
-    setCorrectionError(null);
-    const result = await correctQuestionGeneratorSpelling(roomId);
-    if (result.error) {
-      setCorrectionError(result.error);
-      setCorrectionMode("idle");
-      return;
-    }
-    const candidates = result.candidates ?? [];
-    if (candidates.length === 0) {
-      setCorrectionMode("idle");
-      window.alert("교정할 항목이 없어요. 이미 맞춤법이 깨끗합니다!");
-      return;
-    }
-    setCorrectionCandidates(candidates);
-    setCorrectionSelected(new Set(candidates.map((c) => buildKey(c.sessionId, c.selectionId))));
-    setCorrectionMode("review");
-  }
-
-  function toggleCorrection(key: string) {
-    setCorrectionSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function cancelCorrections() {
-    setCorrectionMode("idle");
-    setCorrectionCandidates([]);
-    setCorrectionSelected(new Set());
-    setCorrectionError(null);
-  }
-
-  async function applyCorrections() {
-    const updates = correctionCandidates
-      .filter((c) => correctionSelected.has(buildKey(c.sessionId, c.selectionId)))
-      .map((c) => ({ sessionId: c.sessionId, selectionId: c.selectionId, newText: c.corrected }));
-    if (updates.length === 0) {
-      cancelCorrections();
-      return;
-    }
-    setApplyingCorrections(true);
-    setCorrectionError(null);
-    const result = await applyQuestionGeneratorSpellingCorrections(roomId, updates);
-    setApplyingCorrections(false);
-    if (result.error) {
-      setCorrectionError(result.error);
-      return;
-    }
-    applyLocalUpdates(updates);
-    cancelCorrections();
-    window.alert(`${result.applied ?? updates.length}개 질문의 맞춤법을 교정했습니다.`);
   }
 
   return (
@@ -580,56 +514,7 @@ function QuestionResultsModal({
                 onToggle={() => setShowQuestionCards((current) => !current)}
               />
             )}
-            {viewMode === "questions" && results.length > 0 && correctionMode === "idle" && (
-              <button
-                type="button"
-                onClick={runCorrection}
-                className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-600"
-              >
-                ✨ 맞춤법 자동 교정
-              </button>
-            )}
-            {viewMode === "questions" && correctionMode === "loading" && (
-              <span className="inline-flex items-center gap-2 rounded-2xl bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700">
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
-                AI가 맞춤법을 점검하고 있어요...
-              </span>
-            )}
           </div>
-
-          {correctionError && (
-            <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {correctionError}
-            </div>
-          )}
-
-          {viewMode === "questions" && correctionMode === "review" && (
-            <div className="mb-4 sticky top-0 z-10 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-violet-800">
-                  교정안 {correctionCandidates.length}개 · 선택됨 {correctionSelected.size}개
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={cancelCorrections}
-                    disabled={applyingCorrections}
-                    className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={applyCorrections}
-                    disabled={applyingCorrections || correctionSelected.size === 0}
-                    className="rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-                  >
-                    {applyingCorrections ? "적용 중..." : `선택한 ${correctionSelected.size}개 적용`}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/*
             * 칠판 아래 학생 명단.
@@ -693,17 +578,13 @@ function QuestionResultsModal({
             <div className="grid gap-3">
               {flattenedQuestions.map(({ sessionId, studentNumber, studentName, order, selection }) => {
                 const key = buildKey(sessionId, selection.id);
-                const candidate = correctionMode === "review"
-                  ? correctionCandidates.find((c) => buildKey(c.sessionId, c.selectionId) === key)
-                  : null;
-                const isSelected = candidate ? correctionSelected.has(key) : false;
                 return (
                   <div key={key} className={`rounded-2xl border bg-white p-4 shadow-sm transition-colors ${
                     boardSessionId === sessionId
                       ? "border-amber-300 bg-amber-50/40 ring-2 ring-amber-100"
                       : newSessionIds.has(sessionId)
                       ? "border-emerald-300 bg-emerald-50/40 ring-2 ring-emerald-100"
-                      : candidate ? "border-violet-200" : "border-sky-100"
+                      : "border-sky-100"
                   }`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -724,18 +605,7 @@ function QuestionResultsModal({
                           {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
                         </p>
                       </div>
-                      {candidate && (
-                        <label className="inline-flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleCorrection(key)}
-                            className="h-4 w-4 accent-violet-500"
-                          />
-                          <span className="text-xs font-semibold text-violet-700">교정 적용</span>
-                        </label>
-                      )}
-                      {!candidate && newSessionIds.has(sessionId) && (
+                      {newSessionIds.has(sessionId) && (
                         <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
                           새 질문
                         </span>
@@ -747,41 +617,24 @@ function QuestionResultsModal({
                         <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
                       </div>
                     )}
-                    {candidate ? (
-                      <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-2">
+                      {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
                         <div className="rounded-xl bg-gray-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-gray-400">교정 전</p>
+                          <p className="text-xs font-semibold text-gray-400">학생이 적은 원본</p>
                           <p className="mt-1 text-sm leading-relaxed text-gray-500 line-through decoration-gray-300">
-                            {candidate.original}
+                            {selection.originalRemixedQuestion}
                           </p>
                         </div>
-                        <div className="rounded-xl bg-violet-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-violet-700">교정 후 (적용 시 최종 질문)</p>
-                          <p className="mt-1 text-base font-medium leading-relaxed text-violet-950">
-                            {candidate.corrected}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-3 space-y-2">
+                      )}
+                      <div className={`rounded-xl px-3 py-2 ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "bg-emerald-50" : ""}`}>
                         {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
-                          <div className="rounded-xl bg-gray-50 px-3 py-2">
-                            <p className="text-xs font-semibold text-gray-400">학생이 적은 원본</p>
-                            <p className="mt-1 text-sm leading-relaxed text-gray-500 line-through decoration-gray-300">
-                              {selection.originalRemixedQuestion}
-                            </p>
-                          </div>
+                          <p className="text-xs font-semibold text-emerald-700">최종 질문 (교사가 고침)</p>
                         )}
-                        <div className={`rounded-xl px-3 py-2 ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "bg-emerald-50" : ""}`}>
-                          {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
-                            <p className="text-xs font-semibold text-emerald-700">최종 질문 (교정 적용됨)</p>
-                          )}
-                          <p className={`text-base font-medium leading-relaxed ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "mt-1 text-emerald-950" : "text-sky-950"}`}>
-                            {selection.remixedQuestion}
-                          </p>
-                        </div>
+                        <p className={`text-base font-medium leading-relaxed ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "mt-1 text-emerald-950" : "text-sky-950"}`}>
+                          {selection.remixedQuestion}
+                        </p>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}

@@ -10,7 +10,7 @@ import {
   isIntegratedLab,
 } from "@/lib/lab-roster";
 import { getCurrentUser } from "./auth-actions";
-import { correctKoreanSpelling, generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
+import { generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
 import { callAgitAi, parseAiJsonObject } from "@/lib/agit-ai";
 import { buildHanjaWritingBoard } from "@/lib/hanja-writing";
 import { getTeacherQuestionCardSets, getTeacherQuestionCardSettingsTree } from "@/lib/question-card-sets";
@@ -1000,75 +1000,6 @@ export async function updateQuestionGeneratorSelection(
   // 찾았는데 내용이 같으면 고칠 것이 없을 뿐이다. 오류로 알리지 않는다.
   if (result.matched === 0) return { error: "수정할 질문을 찾지 못했습니다." };
   return {};
-}
-
-export type SpellingCorrectionCandidate = {
-  sessionId: string;
-  selectionId: string;
-  original: string;
-  corrected: string;
-};
-
-export async function correctQuestionGeneratorSpelling(
-  roomId: string,
-): Promise<{ candidates?: SpellingCorrectionCandidate[]; error?: string }> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "로그인이 필요합니다." };
-
-  const results = await getQuestionGeneratorRoomResults(roomId);
-  if (results.length === 0) return { candidates: [] };
-
-  const inputs: Array<{ id: string; text: string; sessionId: string; selectionId: string }> = [];
-  for (const result of results) {
-    for (const selection of result.selections) {
-      const text = selection.remixedQuestion.trim();
-      if (!text) continue;
-      inputs.push({
-        id: `${result.sessionId}::${selection.id}`,
-        text,
-        sessionId: result.sessionId,
-        selectionId: selection.id,
-      });
-    }
-  }
-  if (inputs.length === 0) return { candidates: [] };
-
-  try {
-    const corrected = await correctKoreanSpelling(
-      user.id,
-      inputs.map(({ id, text }) => ({ id, text })),
-    );
-    const correctedById = new Map(corrected.map((entry) => [entry.id, entry.corrected.trim()]));
-
-    const candidates: SpellingCorrectionCandidate[] = [];
-    for (const input of inputs) {
-      const correctedText = correctedById.get(input.id);
-      if (!correctedText) continue;
-      if (correctedText === input.text) continue;
-      candidates.push({
-        sessionId: input.sessionId,
-        selectionId: input.selectionId,
-        original: input.text,
-        corrected: correctedText,
-      });
-    }
-    return { candidates };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "맞춤법 교정에 실패했습니다.";
-    return { error: message };
-  }
-}
-
-export async function applyQuestionGeneratorSpellingCorrections(
-  roomId: string,
-  updates: QuestionUpdate[],
-): Promise<{ applied?: number; error?: string }> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "로그인이 필요합니다." };
-
-  const result = await applyQuestionUpdatesForRoom(roomId, user.id, updates);
-  if (result.error) return { error: result.error };
-  return { applied: result.applied };
 }
 
 export async function getQuestionGeneratorSourceRooms(classId?: string): Promise<QuestionGeneratorSourceRoomSummary[]> {
