@@ -55,6 +55,20 @@ export const AI_CUSTOM_CARD_SET_LABEL = "선생님 질문 카드";
 export const MAX_AI_CUSTOM_QUESTIONS = 20;
 export const MAX_AI_CUSTOM_QUESTION_LENGTH = 200;
 
+/**
+ * 학생 한 명이 만들 수 있는 질문 수의 상한 — **이 값이 원본이다.**
+ *
+ * 예전에는 `4`가 교사 화면·방 만들기·설정 읽기·제출 검증 네 곳에 흩어져 있었다.
+ * 한 곳만 고치면 조용히 어긋난다 — 교사 화면만 6으로 늘리면 선생님은 6개짜리 방을
+ * 만들었다고 생각하는데 서버가 4로 깎아 4개짜리 방이 된다.
+ * 늘리려면 이 값 하나만 고친다. 화면의 선택지도 아래 목록에서 나온다.
+ */
+export const QUESTION_SELECTION_MAX = 4;
+
+/** 교사 화면이 쓰는 선택지(1 … 상한). 상한을 바꾸면 화면도 따라온다. */
+export const QUESTION_SELECTION_CHOICES: readonly number[] =
+  Array.from({ length: QUESTION_SELECTION_MAX }, (_, index) => index + 1);
+
 export const DEFAULT_QUESTION_GENERATOR_GUIDANCE: Record<QuestionGeneratorMode, string> = {
   direct: "오늘 주제를 잘 보고, 내가 정말 궁금한 것을 질문으로 만들어 봅시다.",
   card_remix: "마음에 드는 질문 카드를 고른 뒤, 오늘 주제에 어울리게 질문을 바꿔 봅시다.",
@@ -84,7 +98,7 @@ export function normalizeQuestionGeneratorConfig(value: unknown): QuestionGenera
 
   const enabledIdSet = new Set(enabledCardSetIds);
 
-  const maxSelections = clampNumber(raw.maxSelections, 1, 4, 1);
+  const maxSelections = clampNumber(raw.maxSelections, 1, QUESTION_SELECTION_MAX, 1);
 
   return {
     mode,
@@ -129,7 +143,7 @@ export function buildQuestionGeneratorConfig(input: {
   teacherCardSets: QuestionCardSet[];
 }): QuestionGeneratorBuildResult {
   const { setup, teacherCardSets } = input;
-  const maxSelections = clampNumber(setup.maxSelections, 1, 4, 1);
+  const maxSelections = clampNumber(setup.maxSelections, 1, QUESTION_SELECTION_MAX, 1);
   // 최소는 목표를 넘을 수 없다 — 넘으면 학생이 절대 낼 수 없는 방이 된다.
   const minSelections = clampNumber(setup.minSelections, 1, maxSelections, maxSelections);
   const guidance = setup.guidance.trim() || DEFAULT_QUESTION_GENERATOR_GUIDANCE[setup.mode];

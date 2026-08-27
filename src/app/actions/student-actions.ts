@@ -9,6 +9,7 @@ import {
 import { parseOutlineResult } from "@/lib/result-format";
 import { persistPortableResult } from "@/lib/portable-results";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
+import { normalizeQuestionGeneratorConfig } from "@/features/activities/question-generator/config";
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildOneLineShareBoard, includesAllConfiguredKeywords, normalizeOneLineShareConfig } from "@/lib/one-line-share";
 import {
@@ -683,17 +684,10 @@ export async function submitQuestionGenerator(
   if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
   if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
 
-  const activityConfig = roomRes.data.activity_config as { minSelections?: unknown; maxSelections?: unknown } | null;
-  const configMaxSelections = Number(activityConfig?.maxSelections);
-  const maxSelections = Number.isFinite(configMaxSelections)
-    ? Math.min(Math.max(Math.trunc(configMaxSelections), 1), 4)
-    : 4;
-  // 하한이 없어 선생님이 3개로 정해도 1개만 쓰고 제출되던 것을 막는다.
-  // 예전에 만든 방에는 minSelections 가 없으므로 1로 읽어 지금까지와 똑같이 둔다.
-  const configMinSelections = Number(activityConfig?.minSelections);
-  const minSelections = Number.isFinite(configMinSelections)
-    ? Math.min(Math.max(Math.trunc(configMinSelections), 1), maxSelections)
-    : 1;
+  // 개수 규칙의 원본은 features/activities/question-generator/config.ts 하나다.
+  // 하한이 없어 선생님이 3개로 정해도 1개만 쓰고 제출되던 것을 여기서 막는다.
+  // 예전에 만든 방에는 minSelections 가 없으므로 normalize 가 1로 읽어 준다.
+  const { minSelections, maxSelections } = normalizeQuestionGeneratorConfig(roomRes.data.activity_config);
 
   const sanitizedSelections = submission.selections.map((selection, index) => ({
     id: typeof selection.id === "string" && selection.id.trim()

@@ -28,6 +28,7 @@ import {
   getRecommendedGradeChipClass,
   getRecommendedGradeLabel,
 } from "@/features/activities/question-generator/card-meta";
+import { QUESTION_SELECTION_CHOICES } from "@/features/activities/question-generator/config";
 import {
   buildDraftStorageKey,
   clearActivityDraft,
@@ -1307,7 +1308,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </div>
 
             <div className="flex gap-2">
-              {[1, 2, 3, 4].map((count) => (
+              {QUESTION_SELECTION_CHOICES.map((count) => (
                 <label
                   key={count}
                   className={`px-4 py-2 rounded-xl border-2 text-sm font-bold cursor-pointer transition-all ${
@@ -1344,7 +1345,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
             </div>
 
             <div className="flex gap-2">
-              {[1, 2, 3, 4].map((count) => {
+              {QUESTION_SELECTION_CHOICES.map((count) => {
                 const goal = Number(draft.max_selections) || 1;
                 const disabled = count > goal;
                 return (
