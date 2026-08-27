@@ -1641,10 +1641,17 @@ function CardSetDetailModal({
 
 function mergeVotingQuestions(
   prev: VotingQuestionDraft[],
-  source: Array<{ id: string; text: string; sourceSessionId?: string; sourceSelectionId?: string }>,
+  source: Array<{ id: string; text: string; sourceSessionId?: string; sourceSelectionId?: string; pickedForVoting?: boolean }>,
 ): VotingQuestionDraft[] {
   const prevById = new Map(prev.map((question) => [question.id, question] as const));
-  return source.map((question) => {
+
+  // 담아 둔 질문을 맨 위로 모은다. **처음 불러올 때만** 정렬한다 —
+  // 체크할 때마다 다시 정렬하면 누른 항목이 눈앞에서 튀어 오른다.
+  const ordered = prevById.size === 0
+    ? [...source].sort((a, b) => Number(b.pickedForVoting === true) - Number(a.pickedForVoting === true))
+    : source;
+
+  return ordered.map((question) => {
     const existing = prevById.get(question.id);
     if (existing) {
       return {
@@ -1656,7 +1663,9 @@ function mergeVotingQuestions(
     return {
       id: question.id,
       text: question.text,
-      included: false,
+      // 교사가 실시간 보기에서 미리 담아 둔 질문은 이미 골라진 채로 올라온다.
+      // 담아 둔 것이 없으면 예전처럼 모두 제외로 시작한다.
+      included: question.pickedForVoting === true,
       sourceSessionId: question.sourceSessionId,
       sourceSelectionId: question.sourceSelectionId,
     };
@@ -1830,7 +1839,10 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-500">고르기에 올릴 질문</p>
                   <h3 className="mt-1 text-base font-bold text-gray-800">{selectedSourceRoom.title}</h3>
-                  <p className="mt-1 text-xs text-gray-500">기본은 모두 제외 상태예요. 학생들과 함께 읽고 필요한 질문만 체크해서 활동에 올려주세요. (편집한 질문은 학생 활동 결과에도 반영됩니다)</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    질문 만들기 <b>실시간 보기</b>에서 <b>☆ 담기</b>로 표시해 둔 질문은 이미 골라진 채로 올라오고 맨 위에 모여요.
+                    표시해 둔 것이 없으면 모두 제외 상태로 시작합니다. (편집한 질문은 학생 활동 결과에도 반영됩니다)
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-amber-700">

@@ -814,6 +814,8 @@ export type QuestionGeneratorRoomResultSummary = {
     originalPrompt: string | null;
     remixedQuestion: string;
     originalRemixedQuestion?: string;
+    /** 교사가 좋은 질문 고르기에 올리려고 미리 표시해 둔 질문인가. */
+    pickedForVoting: boolean;
   }>;
 };
 
@@ -828,6 +830,8 @@ export type QuestionGeneratorSourceRoomSummary = {
     text: string;
     sourceSessionId: string;
     sourceSelectionId: string;
+    /** 교사가 실시간 보기에서 미리 담아 둔 질문인가. */
+    pickedForVoting: boolean;
   }>;
 };
 
@@ -886,6 +890,7 @@ export async function getQuestionGeneratorRoomResults(roomId: string): Promise<Q
           originalPrompt: selection.originalPrompt,
           remixedQuestion: selection.remixedQuestion,
           originalRemixedQuestion: selection.originalRemixedQuestion,
+          pickedForVoting: selection.pickedForVoting === true,
         })),
       }];
     });
@@ -1002,6 +1007,62 @@ export async function updateQuestionGeneratorSelection(
   return {};
 }
 
+/**
+ * `좋은 질문 고르기`에 올릴 질문을 미리 표시한다.
+ *
+ * 예전에는 고르기 활동을 만들 때가 되어서야 30개 넘는 질문을 처음부터 훑어야 했다.
+ * 학생들과 함께 읽으면서 눌러 두면 그 수고가 없어진다.
+ */
+export async function setQuestionGeneratorVotingPick(
+  roomId: string,
+  sessionId: string,
+  selectionId: string,
+  picked: boolean,
+): Promise<{ error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: room } = await admin
+    .schema("writing_helper")
+    .from("rooms")
+    .select("id, teacher_id, activity_type")
+    .eq("id", roomId)
+    .maybeSingle();
+  if (!room || room.teacher_id !== user.id || room.activity_type !== "question_generator") {
+    return { error: "표시할 권한이 없습니다." };
+  }
+
+  const { data: session } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("id, submission")
+    .eq("id", sessionId)
+    .eq("room_id", roomId)
+    .maybeSingle();
+  if (!session) return { error: "학생 답안을 찾지 못했습니다." };
+
+  const submission = (session.submission ?? {}) as Record<string, unknown>;
+  const selections = Array.isArray(submission.selections) ? submission.selections : [];
+  let matched = false;
+  const nextSelections = selections.map((entry) => {
+    const selection = entry as Record<string, unknown>;
+    if (selection?.id !== selectionId) return selection;
+    matched = true;
+    return { ...selection, pickedForVoting: picked };
+  });
+  if (!matched) return { error: "표시할 질문을 찾지 못했습니다." };
+
+  const { error } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .update({ submission: { ...submission, selections: nextSelections } })
+    .eq("id", sessionId)
+    .eq("room_id", roomId);
+  if (error) return { error: "표시를 저장하지 못했습니다." };
+  return {};
+}
+
 export async function getQuestionGeneratorSourceRooms(classId?: string): Promise<QuestionGeneratorSourceRoomSummary[]> {
   const user = await getCurrentUser();
   if (!user) return [];
@@ -1030,7 +1091,7 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
     .in("room_id", roomIds)
     .eq("status", "done");
 
-  const questionsByRoom = new Map<string, Array<{ id: string; text: string; sourceSessionId: string; sourceSelectionId: string }>>();
+  const questionsByRoom = new Map<string, QuestionGeneratorSourceRoomSummary["questions"]>();
 
   for (const session of sessions ?? []) {
     const submission = normalizeQuestionGeneratorSubmission(session.submission);
@@ -1043,6 +1104,7 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
         text: selection.remixedQuestion,
         sourceSessionId: session.id,
         sourceSelectionId: selection.id,
+        pickedForVoting: selection.pickedForVoting === true,
       });
     });
     questionsByRoom.set(session.room_id, current);
@@ -1526,6 +1588,7 @@ async function getQuestionGeneratorSourceRoomSummary(
       text: selection.remixedQuestion,
       sourceSessionId: session.id,
       sourceSelectionId: selection.id,
+      pickedForVoting: selection.pickedForVoting === true,
     }));
   });
 

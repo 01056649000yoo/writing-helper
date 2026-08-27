@@ -29,6 +29,8 @@ export function normalizeQuestionGeneratorSubmission(value: unknown): QuestionGe
       originalRemixedQuestion: typeof selection.originalRemixedQuestion === "string" && selection.originalRemixedQuestion.trim()
         ? selection.originalRemixedQuestion.trim()
         : undefined,
+      // 없으면 표시하지 않은 것이다. 예전 질문은 전부 여기에 해당한다.
+      pickedForVoting: selection.pickedForVoting === true,
     }))
     .filter((selection) => selection.remixedQuestion.length > 0);
 

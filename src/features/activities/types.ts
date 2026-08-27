@@ -185,6 +185,12 @@ export type QuestionGeneratorSubmission = {
     originalPrompt: string | null;
     remixedQuestion: string;
     originalRemixedQuestion?: string;
+    /**
+     * 교사가 `좋은 질문 고르기`에 올리려고 미리 표시해 둔 질문인가.
+     * 학생들과 함께 읽으면서 눌러 두면, 고르기 활동을 만들 때 이미 골라진 채로 올라온다.
+     * 30개가 넘는 질문을 활동 만들 때 처음부터 훑어야 하던 것을 없앤다.
+     */
+    pickedForVoting?: boolean;
   }>;
 };
 

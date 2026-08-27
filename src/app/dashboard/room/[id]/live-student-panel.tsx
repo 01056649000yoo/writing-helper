@@ -10,6 +10,7 @@ import {
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
   getRoomSessions,
+  setQuestionGeneratorVotingPick,
   updateQuestionGeneratorSelection,
 } from "@/app/actions/room-actions";
 import type { ActivityType } from "@/features/activities/types";
@@ -44,6 +45,8 @@ type QuestionResult = {
     originalPrompt: string | null;
     remixedQuestion: string;
     originalRemixedQuestion?: string;
+    /** 교사가 `좋은 질문 고르기` 에 올리려고 미리 담아 둔 질문인가. */
+    pickedForVoting?: boolean;
   }>;
 };
 type QuestionLiveState = "idle" | "connecting" | "live" | "fallback";
@@ -267,6 +270,29 @@ function QuestionResultsModal({
 
   function buildKey(sessionId: string, selectionId: string) {
     return `${sessionId}::${selectionId}`;
+  }
+
+  const pickedForVotingCount = results.reduce(
+    (total, result) => total + result.selections.filter((selection) => selection.pickedForVoting).length,
+    0,
+  );
+
+  /** 별표를 눌렀을 때. 화면을 먼저 바꾸고 저장한다 — 실패하면 되돌린다. */
+  async function toggleVotingPick(sessionId: string, selectionId: string, nextPicked: boolean) {
+    const setPick = (picked: boolean) => onResultsChange(
+      results.map((result) => result.sessionId !== sessionId ? result : {
+        ...result,
+        selections: result.selections.map((selection) =>
+          selection.id === selectionId ? { ...selection, pickedForVoting: picked } : selection),
+      }),
+    );
+
+    setPick(nextPicked);
+    const result = await setQuestionGeneratorVotingPick(roomId, sessionId, selectionId, nextPicked);
+    if (result.error) {
+      setPick(!nextPicked);
+      window.alert(result.error);
+    }
   }
 
   function applyLocalUpdates(updates: Array<{ sessionId: string; selectionId: string; newText: string }>) {
@@ -514,7 +540,19 @@ function QuestionResultsModal({
                 onToggle={() => setShowQuestionCards((current) => !current)}
               />
             )}
+            {pickedForVotingCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-2xl bg-amber-100 px-4 py-2 text-sm font-bold text-amber-800">
+                ★ 고르기 후보 {pickedForVotingCount}개
+              </span>
+            )}
           </div>
+
+          {viewMode === "questions" && results.length > 0 && (
+            <p className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              질문 옆 <b>☆ 담기</b>를 눌러 두면, <b>좋은 질문 고르기</b> 활동을 만들 때 담아 둔 질문이
+              이미 골라진 채로 올라와요. 학생들과 함께 읽으면서 미리 담아 보세요.
+            </p>
+          )}
 
           {/*
             * 칠판 아래 학생 명단.
@@ -605,11 +643,27 @@ function QuestionResultsModal({
                           {selection.method === "direct" ? "직접 질문 만들기" : `${selection.cardSetLabel} 카드`}
                         </p>
                       </div>
-                      {newSessionIds.has(sessionId) && (
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-                          새 질문
-                        </span>
-                      )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {newSessionIds.has(sessionId) && (
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                            새 질문
+                          </span>
+                        )}
+                        {/* 여기서 눌러 두면 `좋은 질문 고르기` 를 만들 때 이미 골라진 채로 올라온다. */}
+                        <button
+                          type="button"
+                          onClick={() => toggleVotingPick(sessionId, selection.id, !selection.pickedForVoting)}
+                          aria-pressed={selection.pickedForVoting}
+                          title={selection.pickedForVoting ? "고르기 후보에서 빼기" : "고르기 후보로 담기"}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                            selection.pickedForVoting
+                              ? "bg-amber-400 text-white hover:bg-amber-500"
+                              : "bg-gray-100 text-gray-500 hover:bg-amber-100 hover:text-amber-700"
+                          }`}
+                        >
+                          {selection.pickedForVoting ? "★ 담음" : "☆ 담기"}
+                        </button>
+                      </div>
                     </div>
                     {showQuestionCards && selection.originalPrompt && (
                       <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2">
