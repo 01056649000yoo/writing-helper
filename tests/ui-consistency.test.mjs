@@ -150,6 +150,33 @@ test("연구소 글자 크기는 아지트 계단과 같다", () => {
   assert.match(globals, /@theme\s*\{[\s\S]*--text-xs:/);
 });
 
+test("교사용 공통 셸은 아지트의 전체 폭과 글자 계단을 따른다", () => {
+  const shellStart = globals.indexOf(".lab-shell {");
+  const shellEnd = globals.indexOf("@media (prefers-reduced-motion: reduce)", shellStart);
+  const shellStyles = globals.slice(shellStart, shellEnd);
+
+  assert.match(shellStyles, /\.lab-shell__header,[\s\S]*width:\s*100%;[\s\S]*padding-inline:\s*clamp\(24px,\s*1\.5vw,\s*48px\)/);
+  assert.doesNotMatch(shellStyles, /width:\s*min\(100%\s*-\s*32px,\s*1280px\)/);
+  assert.match(shellStyles, /@media \(max-width:\s*1023px\)[\s\S]*\.lab-shell__header,[\s\S]*padding-inline:\s*16px/);
+  assert.match(shellStyles, /@media \(max-width:\s*1023px\)[\s\S]*\.lab-shell__nav\s*\{[\s\S]*padding-inline:\s*8px/);
+  assert.match(shellStyles, /@media \(max-width:\s*600px\)[\s\S]*\.lab-page__content\s*\{[\s\S]*padding-inline:\s*12px/);
+
+  for (const selector of [
+    "lab-brand__eyebrow",
+    "lab-brand__title",
+    "lab-profile",
+    "lab-nav-link",
+    "lab-page-heading h1",
+    "lab-page-heading p",
+    "lab-breadcrumb",
+    "lab-button",
+    "lab-chip",
+  ]) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(shellStyles, new RegExp(`\\.${escaped}\\s*\\{[\\s\\S]*?font-size:\\s*var\\(--text-`), `${selector}가 공통 글자 계단을 쓰지 않는다`);
+  }
+});
+
 test("연구소 본문 글꼴은 아지트와 같은 한글 글꼴을 앞에 둔다", async () => {
   const layoutSource = await readFile("src/app/layout.tsx", "utf8");
 
