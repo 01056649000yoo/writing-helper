@@ -177,6 +177,13 @@ test("교사용 공통 셸은 아지트의 전체 폭과 글자 계단을 따른
   }
 });
 
+test("연구소 상단 메뉴는 PC에서 읽기 쉽고 모바일에서는 넘치지 않는다", () => {
+  assert.match(globals, /\.lab-shell__nav\s*\{[\s\S]*?min-height:\s*52px;[\s\S]*?gap:\s*var\(--ui-space-2\)/);
+  assert.match(globals, /\.lab-nav-link\s*\{[\s\S]*?min-height:\s*52px;[\s\S]*?padding-inline:\s*var\(--ui-space-5\);[\s\S]*?font-size:\s*var\(--text-base\)/);
+  assert.match(globals, /@media \(max-width:\s*767px\)[\s\S]*?\.lab-shell__nav\s*\{[\s\S]*?gap:\s*var\(--ui-space-1\)/);
+  assert.match(globals, /@media \(max-width:\s*767px\)[\s\S]*?\.lab-nav-link\s*\{[\s\S]*?min-height:\s*46px;[\s\S]*?padding-inline:\s*var\(--ui-space-3\);[\s\S]*?font-size:\s*var\(--text-sm\)/);
+});
+
 test("연구소 본문 글꼴은 아지트와 같은 한글 글꼴을 앞에 둔다", async () => {
   const layoutSource = await readFile("src/app/layout.tsx", "utf8");
 
