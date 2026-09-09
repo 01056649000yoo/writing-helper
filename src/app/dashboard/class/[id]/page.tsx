@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getClassWorkspace } from "@/app/actions/class-actions";
+import { getClasses, getClassWorkspace } from "@/app/actions/class-actions";
 import { isActivityType } from "@/features/activities/types";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
 import { ClosedRoomsTabs } from "./closed-rooms-tabs";
@@ -11,8 +11,15 @@ type UnifiedRoom = { kind: "writing"; id: string; title: string; topic: string; 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const integratedRoster = process.env.LAB_SSO_ENABLED === "true";
-  const workspace = await getClassWorkspace(id);
+  const [workspace, classes] = await Promise.all([getClassWorkspace(id), getClasses()]);
   if (!workspace) notFound();
+
+  // 학급이 하나뿐인 선생님에게는 `학급 목록` 으로 가는 길이 제자리걸음이다.
+  // `/dashboard` 는 학급이 1개면 곧바로 그 학급으로 되돌려 보내기 때문이다(dashboard/page.tsx).
+  // 즉 눌러도 화면만 깜빡이고 같은 자리로 돌아온다. 2026-09-09 기준 승인 교사 526명 중
+  // 506명이 학급 1개라, 대부분에게는 아무 일도 하지 않는 버튼이었다.
+  // 학급이 여럿인 선생님에게는 다른 학급으로 넘어가는 유일한 길이므로 그대로 둔다.
+  const canSwitchClass = classes.length > 1;
   const { class: cls, rooms } = workspace;
 
   const unified: UnifiedRoom[] = [
@@ -37,7 +44,9 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
   return (
     <main className="lab-page">
       <div className="lab-page__content">
-        <Link href="/dashboard" className="lab-breadcrumb">← 학급 목록</Link>
+        {canSwitchClass && (
+          <Link href="/dashboard" className="lab-breadcrumb">← 학급 목록</Link>
+        )}
         <div className="lab-page-heading">
           <div>
             <div className="flex items-center gap-3">

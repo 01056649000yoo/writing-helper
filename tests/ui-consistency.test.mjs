@@ -196,3 +196,28 @@ test("연구소 본문 글꼴은 아지트와 같은 한글 글꼴을 앞에 둔
   }
   assert.match(globals, /font-family: var\(--font-ui-sans\), "Noto Sans KR"/);
 });
+
+test("학급이 하나뿐인 선생님에게는 `학급 목록` 되돌아가기를 보이지 않는다", () => {
+  /*
+   * 왜 이 검사가 있나 (2026-09-09):
+   *   학급 화면의 `← 학급 목록` 은 `/dashboard` 로 간다. 그런데 `/dashboard` 는 학급이 1개면
+   *   곧바로 그 학급으로 되돌려 보낸다. 즉 학급이 하나인 선생님이 누르면 화면만 깜빡이고
+   *   같은 자리로 돌아온다 — 아무 일도 하지 않는 버튼이다. 당시 승인 교사 526명 중 506명이
+   *   학급 1개였다.
+   *
+   *   두 화면이 짝이라 한쪽만 고치면 어긋난다. 그래서 둘을 함께 본다.
+   *   `/dashboard` 의 자동 넘김이 사라지면 이 숨김은 근거를 잃고, 반대로 숨김이 사라지면
+   *   대부분의 선생님이 다시 제자리걸음 버튼을 보게 된다.
+   */
+  assert.match(dashboard, /classes\.length === 1/);
+  assert.match(dashboard, /redirect\(`\/dashboard\/class\/\$\{classes\[0\]\.id\}`\)/);
+
+  assert.match(classPage, /classes\.length > 1/);
+  assert.match(classPage, /canSwitchClass && \(/);
+
+  // 되돌아가기 자체는 남아 있어야 한다 — 학급이 여럿인 선생님에게는 다른 학급으로 가는 유일한 길이다.
+  assert.match(classPage, /href="\/dashboard" className="lab-breadcrumb">← 학급 목록/);
+
+  // 아지트로 나가는 길은 이 변경과 무관하게 늘 열려 있어야 한다.
+  assert.match(layout, /아지트로 돌아가기/);
+});
