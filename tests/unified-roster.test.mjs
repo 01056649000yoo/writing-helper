@@ -12,7 +12,6 @@ const [
   roomEntryClient,
   roomDetailPage,
   dashboard,
-  classPage,
   livePanel,
 ] = await Promise.all([
   readFile("src/lib/lab-roster.ts", "utf8"),
@@ -24,7 +23,6 @@ const [
   readFile("src/app/room/[id]/room-entry-client.tsx", "utf8"),
   readFile("src/app/dashboard/room/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/dashboard-tabs.tsx", "utf8"),
-  readFile("src/app/dashboard/class/[id]/page.tsx", "utf8"),
   readFile("src/app/dashboard/room/[id]/live-student-panel.tsx", "utf8"),
 ]);
 

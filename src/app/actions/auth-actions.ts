@@ -6,6 +6,8 @@ import { createSupabaseServerClient, createSupabaseAdminClient } from "@/lib/sup
 type AuthResult = { error?: string; success?: boolean; email?: string };
 
 const isSsoEnabled = () => process.env.LAB_SSO_ENABLED === "true";
+const agitHomeUrl = () => process.env.NEXT_PUBLIC_AGIT_APP_URL
+  ?? "https://xn--vz0ba242ncqcba79xhwx.site";
 
 function isValidSchoolName(schoolName: string) {
   return schoolName.length >= 2 && schoolName.length <= 60;
@@ -78,7 +80,7 @@ export async function signIn(_prevState: unknown, formData: FormData): Promise<{
 export async function signOut() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect(isSsoEnabled() ? agitHomeUrl() : "/login");
 }
 
 export async function requestPasswordReset(formData: FormData): Promise<AuthResult> {

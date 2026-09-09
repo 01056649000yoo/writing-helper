@@ -2,8 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getClassWorkspace } from "@/app/actions/class-actions";
 import { isActivityType } from "@/features/activities/types";
-import { DeleteRoomButton } from "./delete-room-button";
-import { EditRoomButton } from "./edit-room-button";
 import { DraftSessionsPanel } from "./draft-sessions-panel";
 import { ClosedRoomsTabs } from "./closed-rooms-tabs";
 import { ActiveRoomsTabs } from "./active-rooms-tabs";
@@ -73,40 +71,6 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
     </main>
   );
 }
-
-function kindLabel(room: UnifiedRoom): string {
-  return writingActivityMeta(room.activity_type).label;
-}
-
-function kindChipColor(room: UnifiedRoom): string {
-  return writingActivityMeta(room.activity_type).chip;
-}
-
-function activeBadgeColor(room: UnifiedRoom): string {
-  return writingActivityMeta(room.activity_type).activeBadge;
-}
-
-function activeDotColor(room: UnifiedRoom): string {
-  return writingActivityMeta(room.activity_type).activeDot;
-}
-
-function cardAccentBorder(room: UnifiedRoom): string {
-  switch (room.activity_type) {
-    case "question_generator": return "border-violet-300 hover:border-violet-400";
-    case "question_voting": return "border-amber-300 hover:border-amber-400";
-    case "one_line_share": return "border-rose-300 hover:border-rose-400";
-    case "hanja_writing": return "border-amber-300 hover:border-orange-400";
-    case "outline_builder":
-    default: return "border-indigo-300 hover:border-indigo-400";
-  }
-}
-
-function cardEmoji(room: UnifiedRoom): string {
-  const activityMeta = writingActivityMeta(room.activity_type);
-  if (activityMeta.emoji) return activityMeta.emoji;
-  return subjectEmoji(room.subject_type);
-}
-
 export type WritingActivityMeta = {
   label: string;
   emoji: string;
@@ -173,13 +137,3 @@ export function writingActivityMeta(activityType: string | null | undefined): Wr
   }
 }
 
-function subjectEmoji(type: string | null) {
-  if (!type) return "✏️";
-  const map: Record<string, string> = {
-    "생활문": "📖", "일기": "📓", "편지": "✉️", "독서감상문": "📚",
-    "기행문": "🗺️", "관찰기록문": "🔬", "이야기 글": "🌈",
-    "설명하는 글": "🔍", "주장하는 글": "💬", "소개하는 글": "🙋",
-    "동시": "🎵", "보고서": "📋",
-  };
-  return map[type] ?? "✏️";
-}

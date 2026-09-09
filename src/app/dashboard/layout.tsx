@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTeacherProfile, signOut } from "@/app/actions/auth-actions";
 import { DashboardNav, DashboardBrandLink } from "./dashboard-nav";

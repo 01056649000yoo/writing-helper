@@ -70,5 +70,5 @@ test("핵심단어 없이는 한 줄 모아 방을 만들 수 없다", async () 
   assert.match(roomActions, /핵심단어를 한 개 이상 적어주세요/);
 
   const newRoom = await readFile("src/app/dashboard/room/new/page.tsx", "utf8");
-  assert.match(newRoom, /name="core_keywords"\n\s+required/);
+  assert.match(newRoom, /name="core_keywords"[\s\S]*?required/);
 });

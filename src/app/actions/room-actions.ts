@@ -13,7 +13,7 @@ import { getCurrentUser } from "./auth-actions";
 import { generateHanjaWordCard, type GeneratedHanjaCard } from "@/lib/gpt";
 import { callAgitAi, parseAiJsonObject } from "@/lib/agit-ai";
 import { buildHanjaWritingBoard } from "@/lib/hanja-writing";
-import { getTeacherQuestionCardSets, getTeacherQuestionCardSettingsTree } from "@/lib/question-card-sets";
+import { getTeacherQuestionCardSets } from "@/lib/question-card-sets";
 import {
   buildQuestionGeneratorConfig,
   parseQuestionGeneratorMode,

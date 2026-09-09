@@ -14,7 +14,7 @@ import {
 } from "@/app/actions/room-actions";
 import { getQuestionCardSettings } from "@/app/actions/settings-actions";
 import { activityDefinitions, getActivityDefinition } from "@/features/activities/registry";
-import type { ActivityType, QuestionCardRole, QuestionCardSet } from "@/features/activities/types";
+import type { ActivityType, QuestionCardSet } from "@/features/activities/types";
 import {
   getCardKeywordBadge,
   getQuestionAreaByCardLabel,
@@ -22,20 +22,12 @@ import {
 import { saveQuestionCardSetting } from "@/app/actions/settings-actions";
 import { LabGuide } from "@/features/activities/LabGuide";
 import { BadgeCircle } from "@/components/badge-circle";
-import {
-  getCardMeta,
-  getCardTheme,
-  getRecommendedGradeChipClass,
-  getRecommendedGradeLabel,
-} from "@/features/activities/question-generator/card-meta";
 import { QUESTION_SELECTION_CHOICES } from "@/features/activities/question-generator/config";
 import {
   buildDraftStorageKey,
   clearActivityDraft,
   persistActivityDraft,
 } from "@/lib/activity-drafts";
-import {
-} from "@/lib/hanja-recommended-words";
 import { useActivityDraft } from "@/lib/use-activity-draft";
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import type { OutlineTemplate, OutlineTemplateItem } from "@/lib/outline-templates";
@@ -69,14 +61,6 @@ type QuestionGeneratorDraft = {
   selectedCardSetIds: string[];
   customAiQuestions: Array<{ id: string; text: string; included: boolean }>;
 };
-
-type CardOriginFilter = "all" | "default" | "custom";
-
-function matchesCardOrigin(cardSet: QuestionCardSet, originFilter: CardOriginFilter) {
-  if (originFilter === "all") return true;
-  if (originFilter === "default") return Boolean(cardSet.isDefault);
-  return !cardSet.isDefault;
-}
 
 type VotingQuestionDraft = {
   id: string;
@@ -769,7 +753,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
   const [modalTargetCardSet, setModalTargetCardSet] = useState<QuestionCardSet | null>(null);
   const [creatingCardSet, setCreatingCardSet] = useState(false);
   const [availableCardSets, setAvailableCardSets] = useState<QuestionCardSet[]>([]);
-  const [loadingCardSets, setLoadingCardSets] = useState(true);
   const initializedRef = useRef(false);
 
   const initialDraft = useMemo<QuestionGeneratorDraft>(() => ({
@@ -783,7 +766,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     customAiQuestions: [],
   }), []);
 
-  const [draft, setDraft, draftControls] = useActivityDraft<QuestionGeneratorDraft>(
+  const [draft, setDraft] = useActivityDraft<QuestionGeneratorDraft>(
     buildDraftStorageKey(classId, "question_generator"),
     initialDraft
   );
@@ -807,7 +790,6 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           });
         }
       }
-      setLoadingCardSets(false);
     });
     return () => { active = false; };
   }, [classId, setDraft]);

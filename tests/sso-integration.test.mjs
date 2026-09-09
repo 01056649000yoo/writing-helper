@@ -68,3 +68,8 @@ test("승인 실패는 연구소 전용 안내로 보내고 아지트 복귀 동
   assert.doesNotMatch(dashboardLayout, /redirect\(withBasePath\(/);
   assert.match(dashboardLayout, /아지트로 돌아가기/);
 });
+
+test("통합 연구소 로그아웃은 아지트로 돌아가고 구 연구소는 자체 로그인으로 돌아간다", () => {
+  assert.match(authActions, /redirect\(isSsoEnabled\(\) \? agitHomeUrl\(\) : "\/login"\)/);
+  assert.match(authActions, /NEXT_PUBLIC_AGIT_APP_URL/);
+});
