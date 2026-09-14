@@ -278,7 +278,7 @@ function EntryShell({
               오늘 주제: <strong>{topic}</strong>
             </div>
           )}
-          <p className="text-xs text-gray-400 mt-3">{helper}</p>
+          <p className="text-sm text-gray-400 mt-3">{helper}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

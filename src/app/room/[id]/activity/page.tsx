@@ -848,12 +848,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
                   {topicDescription && (
                     <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-cyan-100 px-4 py-4">
-                      <p className="text-xs font-semibold text-sky-700">선생님 설명</p>
+                      <p className="text-sm font-semibold text-sky-700">선생님 설명</p>
                       <p className="mt-2 whitespace-pre-line text-sm leading-7 text-sky-950">{topicDescription}</p>
                     </div>
                   )}
                   <div className="rounded-2xl bg-gray-50 px-4 py-4">
-                    <p className="text-xs font-semibold text-gray-500">이렇게 해요</p>
+                    <p className="text-sm font-semibold text-gray-500">이렇게 해요</p>
                     <p className="mt-2 text-sm leading-7 text-gray-700">
                       {questionGeneratorConfig?.guidance || questionModeMeta.studentHint}
                     </p>
@@ -877,7 +877,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
                   {!isTeacherPool && (
                     <>
-                      <p className="mt-1 text-xs text-gray-500">질문의 종류를 고르면 그 안의 질문 카드만 보여드려요.</p>
+                      <p className="mt-1 text-sm text-gray-500">질문의 종류를 고르면 그 안의 질문 카드만 보여드려요.</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {availableAreas.map(({ area, promptCount }) => {
                           const selected = selectedAreaId === area.id;
@@ -994,7 +994,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                  <p className="mt-1 text-sm leading-relaxed text-gray-500">
                     {questionMode === "direct"
                       ? "오늘 주제를 보고 내가 궁금한 것을 질문으로 써 보세요."
                       : "왼쪽 카드는 질문을 만드는 힌트예요. 카드를 보고 내 질문을 물음표로 끝나게 써 보세요."}
@@ -1002,7 +1002,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
                   {selectedPrompt && (
                     <div className="mt-3 rounded-2xl bg-amber-50 px-4 py-3">
-                      <p className="text-xs font-semibold text-amber-700">고른 질문 카드</p>
+                      <p className="text-sm font-semibold text-amber-700">고른 질문 카드</p>
                       <p className="mt-1 text-sm leading-relaxed text-amber-900">{selectedPrompt}</p>
                     </div>
                   )}
@@ -1049,7 +1049,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 <div className="rounded-3xl bg-white p-5 shadow-lg">
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-base font-bold text-gray-800">담은 질문</h2>
-                    <span className="text-xs font-semibold text-sky-600">
+                    <span className="text-sm font-semibold text-sky-600">
                       {questionSelections.length > 0 ? "누르면 고칠 수 있어요" : `${maxSelections}개까지 담을 수 있어요`}
                     </span>
                   </div>
@@ -1073,7 +1073,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                                 onClick={() => editQuestionSelection(selection)}
                                 className="min-w-0 flex-1 text-left"
                               >
-                                <p className="text-xs font-semibold text-sky-700">
+                                <p className="text-sm font-semibold text-sky-700">
                                   {index + 1}. {selection.cardSetLabel}
                                 </p>
                                 <p className="mt-1 text-sm leading-relaxed text-gray-800">{selection.remixedQuestion}</p>
@@ -1116,7 +1116,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                         >
                           {shortage > 0 ? `${shortage}개 더 만들어야 해요` : "제출하기"}
                         </button>
-                        <p className="mt-2 text-center text-xs text-gray-400">
+                        <p className="mt-2 text-center text-sm text-gray-400">
                           {minSelections < maxSelections
                             ? `목표는 ${maxSelections}개예요. 시간이 모자라면 ${minSelections}개만 채워도 낼 수 있어요. 제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요.`
                             : "제출한 뒤에도 결과 화면에서 다시 고칠 수 있어요."}
@@ -1237,7 +1237,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 <p className="text-xs font-bold uppercase tracking-wide text-violet-500">익명 질문 목록</p>
                 <h2 className="mt-1 text-lg font-bold text-gray-800">친구들이 만든 질문</h2>
               </div>
-              <p className="text-xs text-gray-400">작성자는 보이지 않아요</p>
+              <p className="text-sm text-gray-400">작성자는 보이지 않아요</p>
             </div>
 
             {votingQuestions.length === 0 ? (
@@ -1271,7 +1271,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                           <p className="text-base font-medium leading-relaxed text-gray-900">
                             {question.text}
                           </p>
-                          <p className="mt-2 text-xs text-gray-400">
+                          <p className="mt-2 text-sm text-gray-400">
                             {selected ? "선택했어요" : atMax ? "누르면 선택을 바꿀 수 있어요" : "좋다고 생각하면 눌러서 선택해요"}
                           </p>
                         </div>
@@ -1390,7 +1390,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       </button>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-gray-400">핵심단어는 모두 빠짐없이 들어가야 해요. 눌러서 문장에 바로 넣을 수 있어요.</p>
+                  <p className="mt-2 text-sm text-gray-400">핵심단어는 모두 빠짐없이 들어가야 해요. 눌러서 문장에 바로 넣을 수 있어요.</p>
                 </div>
               )}
               {auxiliaryKeywords.length > 0 && (
@@ -1415,7 +1415,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       </button>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-gray-400">보조단어는 꼭 넣지 않아도 돼요. 문장이 더 풍성해질 수 있게 도와줘요.</p>
+                  <p className="mt-2 text-sm text-gray-400">보조단어는 꼭 넣지 않아도 돼요. 문장이 더 풍성해질 수 있게 도와줘요.</p>
                 </div>
               )}
             </div>
@@ -1539,7 +1539,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
             {card.hanja.length > 0 && (
               <div className="mt-5">
-                <p className="text-xs font-bold text-amber-600 mb-2">한자 풀이</p>
+                <p className="text-sm font-bold text-amber-600 mb-2">한자 풀이</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {card.hanja.map((h, idx) => (
                     <div key={`${h.char}-${idx}`} className="rounded-2xl bg-amber-50/70 border border-amber-100 p-3 flex items-center gap-3">
@@ -1553,18 +1553,18 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
             {card.relatedWords.length > 0 && (
               <div className="mt-5">
-                <p className="text-xs font-bold text-amber-600 mb-2">관련 단어</p>
+                <p className="text-sm font-bold text-amber-600 mb-2">관련 단어</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {card.relatedWords.map((r, idx) => (
                     <div key={`${r.word}-${idx}`} className="rounded-2xl bg-amber-50/70 border border-amber-100 p-3">
                       <div className="flex items-baseline gap-2">
                         <span className="text-base font-bold text-gray-800">{r.word}</span>
-                        {r.hanja && <span className="text-xs text-amber-700">{r.hanja}</span>}
+                        {r.hanja && <span className="text-sm text-amber-700">{r.hanja}</span>}
                         {r.sharedChar && (
                           <span className="ml-auto text-xs rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">공유 {r.sharedChar}</span>
                         )}
                       </div>
-                      <p className="mt-1 text-xs text-gray-600 leading-relaxed">{r.meaning}</p>
+                      <p className="mt-1 text-sm text-gray-600 leading-relaxed">{r.meaning}</p>
                     </div>
                   ))}
                 </div>
@@ -1573,7 +1573,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
             {card.example && (
               <div className="mt-4 rounded-2xl bg-gray-50 p-3">
-                <p className="text-xs font-bold text-gray-500">예시 문장</p>
+                <p className="text-sm font-bold text-gray-500">예시 문장</p>
                 <p className="mt-1 text-sm text-gray-700 leading-relaxed">{card.example}</p>
               </div>
             )}
@@ -1700,7 +1700,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                     </BadgeCircle>
                     {key}
                   </h2>
-                  <span className="text-xs font-semibold text-orange-400">
+                  <span className="text-sm font-semibold text-orange-400">
                     {sectionSelectedCount - excludedTeacherItems.length}개 남김
                   </span>
                 </div>
@@ -1735,7 +1735,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                           disabled={orderIndex === 0}
                           onClick={() => moveTemplateItem(answer.itemId, -1)}
                           aria-label={`${answer.label || "이 항목"} 위로 옮기기`}
-                          className="rounded-lg px-1.5 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                          className="rounded-lg px-1.5 py-0.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                         >
                           ▲
                         </button>
@@ -1744,7 +1744,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                           disabled={orderIndex === sectionAnswers.length - 1}
                           onClick={() => moveTemplateItem(answer.itemId, 1)}
                           aria-label={`${answer.label || "이 항목"} 아래로 옮기기`}
-                          className="rounded-lg px-1.5 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                          className="rounded-lg px-1.5 py-0.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                         >
                           ▼
                         </button>
@@ -1823,7 +1823,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
 
                   {excludedTeacherItems.length > 0 && (
                     <details className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-3">
-                      <summary className="cursor-pointer text-xs font-semibold text-gray-500">
+                      <summary className="cursor-pointer text-sm font-semibold text-gray-500">
                         뺀 항목 {excludedTeacherItems.length}개 · 다시 넣기
                       </summary>
                       <div className="mt-3 space-y-2">
@@ -1859,7 +1859,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
           {/* 저장 상태와 임시 저장 — 아지트 학생 글쓰기와 같은 자리(제출 버튼 바로 위)에 둔다. */}
           <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-500">
+              <p className="text-sm font-semibold text-gray-500">
                 {outlineManualSavedAt && !outlineSaveError ? "임시 저장 완료" : "자동 저장"}
               </p>
               <p className={`truncate text-sm font-bold ${outlineSaveError ? "text-red-500" : "text-gray-700"}`}>
@@ -1923,7 +1923,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             >
               <div className="flex items-start justify-between gap-4 border-b border-orange-100 px-5 py-5 sm:px-6">
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-orange-500">내기 전에 한 번 더</p>
+                  <p className="text-sm font-bold text-orange-500">내기 전에 한 번 더</p>
                   <h2 id="outline-preview-title" className="text-2xl font-bold text-gray-800">내가 짠 개요</h2>
                   <p className="mt-1 text-sm text-gray-500">
                     빠뜨린 곳이 없는지 보고, 고칠 것이 있으면 창을 닫고 고쳐요.
@@ -2016,7 +2016,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
             <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
               <div className="flex items-start justify-between gap-4 border-b border-orange-100 px-5 py-5 sm:px-6">
                 <div>
-                  <p className="text-xs font-bold text-orange-500">{sharedQuestionPickerSection}에 질문 추가</p>
+                  <p className="text-sm font-bold text-orange-500">{sharedQuestionPickerSection}에 질문 추가</p>
                   <h2 id="shared-question-picker-title" className="mt-1 text-xl font-bold text-gray-900">
                     친구들과 만든 질문에서 골라보세요
                   </h2>
@@ -2076,7 +2076,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                           </span>
                         </div>
                         {questionRoom.topic && questionRoom.topic !== questionRoom.title && (
-                          <p className="mb-3 text-xs text-gray-500">주제: {questionRoom.topic}</p>
+                          <p className="mb-3 text-sm text-gray-500">주제: {questionRoom.topic}</p>
                         )}
                         <div className="space-y-2">
                           {questionRoom.questions.map((question) => {

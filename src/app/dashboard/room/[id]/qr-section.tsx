@@ -48,7 +48,7 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrSmall} alt="QR 코드" className="w-48 h-48" />
               <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-indigo-500/0 group-hover:bg-indigo-500/10 transition-colors">
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium text-indigo-700 bg-white/90 px-2 py-1 rounded-lg shadow">
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-sm font-medium text-indigo-700 bg-white/90 px-2 py-1 rounded-lg shadow">
                   🔍 크게 보기
                 </span>
               </div>
@@ -58,12 +58,12 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
             {shortUrl && (
               <div className="flex items-center gap-2 bg-indigo-50 rounded-xl px-4 py-3 border border-indigo-100">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-indigo-500 mb-0.5">단축 링크</p>
-                  <span className="text-xs text-indigo-700 truncate block">{shortUrl}</span>
+                  <p className="text-sm font-semibold text-indigo-500 mb-0.5">단축 링크</p>
+                  <span className="text-sm text-indigo-700 truncate block">{shortUrl}</span>
                 </div>
                 <button
                   onClick={() => copyUrl("short", shortUrl)}
-                  className="text-xs text-indigo-600 font-medium hover:text-indigo-800 whitespace-nowrap"
+                  className="text-sm text-indigo-600 font-medium hover:text-indigo-800 whitespace-nowrap"
                 >
                   {copiedTarget === "short" ? "✅ 복사됨" : "복사"}
                 </button>
@@ -71,12 +71,12 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
             )}
             <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-gray-400 mb-0.5">원본 링크</p>
-                <span className="text-xs text-gray-500 truncate block">{roomUrl}</span>
+                <p className="text-sm font-semibold text-gray-400 mb-0.5">원본 링크</p>
+                <span className="text-sm text-gray-500 truncate block">{roomUrl}</span>
               </div>
               <button
                 onClick={() => copyUrl("full", roomUrl)}
-                className="text-xs text-indigo-500 font-medium hover:text-indigo-700 whitespace-nowrap"
+                className="text-sm text-indigo-500 font-medium hover:text-indigo-700 whitespace-nowrap"
               >
                 {copiedTarget === "full" ? "✅ 복사됨" : "복사"}
               </button>

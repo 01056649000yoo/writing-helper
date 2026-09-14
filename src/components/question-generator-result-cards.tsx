@@ -59,7 +59,7 @@ export function TeacherQuestionGeneratorResultList({
                   질문 {index + 1}
                 </p>
                 <h2 className="text-lg font-bold text-gray-800 mt-1">{selection.cardSetLabel}</h2>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-sm text-gray-400 mt-1">
                   {selection.method === "direct" ? "직접 질문 만들기" : "질문 카드로 바꾸기"}
                 </p>
               </div>
@@ -70,13 +70,13 @@ export function TeacherQuestionGeneratorResultList({
 
             {showQuestionCards && selection.originalPrompt && (
               <div className="rounded-2xl bg-white/80 p-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">고른 질문 카드</p>
+                <p className="text-sm font-semibold text-gray-500 mb-2">고른 질문 카드</p>
                 <p className="text-sm text-gray-800 leading-relaxed">{selection.originalPrompt}</p>
               </div>
             )}
 
             <div className="rounded-2xl bg-white p-4">
-              <p className="text-xs font-semibold text-sky-700 mb-2">학생이 만든 질문</p>
+              <p className="text-sm font-semibold text-sky-700 mb-2">학생이 만든 질문</p>
               <p className="text-base font-medium text-sky-950 leading-relaxed">{selection.remixedQuestion}</p>
             </div>
           </div>

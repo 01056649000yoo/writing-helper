@@ -151,7 +151,7 @@ export default async function TeacherResultPage({
 
                     return (
                       <div key={questionId} className="rounded-2xl bg-white p-4">
-                        <p className="text-xs font-semibold text-violet-500">선택한 질문 {index + 1}</p>
+                        <p className="text-sm font-semibold text-violet-500">선택한 질문 {index + 1}</p>
                         <p className="mt-2 text-base font-medium leading-relaxed text-violet-950">{questionText}</p>
                       </div>
                     );
@@ -212,7 +212,7 @@ export default async function TeacherResultPage({
 
                 {hanjaWritingConfig.card.hanja.length > 0 && (
                   <div className="mt-5">
-                    <p className="mb-2 text-xs font-semibold text-amber-700">한자 풀이</p>
+                    <p className="mb-2 text-sm font-semibold text-amber-700">한자 풀이</p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {hanjaWritingConfig.card.hanja.map((entry, index) => (
                         <div key={`${entry.char}-${index}`} className="rounded-2xl bg-white p-3">
@@ -226,15 +226,15 @@ export default async function TeacherResultPage({
 
                 {hanjaWritingConfig.card.relatedWords.length > 0 && (
                   <div className="mt-5">
-                    <p className="mb-2 text-xs font-semibold text-amber-700">관련 단어</p>
+                    <p className="mb-2 text-sm font-semibold text-amber-700">관련 단어</p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {hanjaWritingConfig.card.relatedWords.map((entry, index) => (
                         <div key={`${entry.word}-${index}`} className="rounded-2xl bg-white p-3">
                           <div className="flex items-baseline gap-2">
                             <p className="text-sm font-bold text-gray-800">{entry.word}</p>
-                            {entry.hanja && <span className="text-xs text-amber-700">{entry.hanja}</span>}
+                            {entry.hanja && <span className="text-sm text-amber-700">{entry.hanja}</span>}
                           </div>
-                          <p className="mt-1 text-xs leading-relaxed text-gray-600">{entry.meaning}</p>
+                          <p className="mt-1 text-sm leading-relaxed text-gray-600">{entry.meaning}</p>
                         </div>
                       ))}
                     </div>
@@ -299,11 +299,11 @@ function OutlineAnswersView({ answers }: { answers: unknown }) {
     <div className="space-y-4">
       {grouped.map(({ section, items }) => (
         <div key={section} className="bg-gray-50 rounded-2xl p-4">
-          <p className="text-xs font-bold text-indigo-600 mb-2">{section}</p>
+          <p className="text-sm font-bold text-indigo-600 mb-2">{section}</p>
           <div className="space-y-2">
             {items.map((item, i) => (
               <div key={i} className="bg-white rounded-xl px-4 py-3">
-                <p className="text-xs text-gray-500 mb-1">{item.label}</p>
+                <p className="text-sm text-gray-500 mb-1">{item.label}</p>
                 <p className="text-sm text-gray-800 whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
               </div>
             ))}
@@ -312,11 +312,11 @@ function OutlineAnswersView({ answers }: { answers: unknown }) {
       ))}
       {ungrouped.length > 0 && (
         <div className="bg-gray-50 rounded-2xl p-4">
-          <p className="text-xs font-bold text-gray-500 mb-2">기타</p>
+          <p className="text-sm font-bold text-gray-500 mb-2">기타</p>
           <div className="space-y-2">
             {ungrouped.map((item, i) => (
               <div key={i} className="bg-white rounded-xl px-4 py-3">
-                <p className="text-xs text-gray-500 mb-1">{item.label}</p>
+                <p className="text-sm text-gray-500 mb-1">{item.label}</p>
                 <p className="text-sm text-gray-800 whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
               </div>
             ))}

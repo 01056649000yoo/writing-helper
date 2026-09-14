@@ -15,7 +15,7 @@ export function DetailSection({ title, hint, children }: {
     <section className="rounded-xl border border-gray-200/90 bg-white p-3.5 shadow-2xs">
       <div className="mb-2.5">
         <h3 className="text-sm font-bold text-gray-800">{title}</h3>
-        {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}
+        {hint && <p className="mt-0.5 text-sm text-gray-500">{hint}</p>}
       </div>
       {children}
     </section>
@@ -34,7 +34,7 @@ export function NumberedList({ items }: { items: Array<{ key: string; text: stri
           </BadgeCircle>
           <span className="min-w-0 flex-1 leading-relaxed">
             {item.text}
-            {item.note && <span className="ml-1.5 text-xs text-gray-400">{item.note}</span>}
+            {item.note && <span className="ml-1.5 text-sm text-gray-400">{item.note}</span>}
           </span>
         </li>
       ))}

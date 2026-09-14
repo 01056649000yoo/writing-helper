@@ -96,7 +96,7 @@ export function QuestionVotingCompactList({
     <div className="rounded-3xl border border-violet-100 bg-white overflow-hidden">
       <div className="border-b border-violet-100 bg-violet-50/70 px-4 py-3">
         <p className="text-sm font-bold text-violet-800">전체 순위</p>
-        <p className="mt-1 text-xs text-violet-600">
+        <p className="mt-1 text-sm text-violet-600">
           득표가 많은 질문부터 한눈에 비교할 수 있어요. 표가 같으면 공동 등수예요.
         </p>
       </div>

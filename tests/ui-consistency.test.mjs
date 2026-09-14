@@ -218,6 +218,37 @@ test("연구소 상단 메뉴는 PC에서 읽기 쉽고 모바일에서는 넘�
   assert.match(globals, /@media \(max-width:\s*767px\)[\s\S]*?\.lab-nav-link\s*\{[\s\S]*?min-height:\s*46px;[\s\S]*?padding-inline:\s*var\(--ui-space-3\);[\s\S]*?font-size:\s*var\(--text-sm\)/);
 });
 
+test("읽는 문장에는 가장 작은 칸을 쓰지 않는다", () => {
+  /*
+   * 2026-09-14 지적: 활동 만들기 화면 글씨가 너무 작다.
+   *
+   * 연구소가 스스로 적어 둔 규칙이 있다 — `text-xs` 는 **뱃지·꼬리표 전용**이고 읽어야 하는
+   * 문장에는 `text-sm` 아래를 쓰지 않는다. 그런데 활동 만들기 한 화면에만 `text-xs` 가 81곳,
+   * 학생이 보는 활동 화면까지 합치면 11개 화면 170곳이었다. 규칙이 글로만 있었다.
+   *
+   * 뱃지는 `uppercase` · `tracking-wide` · `rounded-full` 로 알아본다. 그 밖의 자리에서
+   * 가장 작은 칸을 쓰면 여기서 걸린다.
+   */
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(full);
+      else if (/\.tsx$/.test(entry.name)) files.push(full);
+    }
+  };
+  walk("src");
+
+  const badge = ["uppercase", "tracking-wide", "rounded-full"];
+  const offenders = [];
+  for (const file of files) {
+    for (const match of readFileSync(file, "utf8").matchAll(/className="([^"]*\btext-xs\b[^"]*)"/g)) {
+      if (!badge.some((mark) => match[1].includes(mark))) offenders.push(`${file}: ${match[1].slice(0, 40)}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `읽는 문장에 가장 작은 칸: ${offenders.slice(0, 3).join(" / ")}`);
+});
+
 test("연구소 상단 메뉴는 아지트와 같은 모양이다", () => {
   /*
    * 2026-09-14 지적: 두 앱을 오갈 때 이질감이 있다.

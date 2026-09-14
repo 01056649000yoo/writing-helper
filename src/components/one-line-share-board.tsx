@@ -42,7 +42,7 @@ export function OneLineShareTopRanks({
           </div>
           <p className="mt-3 text-base font-bold leading-relaxed text-gray-900">{entry.content}</p>
           {showStudentName && (
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-sm text-gray-500">
               {entry.studentNumber}번 {entry.studentName}
             </p>
           )}
@@ -118,7 +118,7 @@ export function OneLineShareBoard({
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div className="flex items-center gap-2 text-sm text-gray-400">
                   {entry.containsKeywords && (
                     <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
                       핵심단어 포함

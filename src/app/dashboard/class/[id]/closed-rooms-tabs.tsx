@@ -211,7 +211,7 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
                       {room.title}
                     </h3>
                   </div>
-                  <p className="mt-1.5 text-xs text-gray-500 line-clamp-1">주제: {room.topic}</p>
+                  <p className="mt-1.5 text-sm text-gray-500 line-clamp-1">주제: {room.topic}</p>
 
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${kindChipColor(room)}`}>
@@ -223,7 +223,7 @@ export function ClosedRoomsTabs({ closedRooms }: ClosedRoomsTabsProps) {
                       </span>
                     )}
                   </div>
-                  <p className="mt-2 text-xs text-gray-400 font-medium">
+                  <p className="mt-2 text-sm text-gray-400 font-medium">
                     {new Date(room.created_at).toLocaleDateString("ko-KR")} 개설
                   </p>
                 </Link>

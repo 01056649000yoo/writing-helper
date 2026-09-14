@@ -257,7 +257,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                     질문 {index + 1}
                   </p>
                   <h2 className="text-lg font-bold text-gray-800 mt-1">{selection.cardSetLabel}</h2>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-sm text-gray-400 mt-1">
                     {selection.method === "direct" ? "직접 질문 만들기" : "질문 카드로 바꾸기"}
                   </p>
                 </div>
@@ -268,13 +268,13 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
 
               {showQuestionCards && selection.originalPrompt && (
                 <div className="rounded-2xl bg-gray-50 p-4">
-                  <p className="text-xs font-semibold text-gray-500 mb-2">고른 질문 카드</p>
+                  <p className="text-sm font-semibold text-gray-500 mb-2">고른 질문 카드</p>
                   <p className="text-sm text-gray-800 leading-relaxed">{selection.originalPrompt}</p>
                 </div>
               )}
 
               <div className="rounded-2xl bg-sky-50 p-4">
-                <p className="text-xs font-semibold text-sky-700 mb-2">오늘 주제에 맞게 바꾼 질문</p>
+                <p className="text-sm font-semibold text-sky-700 mb-2">오늘 주제에 맞게 바꾼 질문</p>
                 <p className="text-base font-medium text-sky-950 leading-relaxed">{selection.remixedQuestion}</p>
               </div>
 
@@ -310,7 +310,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               <div className="mt-4 space-y-3">
                 {anonymousPeerQuestions.map((question, index) => (
                   <div key={question.id} className="rounded-2xl bg-violet-50 p-4">
-                    <p className="text-xs font-semibold text-violet-600">친구 질문 {index + 1}</p>
+                    <p className="text-sm font-semibold text-violet-600">친구 질문 {index + 1}</p>
                     <p className="mt-2 text-sm leading-relaxed text-violet-950">{question.text}</p>
                   </div>
                 ))}
@@ -348,7 +348,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
 
             {selectedVotingQuestions.map((question, index) => (
               <div key={question.id} className="rounded-2xl bg-violet-50 p-4">
-                <p className="text-xs font-semibold text-violet-600">선택한 질문 {index + 1}</p>
+                <p className="text-sm font-semibold text-violet-600">선택한 질문 {index + 1}</p>
                 <p className="mt-2 text-base font-medium leading-relaxed text-violet-950">{question.text}</p>
               </div>
             ))}
@@ -487,7 +487,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
             <div className="bg-white rounded-3xl shadow-xl p-6">
               <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-bold text-amber-600">내가 만든 문장 ({card.word})</p>
+                  <p className="text-sm font-bold text-amber-600">내가 만든 문장 ({card.word})</p>
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
                     받은 좋아요 합계 {myHanjaEntries.reduce((sum, entry) => sum + entry.likeCount, 0)}
                   </span>
@@ -498,7 +498,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                     return (
                     <div key={`my-hanja-${index}`} className="rounded-2xl bg-white/80 px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold text-amber-700">문장 {index + 1}</p>
+                        <p className="text-sm font-semibold text-amber-700">문장 {index + 1}</p>
                         <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                           ❤️ {myEntry?.likeCount ?? 0}
                         </span>
@@ -535,7 +535,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                     <div key={`top-hanja-${entry.entryId}`} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-xs font-semibold text-amber-700">#{index + 1} 인기 문장</p>
+                          <p className="text-sm font-semibold text-amber-700">#{index + 1} 인기 문장</p>
                           <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
                         </div>
                         <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
@@ -551,7 +551,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
                 <p className="text-sm font-bold text-gray-800">친구들이 쓴 문장</p>
-                <p className="mt-1 text-xs text-gray-500">문장을 읽고 마음에 드는 문장에 좋아요를 남겨 보세요.</p>
+                <p className="mt-1 text-sm text-gray-500">문장을 읽고 마음에 드는 문장에 좋아요를 남겨 보세요.</p>
               </div>
               <span className="rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-semibold">
                 누른 좋아요 {hanjaReactionCount}/{hanjaWritingConfig.maxReactionsPerStudent}
@@ -572,7 +572,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                   <div key={entry.entryId} className="rounded-2xl bg-gray-50 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold text-gray-500">친구 문장 {index + 1}</p>
+                        <p className="text-sm font-semibold text-gray-500">친구 문장 {index + 1}</p>
                         <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
                       </div>
                       <button
@@ -591,7 +591,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                           : `좋아요 ${entry.likeCount}`}
                       </button>
                     </div>
-                    <p className="mt-3 text-xs text-gray-400">
+                    <p className="mt-3 text-sm text-gray-400">
                       {new Date(entry.createdAt).toLocaleString("ko-KR")}
                     </p>
                   </div>
@@ -645,7 +645,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
               <div className="space-y-3">
                 {items.map((item, i) => (
                   <div key={i} className="rounded-2xl bg-orange-50/60 px-4 py-3">
-                    <p className="text-xs font-semibold text-orange-700 mb-1">{item.label}</p>
+                    <p className="text-sm font-semibold text-orange-700 mb-1">{item.label}</p>
                     <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
                   </div>
                 ))}
@@ -670,7 +670,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
           ✏️ 개요 다시 만들기
         </Link>
 
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-sm text-gray-400">
           이 개요를 보면서 글을 완성해봐요 ✍️
         </p>
       </div>

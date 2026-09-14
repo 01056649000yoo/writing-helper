@@ -61,7 +61,7 @@ export function QuestionBoardFullscreen({ studentNumber, studentName, selections
     >
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-white/20 pb-[clamp(8px,1.4vh,18px)]">
         <div>
-          <p className="text-xs font-semibold tracking-[0.2em] text-emerald-200 sm:text-sm">질문 칠판</p>
+          <p className="text-sm font-semibold tracking-[0.2em] text-emerald-200 sm:text-sm">질문 칠판</p>
           <h2 className="mt-1 font-bold leading-tight text-white text-[clamp(1.4rem,min(3vw,4.4vh),2.6rem)]">
             {studentNumber}번 {studentName}
           </h2>
@@ -115,7 +115,7 @@ export function QuestionBoardFullscreen({ studentNumber, studentName, selections
         ))}
       </ol>
 
-      <p className="shrink-0 text-center text-xs text-emerald-200/80 sm:text-sm">
+      <p className="shrink-0 text-center text-sm text-emerald-200/80 sm:text-sm">
         아무 곳이나 눌러도 닫히지 않아요. 오른쪽 위 닫기 단추나 Esc 를 눌러 주세요.
       </p>
     </div>

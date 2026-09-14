@@ -58,7 +58,7 @@ export function EditRoomButton({
     <>
       <button
         onClick={openEditor}
-        className="text-xs text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-lg transition-colors"
+        className="text-sm text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-lg transition-colors"
         title="활동 이름·주제 수정"
       >
         ✏️ 수정
@@ -78,8 +78,8 @@ export function EditRoomButton({
             {/* 무엇을 고칠 수 있고 왜 나머지는 못 고치는지, 대신 무엇을 하면 되는지까지 적는다.
                 "이름·주제만 됩니다"만 적으면 교사는 고장으로 여긴다. */}
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
-              <p className="text-xs font-bold text-amber-800">고칠 수 있는 것은 이름·주제·설명입니다</p>
-              <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
+              <p className="text-sm font-bold text-amber-800">고칠 수 있는 것은 이름·주제·설명입니다</p>
+              <p className="mt-1 text-sm leading-relaxed text-amber-800/90">
                 개요 항목이나 질문 목록 같은 <b>활동 내용은 바꾸지 않습니다.</b>{" "}
                 학생이 낸 답이 항목 하나하나에 붙어 있어서, 항목을 고치면 이미 낸 답이
                 어디에도 붙지 않는 기록이 됩니다.
@@ -87,13 +87,13 @@ export function EditRoomButton({
                   <> 이 활동에는 이미 <b>{answered}명</b>이 참여했어요.</>
                 )}
               </p>
-              <p className="mt-2 text-xs leading-relaxed text-amber-800/90">
+              <p className="mt-2 text-sm leading-relaxed text-amber-800/90">
                 내용을 바꿔서 다시 하고 싶다면 <b>새 활동을 만드세요.</b>{" "}
                 지난 활동의 학생 답은 그대로 남고, 두 결과를 따로 볼 수 있습니다.
               </p>
             </div>
 
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-sm text-gray-500">
               활동은 기한 없이 열려 있어요. 끝낼 때는 활동 화면에서 <b>종료</b>를 누르세요.
             </p>
 

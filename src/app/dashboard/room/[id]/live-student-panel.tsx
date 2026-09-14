@@ -136,7 +136,7 @@ function StudentQrModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-center">
-          <p className="text-xs text-gray-400 mb-0.5">개인 결과 QR</p>
+          <p className="text-sm text-gray-400 mb-0.5">개인 결과 QR</p>
           <h3 className="text-lg font-bold text-gray-800">
             {studentNumber}번 {studentName}
           </h3>
@@ -147,7 +147,7 @@ function StudentQrModal({
         ) : (
           <div className="w-48 h-48 bg-gray-100 rounded-xl animate-pulse" />
         )}
-        <p className="text-xs text-gray-400 text-center">
+        <p className="text-sm text-gray-400 text-center">
           이 QR을 스캔하면 개요를 바로 복사할 수 있어요
         </p>
         <button
@@ -376,7 +376,7 @@ function QuestionResultsModal({
                 <span className={`h-1.5 w-1.5 rounded-full ${liveStatus.dot}`} />
                 {liveStatus.label}
               </span>
-              {isRefreshing && <span className="text-xs font-medium text-gray-400">갱신 중...</span>}
+              {isRefreshing && <span className="text-sm font-medium text-gray-400">갱신 중...</span>}
             </div>
             <h3 id="question-results-live-title" className="text-2xl font-bold text-gray-800 mt-1">전체 질문 실시간 보기</h3>
             <p className="text-sm text-gray-500 mt-1">
@@ -438,7 +438,7 @@ function QuestionResultsModal({
 
           {activeSessions.length > 0 && (
             <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
-              <p className="text-xs font-semibold text-amber-700">
+              <p className="text-sm font-semibold text-amber-700">
                 작성 중 · {activeSessions.map((session) => `${session.student_number}번 ${session.student_name}`).join(", ")}
               </p>
             </div>
@@ -452,7 +452,7 @@ function QuestionResultsModal({
           >
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/20 pb-3">
               <div>
-                <p className="text-xs font-semibold tracking-[0.2em] text-emerald-200">질문 칠판</p>
+                <p className="text-sm font-semibold tracking-[0.2em] text-emerald-200">질문 칠판</p>
                 <h4 className="mt-1 text-xl font-bold text-white sm:text-2xl">
                   {selectedBoardResult
                     ? `${selectedBoardResult.studentNumber}번 ${selectedBoardResult.studentName}`
@@ -578,12 +578,12 @@ function QuestionResultsModal({
           {results.length > 0 && (
             <div className="mb-5">
               <div className="mb-2 flex items-baseline justify-between gap-2">
-                <p className="text-xs font-bold text-gray-500">학생 명단 · 누르면 칠판에 보여요</p>
+                <p className="text-sm font-bold text-gray-500">학생 명단 · 누르면 칠판에 보여요</p>
                 {boardSessionId && (
                   <button
                     type="button"
                     onClick={() => setBoardSessionId(null)}
-                    className="text-xs font-semibold text-gray-400 hover:text-gray-600"
+                    className="text-sm font-semibold text-gray-400 hover:text-gray-600"
                   >
                     칠판 비우기
                   </button>
@@ -645,7 +645,7 @@ function QuestionResultsModal({
                           onClick={() => showStudentOnBoard(sessionId)}
                           aria-pressed={boardSessionId === sessionId}
                           aria-label={`${studentNumber}번 ${studentName} 질문을 칠판에서 보기`}
-                          className="group text-left text-xs font-semibold text-sky-600 hover:text-sky-800"
+                          className="group text-left text-sm font-semibold text-sky-600 hover:text-sky-800"
                         >
                           <span className="underline-offset-4 group-hover:underline">{studentNumber}번 {studentName}</span>
                           <span className="text-gray-400"> · 질문 {order}</span>
@@ -681,14 +681,14 @@ function QuestionResultsModal({
                     </div>
                     {showQuestionCards && selection.originalPrompt && (
                       <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2">
-                        <p className="text-xs font-semibold text-gray-500">고른 질문 카드</p>
+                        <p className="text-sm font-semibold text-gray-500">고른 질문 카드</p>
                         <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
                       </div>
                     )}
                     <div className="mt-3 space-y-2">
                       {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
                         <div className="rounded-xl bg-gray-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-gray-400">학생이 적은 원본</p>
+                          <p className="text-sm font-semibold text-gray-400">학생이 적은 원본</p>
                           <p className="mt-1 text-sm leading-relaxed text-gray-500 line-through decoration-gray-300">
                             {selection.originalRemixedQuestion}
                           </p>
@@ -696,7 +696,7 @@ function QuestionResultsModal({
                       )}
                       <div className={`rounded-xl px-3 py-2 ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "bg-emerald-50" : ""}`}>
                         {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
-                          <p className="text-xs font-semibold text-emerald-700">최종 질문 (교사가 고침)</p>
+                          <p className="text-sm font-semibold text-emerald-700">최종 질문 (교사가 고침)</p>
                         )}
                         <p className={`text-base font-medium leading-relaxed ${selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion ? "mt-1 text-emerald-950" : "text-sky-950"}`}>
                           {selection.remixedQuestion}
@@ -722,7 +722,7 @@ function QuestionResultsModal({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold text-sky-500">학생</p>
+                      <p className="text-sm font-semibold text-sky-500">학생</p>
                       <button
                         type="button"
                         onClick={() => showStudentOnBoard(result.sessionId)}
@@ -777,7 +777,7 @@ function QuestionResultsModal({
                                 <button
                                   type="button"
                                   onClick={() => startEdit(result.sessionId, selection.id, selection.remixedQuestion)}
-                                  className="rounded-xl bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                                  className="rounded-xl bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-700 hover:bg-sky-100"
                                 >
                                   ✏️ 수정
                                 </button>
@@ -787,14 +787,14 @@ function QuestionResultsModal({
 
                           {showQuestionCards && selection.originalPrompt && (
                             <div className="mt-3 rounded-2xl bg-gray-50 p-3">
-                              <p className="text-xs font-semibold text-gray-500">고른 질문 카드</p>
+                              <p className="text-sm font-semibold text-gray-500">고른 질문 카드</p>
                               <p className="mt-1 text-sm leading-relaxed text-gray-700">{selection.originalPrompt}</p>
                             </div>
                           )}
 
                           {isEditing ? (
                             <div className="mt-3 rounded-2xl bg-sky-50 p-3">
-                              <p className="text-xs font-semibold text-sky-700">학생이 만든 질문 수정</p>
+                              <p className="text-sm font-semibold text-sky-700">학생이 만든 질문 수정</p>
                               <textarea
                                 value={editingText}
                                 onChange={(event) => setEditingText(event.target.value)}
@@ -802,14 +802,14 @@ function QuestionResultsModal({
                                 className="mt-2 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm leading-relaxed text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-300 resize-y"
                               />
                               {editError && (
-                                <p className="mt-2 text-xs font-semibold text-red-600">{editError}</p>
+                                <p className="mt-2 text-sm font-semibold text-red-600">{editError}</p>
                               )}
                               <div className="mt-2 flex items-center justify-end gap-2">
                                 <button
                                   type="button"
                                   onClick={cancelEdit}
                                   disabled={isSaving}
-                                  className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                                  className="rounded-xl bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
                                 >
                                   취소
                                 </button>
@@ -817,7 +817,7 @@ function QuestionResultsModal({
                                   type="button"
                                   onClick={() => saveEdit(result.sessionId, selection.id)}
                                   disabled={isSaving}
-                                  className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                                  className="rounded-xl bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
                                 >
                                   {isSaving ? "저장 중..." : "저장"}
                                 </button>
@@ -827,7 +827,7 @@ function QuestionResultsModal({
                             <div className="mt-3 space-y-2">
                               {selection.originalRemixedQuestion && selection.originalRemixedQuestion !== selection.remixedQuestion && (
                                 <div className="rounded-2xl bg-gray-50 p-3">
-                                  <p className="text-xs font-semibold text-gray-500">학생이 적은 원본</p>
+                                  <p className="text-sm font-semibold text-gray-500">학생이 적은 원본</p>
                                   <p className="mt-1 text-sm leading-relaxed text-gray-500 line-through decoration-gray-300">
                                     {selection.originalRemixedQuestion}
                                   </p>
@@ -962,7 +962,7 @@ function StudentSessionResultModal({
               <h3 className="text-lg font-bold text-gray-800">
                 {session.student_name} 학생의 완성 결과
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-sm text-gray-500 mt-0.5">
                 {activityType === "question_generator"
                   ? "질문 만들기"
                   : activityType === "question_voting"
@@ -980,7 +980,7 @@ function StudentSessionResultModal({
               <QuestionCardVisibilityButton
                 showQuestionCards={showQuestionCards}
                 onToggle={() => setShowQuestionCards((current) => !current)}
-                className="px-3.5 py-1.5 text-xs"
+                className="px-3.5 py-1.5 text-sm"
               />
             )}
             <button
@@ -1007,13 +1007,13 @@ function StudentSessionResultModal({
                 currentQuestionResult.selections.map((selection, idx) => (
                   <div key={selection.id || idx} className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-sky-600">질문 {idx + 1}</span>
+                      <span className="text-sm font-bold text-sky-600">질문 {idx + 1}</span>
                       <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded-full border border-sky-100">
                         {selection.method === "direct" ? "직접 작성" : selection.cardSetLabel}
                       </span>
                     </div>
                     {showQuestionCards && selection.originalPrompt && (
-                      <p className="text-xs text-gray-500 mb-1.5 bg-white/70 p-2 rounded-lg">
+                      <p className="text-sm text-gray-500 mb-1.5 bg-white/70 p-2 rounded-lg">
                         💡 {selection.originalPrompt}
                       </p>
                     )}
@@ -1065,12 +1065,12 @@ function StudentSessionResultModal({
           {activityType === "one_line_share" && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-5">
-                <p className="text-xs font-bold text-rose-500 mb-2">내가 작성한 한 줄</p>
+                <p className="text-sm font-bold text-rose-500 mb-2">내가 작성한 한 줄</p>
                 <p className="text-base font-semibold text-rose-950 leading-relaxed bg-white p-4 rounded-xl shadow-sm">
                   💬 &ldquo;{currentOneLine?.content || (typeof session.submission === "object" && session.submission !== null && "content" in session.submission ? String((session.submission as Record<string, unknown>).content) : "작성된 문장이 없습니다.")}&rdquo;
                 </p>
                 {currentOneLine && (
-                  <div className="mt-3 flex items-center justify-between text-xs text-rose-700">
+                  <div className="mt-3 flex items-center justify-between text-sm text-rose-700">
                     <span>❤️ 받은 좋아요: {currentOneLine.likeCount}개</span>
                     <span>{new Date(currentOneLine.createdAt).toLocaleTimeString("ko-KR")}</span>
                   </div>
@@ -1083,7 +1083,7 @@ function StudentSessionResultModal({
           {activityType === "hanja_writing" && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
-                <p className="text-xs font-bold text-amber-600 mb-2">작성한 문장</p>
+                <p className="text-sm font-bold text-amber-600 mb-2">작성한 문장</p>
                 <p className="text-base font-semibold text-gray-900 leading-relaxed bg-white p-4 rounded-xl shadow-sm">
                   {typeof session.submission === "object" && session.submission !== null && "content" in session.submission
                     ? String((session.submission as Record<string, unknown>).content)
@@ -1136,11 +1136,11 @@ function OutlineAnswersView({ answers }: { answers: unknown }) {
     <div className="space-y-4">
       {grouped.map(({ section, items }) => (
         <div key={section} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-          <p className="text-xs font-bold text-indigo-600 mb-2.5">{section}</p>
+          <p className="text-sm font-bold text-indigo-600 mb-2.5">{section}</p>
           <div className="space-y-2">
             {items.map((item, i) => (
               <div key={i} className="bg-white rounded-xl px-4 py-3 shadow-sm">
-                <p className="text-xs text-gray-500 mb-1 font-medium">{item.label}</p>
+                <p className="text-sm text-gray-500 mb-1 font-medium">{item.label}</p>
                 <p className="text-sm text-gray-800 whitespace-pre-line font-medium leading-relaxed">
                   {item.answer || "(비어 있음)"}
                 </p>
@@ -1151,11 +1151,11 @@ function OutlineAnswersView({ answers }: { answers: unknown }) {
       ))}
       {ungrouped.length > 0 && (
         <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-          <p className="text-xs font-bold text-gray-500 mb-2.5">기타</p>
+          <p className="text-sm font-bold text-gray-500 mb-2.5">기타</p>
           <div className="space-y-2">
             {ungrouped.map((item, i) => (
               <div key={i} className="bg-white rounded-xl px-4 py-3 shadow-sm">
-                <p className="text-xs text-gray-500 mb-1 font-medium">{item.label}</p>
+                <p className="text-sm text-gray-500 mb-1 font-medium">{item.label}</p>
                 <p className="text-sm text-gray-800 whitespace-pre-line font-medium leading-relaxed">
                   {item.answer || "(비어 있음)"}
                 </p>
@@ -1271,8 +1271,8 @@ function HanjaWritingResultsModal({
                     <div key={`top-${entry.entryId}`} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-xs font-semibold text-amber-700">#{index + 1} · {entry.studentNumber}번 {entry.studentName}</p>
-                          <p className="mt-1 text-xs font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                          <p className="text-sm font-semibold text-amber-700">#{index + 1} · {entry.studentNumber}번 {entry.studentName}</p>
+                          <p className="mt-1 text-sm font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
                           <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
                         </div>
                         <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
@@ -1298,7 +1298,7 @@ function HanjaWritingResultsModal({
                   {entries.map((entry) => (
                     <div key={entry.entryId} className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
+                        <p className="text-sm font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
                         <div className="flex items-center gap-2">
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
                             받은 ❤️ {entry.likeCount}
@@ -1308,9 +1308,9 @@ function HanjaWritingResultsModal({
                           </span>
                         </div>
                       </div>
-                      <p className="mt-1 text-xs font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                      <p className="mt-1 text-sm font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
                       <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
-                      <p className="mt-3 text-xs text-gray-400">
+                      <p className="mt-3 text-sm text-gray-400">
                         {new Date(entry.createdAt).toLocaleString("ko-KR")}
                       </p>
                     </div>
@@ -1569,7 +1569,7 @@ export default function LiveStudentPanel({
                 실시간 갱신 중
               </span>
             )}
-            <span className="text-xs text-gray-500">
+            <span className="text-sm text-gray-500">
               {activityType === "question_generator" && "학생 질문 모아보기 가능"}
               {activityType === "question_voting" && "좋은 질문 득표수 실시간 집계"}
               {activityType === "one_line_share" && "한 줄 및 좋아요 수 집계"}
@@ -1583,7 +1583,7 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsQuestionResultsOpen(true)}
-                className="rounded-xl bg-sky-500 hover:bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95"
+                className="rounded-xl bg-sky-500 hover:bg-sky-600 px-3 py-1.5 text-sm font-bold text-white shadow-2xs transition-all active:scale-95"
               >
                 📡 전체 질문 실시간 보기
               </button>
@@ -1592,7 +1592,7 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsQuestionVotingResultsOpen(true)}
-                className="rounded-xl bg-violet-500 hover:bg-violet-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-violet-200"
+                className="rounded-xl bg-violet-500 hover:bg-violet-600 px-3 py-1.5 text-sm font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-violet-200"
                 disabled={questionVotingResults.length === 0}
               >
                 📊 좋은 질문 결과 보기
@@ -1602,7 +1602,7 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsOneLineShareResultsOpen(true)}
-                className="rounded-xl bg-rose-500 hover:bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-rose-200"
+                className="rounded-xl bg-rose-500 hover:bg-rose-600 px-3 py-1.5 text-sm font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-rose-200"
                 disabled={oneLineShareResults.length === 0}
               >
                 💬 한줄모아 결과 보기
@@ -1612,7 +1612,7 @@ export default function LiveStudentPanel({
               <button
                 type="button"
                 onClick={() => setIsHanjaWritingResultsOpen(true)}
-                className="rounded-xl bg-amber-500 hover:bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-amber-200"
+                className="rounded-xl bg-amber-500 hover:bg-amber-600 px-3 py-1.5 text-sm font-bold text-white shadow-2xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-amber-200"
                 disabled={hanjaWritingResults.length === 0}
               >
                 📜 한자 문장 결과 보기
@@ -1630,7 +1630,7 @@ export default function LiveStudentPanel({
 
           return (
             <div className="rounded-xl bg-slate-50/80 border border-slate-200/70 p-3 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-gray-500">
+              <div className="flex items-center justify-between text-sm font-bold text-gray-500">
                 <span>학급 전체 진척도 (총 {totalCount}명)</span>
                 <span className="text-emerald-700 font-extrabold">{donePct}% 완료 ({doneSessions.length}명)</span>
               </div>
@@ -1657,23 +1657,23 @@ export default function LiveStudentPanel({
               {/* 3개 지표 인라인 카드 */}
               <div className="grid grid-cols-3 gap-2 text-center pt-0.5">
                 <div className="rounded-lg bg-white px-2 py-1.5 border border-emerald-200 shadow-2xs">
-                  <span className="text-xs font-bold text-emerald-700 block">🟢 완료</span>
+                  <span className="text-sm font-bold text-emerald-700 block">🟢 완료</span>
                   <span className="text-lg font-black text-emerald-800 leading-tight block mt-0.5">
-                    {doneSessions.length}<span className="text-xs font-normal text-gray-400">/{totalCount}</span>
+                    {doneSessions.length}<span className="text-sm font-normal text-gray-400">/{totalCount}</span>
                   </span>
                 </div>
 
                 <div className="rounded-lg bg-white px-2 py-1.5 border border-sky-200 shadow-2xs">
-                  <span className="text-xs font-bold text-sky-700 block">🔵 작성 중</span>
+                  <span className="text-sm font-bold text-sky-700 block">🔵 작성 중</span>
                   <span className="text-lg font-black text-sky-800 leading-tight block mt-0.5">
-                    {activeSessions.length}<span className="text-xs font-normal text-gray-400">명</span>
+                    {activeSessions.length}<span className="text-sm font-normal text-gray-400">명</span>
                   </span>
                 </div>
 
                 <div className="rounded-lg bg-white px-2 py-1.5 border border-gray-200 shadow-2xs">
-                  <span className="text-xs font-bold text-gray-500 block">⚪ 시작 전</span>
+                  <span className="text-sm font-bold text-gray-500 block">⚪ 시작 전</span>
                   <span className="text-lg font-black text-gray-700 leading-tight block mt-0.5">
-                    {notConnected.length}<span className="text-xs font-normal text-gray-400">명</span>
+                    {notConnected.length}<span className="text-sm font-normal text-gray-400">명</span>
                   </span>
                 </div>
               </div>
@@ -1685,11 +1685,11 @@ export default function LiveStudentPanel({
         {doneSessions.length > 0 && (
           <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold text-emerald-800 flex items-center gap-1">
+              <p className="text-sm font-bold text-emerald-800 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 ✅ 제출 완료 ({doneSessions.length}명)
               </p>
-              <p className="text-xs text-emerald-700 font-medium">
+              <p className="text-sm text-emerald-700 font-medium">
                 {activityType === "question_generator"
                   ? "보기 → 학생 질문 상세"
                   : activityType === "question_voting"
@@ -1710,17 +1710,17 @@ export default function LiveStudentPanel({
                   className="flex items-center justify-between gap-1.5 bg-white border border-emerald-200 rounded-lg px-2.5 py-1.5 shadow-2xs hover:border-emerald-300 transition-colors"
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-100 text-xs font-bold text-emerald-700 font-mono">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-100 text-sm font-bold text-emerald-700 font-mono">
                       {s.student_number}
                     </span>
-                    <span className="text-xs font-bold text-gray-800 truncate">{s.student_name}</span>
+                    <span className="text-sm font-bold text-gray-800 truncate">{s.student_name}</span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {activityType === "outline_builder" && showResultQr ? (
                       <button
                         type="button"
                         onClick={() => setQrTarget(s)}
-                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded font-medium transition-colors"
+                        className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded font-medium transition-colors"
                         title="개인 결과 QR 보기"
                       >
                         QR
@@ -1729,7 +1729,7 @@ export default function LiveStudentPanel({
                     <button
                       type="button"
                       onClick={() => setActiveSessionResult(s)}
-                      className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-2xs transition-all active:scale-95"
+                      className="text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-2xs transition-all active:scale-95"
                     >
                       보기 →
                     </button>
@@ -1744,19 +1744,19 @@ export default function LiveStudentPanel({
         {activeSessions.length > 0 && (
           <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold text-sky-800 flex items-center gap-1">
+              <p className="text-sm font-bold text-sky-800 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
                 ✏️ 작성 중인 학생 ({activeSessions.length}명)
               </p>
-              <span className="text-xs text-sky-600 font-medium">실시간 작성 진행</span>
+              <span className="text-sm text-sky-600 font-medium">실시간 작성 진행</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
               {activeSessions.map((s) => (
                 <div key={s.id} className="rounded-lg border border-sky-200 bg-white px-2 py-1.5 shadow-2xs flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sky-100 text-xs font-bold text-sky-700 font-mono">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sky-100 text-sm font-bold text-sky-700 font-mono">
                     {s.student_number}
                   </span>
-                  <span className="text-xs font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
+                  <span className="text-sm font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
                   {s.level && (
                     <span className={`text-xs px-1 rounded shrink-0 ${levelStyle(s.level)}`}>
                       {levelLabel(s.level)}
@@ -1772,14 +1772,14 @@ export default function LiveStudentPanel({
         {notConnected.length > 0 && (
           <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold text-gray-600">⬜ 시작 전 ({notConnected.length}명)</p>
-              <span className="text-xs text-gray-400">미참여 학생</span>
+              <p className="text-sm font-bold text-gray-600">⬜ 시작 전 ({notConnected.length}명)</p>
+              <span className="text-sm text-gray-400">미참여 학생</span>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-1">
               {notConnected.map((s) => (
-                <div key={s.id} className="flex items-center gap-1 bg-white border border-gray-200 rounded px-1.5 py-1 text-xs shadow-2xs">
-                  <span className="text-xs text-gray-400 font-mono w-3.5 shrink-0">{s.student_number}</span>
-                  <span className="text-xs text-gray-600 font-medium truncate">{s.student_name}</span>
+                <div key={s.id} className="flex items-center gap-1 bg-white border border-gray-200 rounded px-1.5 py-1 text-sm shadow-2xs">
+                  <span className="text-sm text-gray-400 font-mono w-3.5 shrink-0">{s.student_number}</span>
+                  <span className="text-sm text-gray-600 font-medium truncate">{s.student_name}</span>
                 </div>
               ))}
             </div>
@@ -1787,11 +1787,11 @@ export default function LiveStudentPanel({
         )}
 
         {sessions.length === 0 && students.length === 0 && (
-          <p className="text-center text-gray-400 text-xs py-3">학생 명단이 없습니다.</p>
+          <p className="text-center text-gray-400 text-sm py-3">학생 명단이 없습니다.</p>
         )}
 
         {sessions.length === 0 && students.length > 0 && (
-          <p className="text-center text-gray-400 text-xs py-2 animate-pulse">
+          <p className="text-center text-gray-400 text-sm py-2 animate-pulse">
             학생이 활동에 입장하면 여기에 표시돼요
           </p>
         )}

@@ -203,7 +203,7 @@ export function ActiveRoomsTabs({ activeRooms, classId }: ActiveRoomsTabsProps) 
                 <Link href={href} className="block p-5">
                   <span className="block text-2xl">{cardEmoji(room)}</span>
                   <h3 className="mt-2 font-bold text-gray-800 text-sm leading-snug line-clamp-2 pr-12">{room.title}</h3>
-                  <p className="mt-1 text-xs text-gray-500 line-clamp-1">주제: {room.topic}</p>
+                  <p className="mt-1 text-sm text-gray-500 line-clamp-1">주제: {room.topic}</p>
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -216,7 +216,7 @@ export function ActiveRoomsTabs({ activeRooms, classId }: ActiveRoomsTabsProps) 
                       <span className="text-xs bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full">{room.subject_type}</span>
                     )}
                   </div>
-                  <p className="mt-2 text-xs text-gray-400 font-medium">
+                  <p className="mt-2 text-sm text-gray-400 font-medium">
                     {new Date(room.created_at).toLocaleDateString("ko-KR")} 개설
                   </p>
                 </Link>

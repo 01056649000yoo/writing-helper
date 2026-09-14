@@ -144,7 +144,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
             <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
               <span>✨</span> AI 질문 카드 묶음 생성기
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">오늘 수업 주제에 딱 맞는 질문 카드 묶음과 질문 힌트를 AI로 빠르게 생성합니다.</p>
+            <p className="text-sm text-gray-500 mt-0.5">오늘 수업 주제에 딱 맞는 질문 카드 묶음과 질문 힌트를 AI로 빠르게 생성합니다.</p>
           </div>
           {step !== "generating" && step !== "saving" && (
             <button
@@ -268,7 +268,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
           {step === "preview" && (
             <div className="space-y-6">
               <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100/60">
-                <p className="text-xs text-indigo-700 font-bold leading-relaxed">
+                <p className="text-sm text-indigo-700 font-bold leading-relaxed">
                   💡 <strong>작성 꿀팁</strong>: AI가 추천한 역할과 질문들을 확인해 보세요. 
                   이모지와 텍스트를 마우스로 클릭하면 즉시 수정할 수 있습니다. 
                   수정이 완료된 역할 중 등록할 카드만 왼쪽 체크박스를 켜고 하단 일괄 등록을 누르세요.
@@ -320,7 +320,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                               type="text"
                               value={role.subtitle}
                               onChange={(e) => handleUpdateRoleField(roleIdx, "subtitle", e.target.value)}
-                              className="w-full text-indigo-600 bg-indigo-50/50 rounded-lg border border-indigo-100 px-2 py-1.5 text-xs font-bold focus:ring-1 focus:ring-indigo-500"
+                              className="w-full text-indigo-600 bg-indigo-50/50 rounded-lg border border-indigo-100 px-2 py-1.5 text-sm font-bold focus:ring-1 focus:ring-indigo-500"
                               placeholder="짧은 성격 설명"
                             />
                           </div>
@@ -329,7 +329,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                               type="text"
                               value={role.description}
                               onChange={(e) => handleUpdateRoleField(roleIdx, "description", e.target.value)}
-                              className="w-full text-gray-500 rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500"
+                              className="w-full text-gray-500 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500"
                               placeholder="학생용 역할 설명"
                             />
                           </div>
@@ -348,7 +348,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                                     type="text"
                                     value={cardSet.label}
                                     onChange={(e) => handleUpdateCardSetField(roleIdx, cardIdx, "label", e.target.value)}
-                                    className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500"
+                                    className="w-full text-sm font-bold text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500"
                                   />
                                 </div>
                                 <div>
@@ -357,7 +357,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                                     type="text"
                                     value={cardSet.description}
                                     onChange={(e) => handleUpdateCardSetField(roleIdx, cardIdx, "description", e.target.value)}
-                                    className="w-full text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500"
+                                    className="w-full text-sm text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500"
                                   />
                                 </div>
                               </div>
@@ -370,7 +370,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                                   value={cardSet.prompts.join("\n")}
                                   onChange={(e) => handleUpdatePrompts(roleIdx, cardIdx, e.target.value)}
                                   rows={Math.max(3, cardSet.prompts.length)}
-                                  className="w-full text-xs text-gray-700 leading-relaxed border border-gray-200 rounded-lg p-2.5 focus:ring-1 focus:ring-emerald-500 resize-y"
+                                  className="w-full text-sm text-gray-700 leading-relaxed border border-gray-200 rounded-lg p-2.5 focus:ring-1 focus:ring-emerald-500 resize-y"
                                 />
                               </div>
                             </div>

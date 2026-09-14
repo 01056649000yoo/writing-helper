@@ -66,7 +66,7 @@ export function OutlineBuilderDetail({ config, room }: ActivityTeacherDetailProp
           <div className="space-y-3">
             {template.sections.map((section) => (
               <div key={section.key}>
-                <p className="mb-1 text-xs font-bold text-indigo-600">{section.key}</p>
+                <p className="mb-1 text-sm font-bold text-indigo-600">{section.key}</p>
                 {section.items.length === 0 ? (
                   <EmptyLine>이 칸에는 항목이 없습니다.</EmptyLine>
                 ) : (
@@ -75,7 +75,7 @@ export function OutlineBuilderDetail({ config, room }: ActivityTeacherDetailProp
                       <li key={item.id} className="rounded-lg bg-gray-50 px-3 py-2">
                         <p className="text-sm font-semibold text-gray-800">{item.label || "(이름 없는 항목)"}</p>
                         {item.placeholder && (
-                          <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{item.placeholder}</p>
+                          <p className="mt-0.5 text-sm leading-relaxed text-gray-500">{item.placeholder}</p>
                         )}
                       </li>
                     ))}

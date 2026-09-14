@@ -97,7 +97,7 @@ export function DraftSessionsPanel({ classId }: { classId: string }) {
                       e.stopPropagation();
                       setConfirmingDeleteKey(null);
                     }}
-                    className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-200 transition-colors"
+                    className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm font-semibold text-gray-500 hover:bg-gray-200 transition-colors"
                   >
                     취소
                   </button>
@@ -108,7 +108,7 @@ export function DraftSessionsPanel({ classId }: { classId: string }) {
                       e.stopPropagation();
                       handleDeleteDraft(draft.storageKey);
                     }}
-                    className="rounded-lg bg-red-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-600 shadow-sm transition-colors"
+                    className="rounded-lg bg-red-500 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-red-600 shadow-sm transition-colors"
                   >
                     삭제
                   </button>

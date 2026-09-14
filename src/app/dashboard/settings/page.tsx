@@ -211,15 +211,15 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
             <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
-              <p className="text-xs font-semibold text-indigo-700">질문 카드 묶음</p>
+              <p className="text-sm font-semibold text-indigo-700">질문 카드 묶음</p>
               <p className="text-2xl font-bold text-indigo-950 mt-1">{cardSets.length}개</p>
             </div>
             <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4">
-              <p className="text-xs font-semibold text-emerald-700">전체 질문 힌트</p>
+              <p className="text-sm font-semibold text-emerald-700">전체 질문 힌트</p>
               <p className="text-2xl font-bold text-emerald-950 mt-1">{totalPrompts}개</p>
             </div>
             <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 col-span-2 sm:col-span-1">
-              <p className="text-xs font-semibold text-amber-700">핵심 키워드 분류</p>
+              <p className="text-sm font-semibold text-amber-700">핵심 키워드 분류</p>
               <p className="text-2xl font-bold text-amber-950 mt-1">6대 영역 (100% 매핑)</p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2">
               <span className="text-xl">🏷️</span>
               <h2 className="text-lg font-bold text-gray-800">질문 키워드별 카드 목록</h2>
-              <span className="text-xs font-semibold text-gray-400">({filteredCardSets.length}개)</span>
+              <span className="text-sm font-semibold text-gray-400">({filteredCardSets.length}개)</span>
             </div>
 
             <div className="flex gap-2 flex-wrap">
@@ -239,21 +239,21 @@ export default function SettingsPage() {
                 type="button"
                 onClick={handleResetDefaultRoles}
                 disabled={resetting}
-                className="rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-600 px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-all disabled:opacity-50"
+                className="rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-600 px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-all disabled:opacity-50"
               >
                 {resetting ? "초기화 중..." : "🔄 기본값 되돌리기"}
               </button>
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-2xs whitespace-nowrap transition-all"
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-sm font-bold shadow-2xs whitespace-nowrap transition-all"
               >
                 ✨ AI 질문 카드 생성
               </button>
               <button
                 type="button"
                 onClick={addCardSet}
-                className="rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap transition-colors"
+                className="rounded-xl border border-gray-200 bg-white hover:bg-gray-50 px-3.5 py-2 text-sm font-semibold text-gray-700 whitespace-nowrap transition-colors"
               >
                 + 새 카드 추가
               </button>
@@ -286,7 +286,7 @@ export default function SettingsPage() {
               placeholder="질문 또는 키워드 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="px-3.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full sm:w-56"
+              className="px-3.5 py-1.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full sm:w-56"
             />
           </div>
 
@@ -333,11 +333,11 @@ export default function SettingsPage() {
                             <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">
                               {card.label}
                             </h3>
-                            <span className="text-xs font-semibold text-gray-400 shrink-0">
+                            <span className="text-sm font-semibold text-gray-400 shrink-0">
                               (질문 {card.prompts.length}개)
                             </span>
                           </div>
-                          <p className="text-xs text-gray-500 truncate mt-0.5">
+                          <p className="text-sm text-gray-500 truncate mt-0.5">
                             {card.description || "설명 없음"}
                           </p>
                         </div>
@@ -350,14 +350,14 @@ export default function SettingsPage() {
                             <button
                               type="button"
                               onClick={() => updateCardSet(card.id, { isExpanded: !card.isExpanded })}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors"
+                              className="text-sm font-semibold px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors"
                             >
                               {card.isExpanded ? "질문 접기 ▲" : "질문 보기 👁️"}
                             </button>
                             <button
                               type="button"
                               onClick={() => updateCardSet(card.id, { isEditing: true, isExpanded: true })}
-                              className="text-xs font-bold px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
+                              className="text-sm font-bold px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
                             >
                               수정 ✏️
                             </button>
@@ -368,7 +368,7 @@ export default function SettingsPage() {
                           type="button"
                           onClick={() => handleDeleteCardSet(card)}
                           disabled={deletingCardId === card.id}
-                          className="text-xs font-semibold px-2.5 py-1.5 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                          className="text-sm font-semibold px-2.5 py-1.5 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
                         >
                           삭제
                         </button>
@@ -378,16 +378,16 @@ export default function SettingsPage() {
                     {/* 1. 조회 모드: 질문 힌트 목록 펼침 */}
                     {card.isExpanded && !card.isEditing && (
                       <div className="px-5 pb-5 pt-1 border-t border-gray-100 bg-gray-50/50 space-y-2">
-                        <p className="text-xs font-bold text-gray-500 mt-2 mb-1">
+                        <p className="text-sm font-bold text-gray-500 mt-2 mb-1">
                           포함된 질문 힌트 목록 ({card.prompts.length}개)
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {card.prompts.map((prompt, pIdx) => (
                             <div
                               key={pIdx}
-                              className="p-3 rounded-xl bg-white border border-gray-200/80 shadow-2xs flex items-start gap-2.5 text-xs text-gray-800 leading-relaxed font-medium"
+                              className="p-3 rounded-xl bg-white border border-gray-200/80 shadow-2xs flex items-start gap-2.5 text-sm text-gray-800 leading-relaxed font-medium"
                             >
-                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-indigo-50 text-indigo-700 text-xs font-bold">
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-indigo-50 text-indigo-700 text-sm font-bold">
                                 {pIdx + 1}
                               </span>
                               <span className="flex-1">{prompt}</span>
@@ -402,22 +402,22 @@ export default function SettingsPage() {
                       <div className="px-5 pb-5 pt-3 border-t border-indigo-100 bg-indigo-50/20 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-bold text-gray-700 mb-1">카드 제목</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">카드 제목</label>
                             <input
                               type="text"
                               value={card.label}
                               onChange={(e) => updateCardSet(card.id, { label: e.target.value })}
-                              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-gray-700 mb-1">카드 설명</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">카드 설명</label>
                             <input
                               type="text"
                               value={card.description}
                               onChange={(e) => updateCardSet(card.id, { description: e.target.value })}
-                              className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
                             />
                           </div>
                         </div>
@@ -425,7 +425,7 @@ export default function SettingsPage() {
                         {/* 개별 질문 리스트 수정 */}
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <label className="block text-xs font-bold text-gray-700">
+                            <label className="block text-sm font-bold text-gray-700">
                               질문 힌트 문장 ({card.prompts.length}개)
                             </label>
                             <button
@@ -435,7 +435,7 @@ export default function SettingsPage() {
                                   prompts: [...card.prompts, "새 질문 힌트를 입력하세요."],
                                 });
                               }}
-                              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg transition-colors"
+                              className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg transition-colors"
                             >
                               + 질문 추가
                             </button>
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                           <div className="space-y-2">
                             {card.prompts.map((prompt, pIdx) => (
                               <div key={pIdx} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200">
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 text-xs font-bold">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 text-sm font-bold">
                                   {pIdx + 1}
                                 </span>
                                 <input
@@ -455,7 +455,7 @@ export default function SettingsPage() {
                                     nextPrompts[pIdx] = e.target.value;
                                     updateCardSet(card.id, { prompts: nextPrompts });
                                   }}
-                                  className="w-full text-xs text-gray-800 focus:outline-none"
+                                  className="w-full text-sm text-gray-800 focus:outline-none"
                                 />
                                 <button
                                   type="button"
@@ -463,7 +463,7 @@ export default function SettingsPage() {
                                     const nextPrompts = card.prompts.filter((_, idx) => idx !== pIdx);
                                     updateCardSet(card.id, { prompts: nextPrompts });
                                   }}
-                                  className="text-gray-400 hover:text-red-500 text-xs px-1.5 py-0.5 rounded"
+                                  className="text-gray-400 hover:text-red-500 text-sm px-1.5 py-0.5 rounded"
                                   title="질문 삭제"
                                 >
                                   ✕
@@ -484,7 +484,7 @@ export default function SettingsPage() {
                                 updateCardSet(card.id, { isEditing: false });
                               }
                             }}
-                            className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 bg-white border border-gray-200 rounded-xl"
+                            className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-white border border-gray-200 rounded-xl"
                           >
                             취소
                           </button>
@@ -492,7 +492,7 @@ export default function SettingsPage() {
                             type="button"
                             onClick={() => handleSaveCardSet(card, index)}
                             disabled={savingCardId === card.id}
-                            className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-2xs transition-all disabled:opacity-50"
+                            className="px-5 py-2 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-2xs transition-all disabled:opacity-50"
                           >
                             {savingCardId === card.id ? "저장 중..." : "저장 완료"}
                           </button>

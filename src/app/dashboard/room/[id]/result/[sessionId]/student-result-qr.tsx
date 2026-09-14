@@ -42,7 +42,7 @@ export function StudentResultQr({
   return (
     <>
       <div className="flex flex-col items-center gap-2 shrink-0">
-        <p className="text-xs text-gray-400 font-medium">학생 결과 QR</p>
+        <p className="text-sm text-gray-400 font-medium">학생 결과 QR</p>
         {qrSmall ? (
           <button
             onClick={() => setExpanded(true)}
@@ -51,7 +51,7 @@ export function StudentResultQr({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qrSmall} alt="학생 결과 QR" className="w-20 h-20" />
-            <p className="text-xs text-green-600 text-center mt-1 group-hover:font-medium">크게 보기</p>
+            <p className="text-sm text-green-600 text-center mt-1 group-hover:font-medium">크게 보기</p>
           </button>
         ) : (
           <div className="w-24 h-24 bg-gray-100 rounded-2xl animate-pulse" />
@@ -68,7 +68,7 @@ export function StudentResultQr({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center">
-              <p className="text-xs text-gray-400 mb-0.5">개인 결과 QR</p>
+              <p className="text-sm text-gray-400 mb-0.5">개인 결과 QR</p>
               <h3 className="text-xl font-bold text-gray-800">
                 {studentNumber}번 {studentName}
               </h3>
@@ -77,7 +77,7 @@ export function StudentResultQr({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={qrLarge} alt="QR 확대" className="w-full max-w-xs rounded-2xl" />
             )}
-            <p className="text-xs text-gray-400 text-center">
+            <p className="text-sm text-gray-400 text-center">
               학생이 이 QR을 스캔하면 개요를 바로 복사할 수 있어요
             </p>
             <button

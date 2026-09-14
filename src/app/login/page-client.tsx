@@ -93,7 +93,7 @@ export default function LoginPageClient() {
 
             <div className="mb-8 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3">
               <span className="text-amber-500 text-base shrink-0 mt-0.5">🧪</span>
-              <p className="text-xs leading-relaxed text-amber-800">
+              <p className="text-sm leading-relaxed text-amber-800">
                 <strong>지금은 베타 버전</strong>이에요. 기능을 만들어가며 함께 다듬는 중이라 일부 화면이 바뀌거나 점검 중일 수 있어요. 불편한 점은 언제든 알려주세요!
               </p>
             </div>
@@ -128,7 +128,7 @@ export default function LoginPageClient() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-center px-1">
                       <label className="block text-sm font-semibold text-gray-700">비밀번호</label>
-                      <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-indigo-500 transition-colors">
+                      <Link href="/forgot-password" className="text-sm text-gray-400 hover:text-indigo-500 transition-colors">
                         비밀번호 찾기
                       </Link>
                     </div>
@@ -198,14 +198,14 @@ export default function LoginPageClient() {
                 <span className="block text-sm font-bold text-sky-900">
                   {ssoEnabled ? "아지트에서 교사 로그인하기" : "끄적끄적아지트로 이동"}
                 </span>
-                <span className="mt-1 block text-xs text-sky-700">
+                <span className="mt-1 block text-sm text-sky-700">
                   {ssoEnabled ? "로그인 후 글쓰기 연구소 메뉴를 눌러주세요" : "글쓰기 활동하러 이동하기"}
                 </span>
               </span>
               <span className="text-lg font-semibold text-sky-700">→</span>
             </a>
 
-            <p className="text-center text-xs text-gray-300 mt-8 font-medium">
+            <p className="text-center text-sm text-gray-300 mt-8 font-medium">
               v2.1.0 • AZIT WRITING LAB
             </p>
           </div>
@@ -244,7 +244,7 @@ function CompactFeatureCard({
         <span className="text-xl shrink-0">{emoji}</span>
         <div>
           <p className="text-sm font-bold text-white">{title}</p>
-          <p className="mt-1 text-xs leading-relaxed text-indigo-100/85">{desc}</p>
+          <p className="mt-1 text-sm leading-relaxed text-indigo-100/85">{desc}</p>
         </div>
       </div>
     </div>

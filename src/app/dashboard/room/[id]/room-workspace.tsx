@@ -39,7 +39,7 @@ export function RoomWorkspace({
             </div>
             <h1 className="text-base sm:text-lg font-black text-gray-800 truncate">{room.title}</h1>
             {room.topic && (
-              <span className="text-xs text-gray-500 font-medium truncate hidden sm:inline">
+              <span className="text-sm text-gray-500 font-medium truncate hidden sm:inline">
                 주제: {room.topic}
               </span>
             )}
@@ -69,7 +69,7 @@ export function RoomWorkspace({
             })
           ) : (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-4">
-              <p className="text-xs text-gray-400">이 활동은 아직 내용 화면이 없습니다.</p>
+              <p className="text-sm text-gray-400">이 활동은 아직 내용 화면이 없습니다.</p>
             </div>
           )}
         </div>

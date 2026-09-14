@@ -20,7 +20,7 @@ export function QuestionGeneratorDetail({ config, room }: ActivityTeacherDetailP
         <p className="text-sm font-semibold text-gray-800">
           {modeMeta.icon} {modeMeta.label}
         </p>
-        <p className="mt-1 text-xs leading-relaxed text-gray-500">{modeMeta.teacherHint}</p>
+        <p className="mt-1 text-sm leading-relaxed text-gray-500">{modeMeta.teacherHint}</p>
       </DetailSection>
 
       {room.topicDescription && (
@@ -42,10 +42,10 @@ export function QuestionGeneratorDetail({ config, room }: ActivityTeacherDetailP
                 <div key={cardSet.id} className="rounded-lg bg-gray-50 px-3 py-2">
                   <p className="text-sm font-semibold text-gray-800">
                     {cardSet.label}
-                    <span className="ml-1.5 text-xs font-normal text-gray-400">{cardSet.prompts.length}개</span>
+                    <span className="ml-1.5 text-sm font-normal text-gray-400">{cardSet.prompts.length}개</span>
                   </p>
                   {cardSet.prompts.length > 0 && (
-                    <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    <p className="mt-1 text-sm leading-relaxed text-gray-500">
                       {cardSet.prompts.slice(0, 6).join(" · ")}
                       {cardSet.prompts.length > 6 && ` 외 ${cardSet.prompts.length - 6}개`}
                     </p>
@@ -67,7 +67,7 @@ export function QuestionGeneratorDetail({ config, room }: ActivityTeacherDetailP
         <FactRows rows={[
           { label: "한 명이 만드는 질문 수", value: `${normalized.maxSelections}개` },
         ]} />
-        <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-500">{normalized.guidance}</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-500">{normalized.guidance}</p>
       </DetailSection>
     </>
   );

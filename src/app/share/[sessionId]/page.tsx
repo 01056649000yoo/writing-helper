@@ -100,7 +100,7 @@ export default async function SharePage({
             의 <strong>{room?.topic}</strong> 글쓰기 개요
           </p>
           {room?.title && (
-            <p className="text-xs text-gray-400 mt-1">{room.title}</p>
+            <p className="text-sm text-gray-400 mt-1">{room.title}</p>
           )}
         </div>
 
@@ -113,7 +113,7 @@ export default async function SharePage({
               <div className="space-y-3">
                 {items.map((item, i) => (
                   <div key={i} className="rounded-2xl bg-orange-50/60 px-4 py-3">
-                    <p className="text-xs font-semibold text-orange-700 mb-1">{item.label}</p>
+                    <p className="text-sm font-semibold text-orange-700 mb-1">{item.label}</p>
                     <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{item.answer || "(비어 있음)"}</p>
                   </div>
                 ))}
@@ -124,7 +124,7 @@ export default async function SharePage({
 
         <CopyButton text={copyText} />
 
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-sm text-gray-400">
           이 개요를 보면서 글을 완성해봐요 ✍️
         </p>
       </div>
