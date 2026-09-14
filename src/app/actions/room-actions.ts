@@ -281,6 +281,13 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       sourceQuestions: shuffledQuestions,
       evaluationCriteria,
       maxSelections: clampNumber(formData.get("max_selections"), 1, shuffledQuestions.length, 1),
+      /*
+       * 좋은 질문을 누가 고르는지. 화면에서 안 보내면 아이들 투표로 본다(지금까지의 기본값).
+       * 이 값이 개요 짜기에서 무엇을 보여 줄지 정한다 — 짐작하지 않고 선생님이 정한다.
+       */
+      selectionMode: String(formData.get("selection_mode") ?? "") === "teacher_set"
+        ? ("teacher_set" as const)
+        : ("student_vote" as const),
     };
   } else if (activityType === "hanja_writing") {
     const cardRaw = String(formData.get("hanja_card") ?? "").trim();

@@ -606,12 +606,28 @@ export async function getOutlineSharedQuestionCandidates(sessionId: string, room
     if (!config) return [];
 
     const ranking = buildQuestionVotingRanking(config, submissionsByRoom.get(room.id) ?? []);
-    // 한 표도 못 받은 질문은 담지 않는다 — `선별된 좋은 질문`이라는 말의 뜻이 흐려진다.
-    // 아직 아무도 고르지 않았으면(투표 전) 후보를 순서대로 보여 준다.
     const voted = ranking.filter((entry) => entry.votes > 0);
-    const source = voted.length > 0
-      ? voted
-      : config.sourceQuestions.map((question) => ({ questionId: question.id, text: question.text, votes: 0 }));
+    const curated = config.sourceQuestions.map((question) => ({
+      questionId: question.id,
+      text: question.text,
+      votes: 0,
+    }));
+
+    /*
+     * 누가 고른 질문을 줄 것인가 (2026-09-14).
+     *
+     * 전에는 이 뜻을 **표가 하나라도 있는지**로 짐작했다. 그래서 선생님이 질문을 정리해 두고
+     * 투표를 시킬 생각이 없었는데 아이 한 명이 활동방에 들어가 두 개를 고르면, 그 순간부터
+     * 나머지가 개요 짜기에서 **조용히 사라졌다.** 선생님은 까닭을 알 길이 없었다.
+     * 이제는 방을 만들 때 선생님이 정한 값을 그대로 따른다.
+     *
+     * 옛 방에는 그 값이 없다. 그때만 예전처럼 짐작한다 — 이미 그렇게 돌던 방의 동작을 바꾸지 않는다.
+     */
+    const source = config.selectionMode === "teacher_set"
+      ? curated
+      : config.selectionMode === "student_vote"
+        ? voted
+        : (voted.length > 0 ? voted : curated);
 
     const questions = source
       .slice(0, remainingQuestionCount)

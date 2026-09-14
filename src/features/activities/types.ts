@@ -217,6 +217,18 @@ export type QuestionVotingConfig = {
   }>;
   evaluationCriteria: string[];
   maxSelections: number;
+  /*
+   * 좋은 질문을 **누가** 고르는가 (2026-09-14).
+   *   "student_vote" 아이들이 투표로 고른다 — 표를 받은 질문만 다음 활동으로 간다.
+   *   "teacher_set"  선생님이 정리해 둔 그대로 준다 — 투표와 상관없이 담은 질문이 모두 간다.
+   *
+   * 왜 필요한가: 전에는 이 뜻을 **표가 하나라도 있는지**로 짐작했다. 그래서 선생님이 질문을
+   * 정리해 두고 투표를 시킬 생각이 없었는데 아이 한 명이 활동방에 들어가 두 개를 고르면,
+   * 그 순간부터 나머지가 개요 짜기에서 조용히 사라졌다. 짐작하지 않고 선생님이 정한다.
+   *
+   * 옛 방에는 이 값이 없다(undefined). 그때는 지금까지 하던 대로 둔다.
+   */
+  selectionMode?: "student_vote" | "teacher_set";
 };
 
 export type QuestionVotingSubmission = {

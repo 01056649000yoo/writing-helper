@@ -31,9 +31,17 @@ test("우리 반이 고른 질문을 득표순으로, 같은 교사·같은 학�
   // 개요에 넣을 질문은 "좋다고 뽑힌 것"이어야 좋은 질문 고르기 활동과 이어진다.
   assert.match(source, /buildQuestionVotingRanking\(config, submissionsByRoom/);
   assert.match(source, /entry\.votes > 0/);
-  // 아직 아무도 고르지 않았으면 후보를 그대로 보여 준다(활동 직후에도 비어 보이지 않게).
-  assert.match(source, /voted\.length > 0/);
+  /*
+   * 2026-09-14: 무엇을 줄지 **짐작하지 않는다.**
+   * 전에는 `표가 하나라도 있는지` 로 갈랐다. 그래서 선생님이 질문을 정리해 두고 투표를 시킬 생각이
+   * 없었는데 아이 한 명이 활동방에서 두 개를 고르면, 그 순간부터 나머지가 개요 짜기에서
+   * **조용히 사라졌다.** 이제 방을 만들 때 선생님이 정한 값(selectionMode)을 따른다.
+   */
+  assert.match(source, /config\.selectionMode === "teacher_set"/);
+  assert.match(source, /config\.selectionMode === "student_vote"/);
   assert.match(source, /config\.sourceQuestions/);
+  // 옛 방에는 그 값이 없다. 그때만 예전처럼 짐작한다 — 이미 돌던 방의 동작을 바꾸지 않는다.
+  assert.match(source, /voted\.length > 0 \? voted : curated/);
   // 집계만 읽고 누가 골랐는지는 화면에 내보내지 않는다.
   assert.match(source, /\.select\("room_id, submission"\)/);
   assert.doesNotMatch(source, /student_name|agit_student_id/);
@@ -260,4 +268,33 @@ test("개요를 내기 전에 전체를 한 화면에서 확인할 수 있다", 
   assert.match(activityPage, /if \(!outlinePreviewOpen\) return undefined;/);
   assert.match(activityPage, /document\.body\.style\.overflow = "hidden";/);
   assert.match(activityPage, /document\.body\.style\.overflow = previousOverflow;/);
+});
+
+
+/*
+ * 2026-09-14 요청: "좋은 질문 고르기를 학생이 할 건지 교사가 할 건지 선택해서 할 수 있게."
+ *
+ * 아이들이 질문 만들기 → 교사가 추려 편집 → 학생이 개요 짜기에서 가져다 쓰기.
+ * 이 흐름에서 투표는 **더 할 수도 있는 일**이지 반드시 거쳐야 하는 관문이 아니다.
+ */
+test("좋은 질문을 누가 고르는지 선생님이 정하고, 그 값이 방에 저장된다", async () => {
+  const [form, contract, types] = await Promise.all([
+    readFile("src/app/dashboard/room/new/page.tsx", "utf8"),
+    readFile("src/lib/question-voting.ts", "utf8"),
+    readFile("src/features/activities/types.ts", "utf8"),
+  ]);
+
+  // 선생님이 방 만들 때 고른다. 두 갈래가 모두 있어야 고르는 뜻이 생긴다.
+  assert.match(form, /selection_mode: "student_vote" \| "teacher_set"/);
+  assert.match(form, /아이들이 투표로 고르기/);
+  assert.match(form, /선생님이 직접 고르기/);
+  assert.match(form, /fd\.set\("selection_mode", draft\.selection_mode\)/);
+
+  // 방에 저장된다. 화면이 안 보내면 지금까지의 기본값(아이들 투표)으로 둔다.
+  assert.match(roomActions, /selectionMode: String\(formData\.get\("selection_mode"\)/);
+  assert.match(roomActions, /"student_vote" as const/);
+
+  // 계약은 아는 값만 받는다 — 모르는 값이 들어오면 옛 방과 같게 비워 둔다.
+  assert.match(contract, /raw\.selectionMode === "teacher_set" \|\| raw\.selectionMode === "student_vote"/);
+  assert.match(types, /selectionMode\?: "student_vote" \| "teacher_set"/);
 });

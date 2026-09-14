@@ -71,6 +71,8 @@ type VotingQuestionDraft = {
 };
 
 type QuestionVotingDraft = {
+  /** 좋은 질문을 누가 고르는가 — 아이들이 투표로("student_vote") 또는 선생님이 정리해서("teacher_set"). */
+  selection_mode: "student_vote" | "teacher_set";
   max_selections: string;
   evaluation_criteria: string;
   source_room_id: string;
@@ -759,6 +761,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
     topic: "",
     topic_description: "",
     mode: "direct",
+    selection_mode: "student_vote",
     max_selections: "3",
     min_selections: "3",
     guidance: "",
@@ -1660,7 +1663,8 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
   const [sourceRooms, setSourceRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
   const [loadingSourceRooms, setLoadingSourceRooms] = useState(true);
   const initialDraft = useMemo<QuestionVotingDraft>(() => ({
-        max_selections: "1",
+    selection_mode: "student_vote",
+    max_selections: "1",
     evaluation_criteria: "생각이 더 이어지는 질문\n친구가 더 이야기하고 싶어지는 질문",
     source_room_id: "",
     source_room_title: "",
@@ -1733,6 +1737,7 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
     const fd = new FormData(e.currentTarget);
     fd.set("class_id", classId);
     fd.set("activity_type", "question_voting");
+    fd.set("selection_mode", draft.selection_mode);
     fd.set("max_selections", String(Math.min(effectiveMaxSelections, selectedQuestions.length)));
     fd.set("selected_questions", JSON.stringify(selectedQuestions));
     fd.set("voting_questions", JSON.stringify(votingQuestionsPayload));
@@ -1813,6 +1818,47 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
             </div>
           )}
         </div>
+
+        {selectedSourceRoom && votingQuestions.length > 0 && (
+          <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-sky-500">좋은 질문을 누가 고를까요?</p>
+            {/*
+              * 전에는 이 뜻을 **표가 하나라도 있는지**로 짐작했다. 그래서 선생님이 질문을 정리해 두고
+              * 투표를 시킬 생각이 없었는데 아이 한 명이 두 개를 고르면, 그 순간부터 나머지가
+              * 개요 짜기에서 조용히 사라졌다. 이제 선생님이 정한다 (2026-09-14).
+              */}
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {([
+                {
+                  id: "student_vote" as const,
+                  title: "아이들이 투표로 고르기",
+                  desc: "활동방에서 아이들이 고릅니다. 개요 짜기에는 표를 받은 질문만 갑니다.",
+                },
+                {
+                  id: "teacher_set" as const,
+                  title: "선생님이 직접 고르기",
+                  desc: "위에서 담은 질문이 그대로 갑니다. 투표를 하지 않아도 개요 짜기에서 바로 씁니다.",
+                },
+              ]).map((option) => {
+                const active = draft.selection_mode === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setDraft((prev) => ({ ...prev, selection_mode: option.id }))}
+                    aria-pressed={active}
+                    className={`rounded-2xl border-2 p-4 text-left transition-colors ${
+                      active ? "border-sky-400 bg-white" : "border-white bg-white/60 hover:border-sky-200"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold text-gray-800">{option.title}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-gray-500">{option.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {selectedSourceRoom && votingQuestions.length > 0 && (
           <div className="rounded-3xl border border-amber-100 bg-amber-50/70 p-5">

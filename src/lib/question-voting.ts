@@ -40,6 +40,10 @@ export function normalizeQuestionVotingConfig(value: unknown): QuestionVotingCon
         sourceQuestions: dedupedSourceQuestions,
         evaluationCriteria,
         maxSelections: clampNumber(raw.maxSelections, 1, Math.max(dedupedSourceQuestions.length, 1), 1),
+        // 아는 값만 받는다. 옛 방에는 없으므로 undefined 로 두어 지금까지 하던 대로 돌게 한다.
+        selectionMode: raw.selectionMode === "teacher_set" || raw.selectionMode === "student_vote"
+          ? raw.selectionMode
+          : undefined,
       }
     : null;
 }
