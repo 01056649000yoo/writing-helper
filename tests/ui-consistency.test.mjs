@@ -218,6 +218,27 @@ test("연구소 상단 메뉴는 PC에서 읽기 쉽고 모바일에서는 넘�
   assert.match(globals, /@media \(max-width:\s*767px\)[\s\S]*?\.lab-nav-link\s*\{[\s\S]*?min-height:\s*46px;[\s\S]*?padding-inline:\s*var\(--ui-space-3\);[\s\S]*?font-size:\s*var\(--text-sm\)/);
 });
 
+test("연구소 상단 메뉴는 아지트와 같은 모양이다", () => {
+  /*
+   * 2026-09-14 지적: 두 앱을 오갈 때 이질감이 있다.
+   * 아지트의 업무 메뉴는 **회색 줄 위에 지금 자리만 흰 바탕으로 떠오르고**, 글자는 0.95rem,
+   * `아이콘 + 이름` 모양이다. 연구소는 흰 줄에 연파랑이 칠해지고 글자가 1rem, 이름만 있었다.
+   *
+   * ⚠️ 아지트 쪽 원본은 `vibe_agit/src/components/teacher/TeacherDashboard.jsx` 의 메뉴 항목과
+   *    `TeacherDashboard.css` 다. 한쪽을 바꾸면 다른 쪽도 같이 바꾼다.
+   */
+  const linkStart = globals.indexOf(".lab-nav-link {");
+  const linkStyles = globals.slice(linkStart, globals.indexOf(".lab-nav-link[aria-current=\"page\"]::after", linkStart));
+  assert.match(linkStyles, /font-size:\s*0\.95rem/);
+  // 활성은 흰 바탕으로 떠오른다. 연파랑을 칠하지 않는다.
+  assert.match(linkStyles, /\[aria-current="page"\]\s*\{[^}]*background:\s*var\(--ui-surface\)/);
+  assert.doesNotMatch(linkStyles, /\[aria-current="page"\]\s*\{[^}]*var\(--ui-primary-soft\)/);
+  // 메뉴 줄은 머리말과 다른 층이다.
+  assert.match(globals, /\.lab-shell__nav-wrap \{[^}]*background:\s*var\(--ui-surface-muted\)/);
+  // 아이콘은 뜻을 돕는 장식이라 화면 낭독에서는 숨긴다.
+  assert.match(nav, /<span aria-hidden="true">\{item\.icon\}<\/span>/);
+});
+
 test("연구소 본문 글꼴은 아지트와 같은 한글 글꼴을 앞에 둔다", async () => {
   const layoutSource = await readFile("src/app/layout.tsx", "utf8");
 

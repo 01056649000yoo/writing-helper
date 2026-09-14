@@ -42,11 +42,15 @@ export function DashboardNav() {
   const activeClassId = currentClassId ?? savedClassId;
   const homeHref = activeClassId ? `/dashboard/class/${activeClassId}` : "/dashboard";
 
+  /*
+   * 아지트의 업무 메뉴는 `아이콘 + 이름` 이다(2026-09-14). 두 화면을 오갈 때 메뉴가 다르게
+   * 보이지 않도록 같은 모양으로 맞춘다. 아이콘은 뜻을 돕는 장식이라 화면 낭독에서는 숨긴다.
+   */
   const primaryItems = [
-    { href: homeHref, label: "학급·활동", section: "home" as const },
-    { href: "/dashboard/settings", label: "질문 카드", section: "settings" as const },
+    { href: homeHref, label: "학급·활동", icon: "🏫", section: "home" as const },
+    { href: "/dashboard/settings", label: "질문 카드", icon: "🗂️", section: "settings" as const },
     // 도움말은 상단에 둔다 — 학급 안에서 활동을 만드는 자리에서도 열려야 한다(2026-08-20).
-    { href: "/dashboard/guide", label: "도움말", section: "guide" as const },
+    { href: "/dashboard/guide", label: "도움말", icon: "❓", section: "guide" as const },
   ];
 
   return (
@@ -60,6 +64,7 @@ export function DashboardNav() {
             className="lab-nav-link"
             aria-current={active ? "page" : undefined}
           >
+            <span aria-hidden="true">{item.icon}</span>
             {item.label}
           </Link>
         );
