@@ -218,6 +218,40 @@ test("연구소 상단 메뉴는 PC에서 읽기 쉽고 모바일에서는 넘�
   assert.match(globals, /@media \(max-width:\s*767px\)[\s\S]*?\.lab-nav-link\s*\{[\s\S]*?min-height:\s*46px;[\s\S]*?padding-inline:\s*var\(--ui-space-3\);[\s\S]*?font-size:\s*var\(--text-sm\)/);
 });
 
+test("화면 폭은 정해진 셋 중 하나만 쓴다", () => {
+  /*
+   * 2026-09-14 지적: 질문 카드는 가운데 정렬인데 도움말은 좌측 정렬이라 거슬린다.
+   *
+   * 까닭은 감싸개가 달랐기 때문이다 — 질문 카드는 `--medium`(960px 가운데), 도움말은
+   * 기본 폭에 Tailwind `max-w-6xl` 만 붙여 **가운데 정렬 없이 왼쪽에 붙어** 있었다.
+   * 폭을 화면마다 손으로 적으면 이런 어긋남이 계속 생긴다. 정해진 셋만 쓴다:
+   *   (기본) 전체 폭 · `--medium` 960 가운데 · `--narrow` 좁은 양식
+   */
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(full);
+      else if (/\.tsx$/.test(entry.name)) files.push(full);
+    }
+  };
+  walk("src");
+
+  const offenders = [];
+  for (const file of files) {
+    for (const match of readFileSync(file, "utf8").matchAll(/className=\{?[`"]([^`"]*lab-page__content[^`"]*)[`"]/g)) {
+      if (/\bmax-w-|\bmx-auto\b/.test(match[1])) offenders.push(`${file}: ${match[1].slice(0, 50)}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `화면 폭을 손으로 적은 자리: ${offenders.join(" / ")}`);
+  // 도움말과 질문 카드는 같은 폭을 쓴다 — 나란히 오갈 때 글이 움직이면 안 된다.
+  // (`guide` 는 이 파일에서 다른 화면을 가리키므로 여기서 직접 읽는다.)
+  const guidePage = readFileSync("src/app/dashboard/guide/page.tsx", "utf8");
+  const settingsPage = readFileSync("src/app/dashboard/settings/page.tsx", "utf8");
+  assert.match(guidePage, /lab-page__content lab-page__content--medium/);
+  assert.match(settingsPage, /lab-page__content lab-page__content--medium/);
+});
+
 test("읽는 문장에는 가장 작은 칸을 쓰지 않는다", () => {
   /*
    * 2026-09-14 지적: 활동 만들기 화면 글씨가 너무 작다.
