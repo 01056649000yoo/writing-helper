@@ -58,7 +58,7 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
             {shortUrl && (
               <div className="flex items-center gap-2 bg-indigo-50 rounded-xl px-4 py-3 border border-indigo-100">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold text-indigo-500 mb-0.5">단축 링크</p>
+                  <p className="text-xs font-semibold text-indigo-500 mb-0.5">단축 링크</p>
                   <span className="text-xs text-indigo-700 truncate block">{shortUrl}</span>
                 </div>
                 <button
@@ -71,7 +71,7 @@ export default function QRCodeSection({ roomUrl, shortUrl }: { roomUrl: string; 
             )}
             <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold text-gray-400 mb-0.5">원본 링크</p>
+                <p className="text-xs font-semibold text-gray-400 mb-0.5">원본 링크</p>
                 <span className="text-xs text-gray-500 truncate block">{roomUrl}</span>
               </div>
               <button

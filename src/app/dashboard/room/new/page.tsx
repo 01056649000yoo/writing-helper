@@ -215,11 +215,11 @@ function ActivitySelectionScreen({ classId }: { classId: string }) {
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-lg">📦</span>
                   <h2 className="text-sm font-bold text-gray-800 truncate">글쓰기 활동 꾸러미</h2>
-                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600">
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600">
                     {WRITING_BUNDLE_DEFINITIONS.length}개
                   </span>
                 </div>
-                <span className="shrink-0 text-[11px] font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">바로 사용</span>
+                <span className="shrink-0 text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">바로 사용</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -971,7 +971,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                   카드 힌트 없이 학생이 스스로 생각해서 질문을 작성합니다.
                 </p>
               </div>
-              <span className="text-[11px] font-semibold text-sky-700 bg-white px-2.5 py-1 rounded-lg border border-sky-100 text-center">
+              <span className="text-xs font-semibold text-sky-700 bg-white px-2.5 py-1 rounded-lg border border-sky-100 text-center">
                 자율 질문 창작
               </span>
             </label>
@@ -1008,7 +1008,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                   생각을 넓혀주는 질문 카드 묶음을 제공해 골라서 수정합니다.
                 </p>
               </div>
-              <span className="text-[11px] font-semibold text-violet-700 bg-white px-2.5 py-1 rounded-lg border border-violet-100 text-center">
+              <span className="text-xs font-semibold text-violet-700 bg-white px-2.5 py-1 rounded-lg border border-violet-100 text-center">
                 비계(Scaffolding) 카드 제공
               </span>
             </label>
@@ -1038,7 +1038,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                   오늘 주제에 맞는 <strong>질문 카드</strong>(완성된 질문이 아니라 관점을 여는 문장)를 AI가 만들어 줍니다.
                 </p>
               </div>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-100 text-center">
+              <span className="text-xs font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-100 text-center">
 주제 맞춤 질문 카드
               </span>
             </label>
@@ -1050,7 +1050,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
           {draft.mode === "direct" && (
             <div className="rounded-2xl bg-sky-50/60 border border-sky-100 p-4 space-y-2.5">
               <label className="block text-xs font-bold text-sky-800">
-                ✍️ 학생에게 전달할 질문 작성 가이드 <span className="text-[11px] font-normal text-sky-600">(선택)</span>
+                ✍️ 학생에게 전달할 질문 작성 가이드 <span className="text-xs font-normal text-sky-600">(선택)</span>
               </label>
               <textarea
                 rows={3}
@@ -1059,7 +1059,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                 placeholder="학생들이 질문을 만들 때 참고할 안내나 유의사항을 입력하세요."
                 className="w-full px-3.5 py-2.5 text-sm text-gray-800 bg-white border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300"
               />
-              <p className="text-[11px] text-sky-600">
+              <p className="text-xs text-sky-600">
                 학생들은 카드 힌트 없이 입력창에서 바로 자신만의 질문을 작성하게 됩니다.
               </p>
             </div>
@@ -1071,7 +1071,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <p className="text-xs font-bold text-violet-800">🃏 제공할 질문 카드 묶음 선택</p>
-                  <p className="text-[11px] text-violet-600 mt-0.5">
+                  <p className="text-xs text-violet-600 mt-0.5">
                     총 {availableCardSets.length}개 묶음 중 {draft.selectedCardSetIds.length}개 선택됨
                   </p>
                 </div>
@@ -1131,14 +1131,14 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${getCardBadgeStyle(cs.label)}`}>
+                            <span className={`text-xs font-bold px-1.5 py-0.2 rounded border ${getCardBadgeStyle(cs.label)}`}>
                               {getCardBadge(cs.label)}
                             </span>
                             <p className={`truncate font-bold text-xs ${checked ? "text-violet-950" : "text-gray-800"}`}>
                               {cs.label}
                             </p>
                           </div>
-                          <p className="text-[11px] text-gray-500 truncate">{cs.description || `${cs.prompts.length}개 질문 힌트`}</p>
+                          <p className="text-xs text-gray-500 truncate">{cs.description || `${cs.prompts.length}개 질문 힌트`}</p>
                         </div>
                       </label>
 
@@ -1146,7 +1146,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                       <button
                         type="button"
                         onClick={() => setModalTargetCardSet(cs)}
-                        className="shrink-0 text-[11px] font-medium text-violet-600 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded-lg transition-colors"
+                        className="shrink-0 text-xs font-medium text-violet-600 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded-lg transition-colors"
                         title="질문 세부 내용 보기"
                       >
                         👁️ 보기
@@ -1164,7 +1164,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2.5">
                 <div>
                   <p className="text-xs font-bold text-emerald-800">✨ AI 질문 카드 고르기</p>
-                  <p className="text-[11px] text-emerald-600 mt-0.5">
+                  <p className="text-xs text-emerald-600 mt-0.5">
                     고른 카드가 학생 화면에 그대로 보입니다. 학생은 카드를 힌트 삼아 <strong>자기 질문</strong>을 씁니다.
                   </p>
                 </div>
@@ -1245,7 +1245,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] font-bold text-emerald-700">질문 카드 {idx + 1}</span>
+                          <span className="text-xs font-bold text-emerald-700">질문 카드 {idx + 1}</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -1254,7 +1254,7 @@ function QuestionGeneratorSetup({ classId }: { classId: string }) {
                                 customAiQuestions: p.customAiQuestions.filter((item) => item.id !== q.id),
                               }));
                             }}
-                            className="text-[10px] text-gray-400 hover:text-red-500"
+                            className="text-xs text-gray-400 hover:text-red-500"
                           >
                             삭제
                           </button>
@@ -1502,7 +1502,7 @@ function NewCardSetModal({
                 placeholder="예) 상상, 마음, 감각"
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-300"
               />
-              <p className={`mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${area.chip.bg} ${area.chip.text} ${area.chip.border}`}>
+              <p className={`mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${area.chip.bg} ${area.chip.text} ${area.chip.border}`}>
                 <span>{area.emoji}</span>
                 <span>{area.label} 카테고리로 묶여요</span>
               </p>
@@ -1537,7 +1537,7 @@ function NewCardSetModal({
               placeholder={"예) 이야기가 끝난 다음 날 주인공에게 무슨 일이 생길지 상상해 보고, 그것을 묻는 질문을 만들어 보세요.\n예) 가장 또렷이 떠오르는 장면을 고르고, 그곳에서 어떤 소리가 들렸을지 묻는 질문을 만들어 보세요."}
               className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm leading-6 text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-300"
             />
-            <p className="mt-1.5 text-[11px] text-gray-500">
+            <p className="mt-1.5 text-xs text-gray-500">
               학생은 이 문장을 힌트로 읽고 <strong>자기 질문</strong>을 씁니다. 물음표로 끝나는 완성된 질문은 그대로 베끼게 되니 피해 주세요.
             </p>
           </div>
@@ -2082,7 +2082,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
           <div>
             <label className="block text-base font-medium text-gray-700 mb-2">
               <span className="inline-flex items-center gap-1.5">
-                <span className="rounded-full bg-rose-500 text-white px-2 py-0.5 text-[11px] font-bold">필수</span>
+                <span className="rounded-full bg-rose-500 text-white px-2 py-0.5 text-xs font-bold">필수</span>
                 핵심단어
               </span>
             </label>
@@ -2100,7 +2100,7 @@ function OneLineShareSetup({ classId }: { classId: string }) {
           <div>
             <label className="block text-base font-medium text-gray-700 mb-2">
               <span className="inline-flex items-center gap-1.5">
-                <span className="rounded-full bg-gray-200 text-gray-700 px-2 py-0.5 text-[11px] font-bold">선택</span>
+                <span className="rounded-full bg-gray-200 text-gray-700 px-2 py-0.5 text-xs font-bold">선택</span>
                 보조단어
               </span>
             </label>

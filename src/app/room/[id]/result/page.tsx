@@ -499,7 +499,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                     <div key={`my-hanja-${index}`} className="rounded-2xl bg-white/80 px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-xs font-semibold text-amber-700">문장 {index + 1}</p>
-                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                           ❤️ {myEntry?.likeCount ?? 0}
                         </span>
                       </div>
@@ -591,7 +591,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
                           : `좋아요 ${entry.likeCount}`}
                       </button>
                     </div>
-                    <p className="mt-3 text-[11px] text-gray-400">
+                    <p className="mt-3 text-xs text-gray-400">
                       {new Date(entry.createdAt).toLocaleString("ko-KR")}
                     </p>
                   </div>

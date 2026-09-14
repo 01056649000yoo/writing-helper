@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const [globals, layout, nav, dashboard, classPage, roomNew, guide, login, compose, readme] = await Promise.all([
@@ -148,6 +149,39 @@ test("연구소 글자 크기는 아지트 계단과 같다", () => {
   }
   // Tailwind 기본 크기를 다시 정의해야 이미 쓰고 있는 `text-*` 클래스가 한 곳을 따라온다.
   assert.match(globals, /@theme\s*\{[\s\S]*--text-xs:/);
+});
+
+test("계단을 비켜 간 글자 크기가 없다", () => {
+  /*
+   * 2026-09-14: 계단은 2026-08-24 에 맞췄는데 **비켜 간 자리**가 남아 있었다.
+   * 화면 코드에 `text-[11px]` 54곳·`text-[10px]` 11곳, globals.css 에 0.68~0.78rem 열 곳이
+   * 박혀 있었다. 계단의 바닥은 0.8rem 이다 — 그 아래는 아이가 태블릿에서 못 읽는다.
+   * 아지트와 나란히 놓았을 때 느껴지던 이질감의 정체가 이것이었다.
+   *
+   * 한 자리만 고치면 또 흩어지므로 **비켜 가는 방식 자체**를 막는다.
+   */
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(tsx?|jsx?|css)$/.test(entry.name)) files.push(full);
+    }
+  };
+  walk("src");
+
+  const offenders = [];
+  for (const file of files) {
+    // 주석에 적힌 보기(`text-[13px]` 처럼)는 세지 않는다.
+    const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, " ");
+    for (const match of code.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) {
+      if (Number(match[1]) < 12.8) offenders.push(`${file} ${match[0]}`);
+    }
+    for (const match of code.matchAll(/font-size:\s*(0\.\d+)rem/g)) {
+      if (Number(match[1]) < 0.8) offenders.push(`${file} font-size:${match[1]}rem`);
+    }
+  }
+  assert.deepEqual(offenders, [], `계단보다 작은 글자: ${offenders.slice(0, 5).join(", ")}`);
 });
 
 test("교사용 공통 셸은 아지트의 전체 폭과 글자 계단을 따른다", () => {

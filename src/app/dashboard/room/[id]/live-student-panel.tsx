@@ -369,14 +369,14 @@ function QuestionResultsModal({
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-500">질문 만들기 결과</p>
               <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${liveStatus.className}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${liveStatus.className}`}
                 role="status"
                 aria-live="polite"
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${liveStatus.dot}`} />
                 {liveStatus.label}
               </span>
-              {isRefreshing && <span className="text-[11px] font-medium text-gray-400">갱신 중...</span>}
+              {isRefreshing && <span className="text-xs font-medium text-gray-400">갱신 중...</span>}
             </div>
             <h3 id="question-results-live-title" className="text-2xl font-bold text-gray-800 mt-1">전체 질문 실시간 보기</h3>
             <p className="text-sm text-gray-500 mt-1">
@@ -611,7 +611,7 @@ function QuestionResultsModal({
                       <span className="block truncate text-sm font-bold text-gray-800">
                         {result.studentNumber}번 {result.studentName}
                       </span>
-                      <span className={`mt-0.5 block text-[11px] font-semibold ${isNew ? "text-emerald-600" : "text-sky-500"}`}>
+                      <span className={`mt-0.5 block text-xs font-semibold ${isNew ? "text-emerald-600" : "text-sky-500"}`}>
                         {isNew ? "새 질문 " : ""}질문 {result.selections.length}개
                       </span>
                     </button>
@@ -649,7 +649,7 @@ function QuestionResultsModal({
                         >
                           <span className="underline-offset-4 group-hover:underline">{studentNumber}번 {studentName}</span>
                           <span className="text-gray-400"> · 질문 {order}</span>
-                          <span className="ml-2 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] text-sky-600 group-hover:bg-sky-100">
+                          <span className="ml-2 rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-600 group-hover:bg-sky-100">
                             칠판에서 보기
                           </span>
                         </button>
@@ -659,7 +659,7 @@ function QuestionResultsModal({
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         {newSessionIds.has(sessionId) && (
-                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
                             새 질문
                           </span>
                         )}
@@ -669,7 +669,7 @@ function QuestionResultsModal({
                           onClick={() => toggleVotingPick(sessionId, selection.id, !selection.pickedForVoting)}
                           aria-pressed={selection.pickedForVoting}
                           title={selection.pickedForVoting ? "고르기 후보에서 빼기" : "고르기 후보로 담기"}
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition-colors ${
                             selection.pickedForVoting
                               ? "bg-amber-400 text-white hover:bg-amber-500"
                               : "bg-gray-100 text-gray-500 hover:bg-amber-100 hover:text-amber-700"
@@ -733,7 +733,7 @@ function QuestionResultsModal({
                         <span className="text-lg font-bold text-gray-800 underline-offset-4 group-hover:text-sky-800 group-hover:underline">
                           {result.studentNumber}번 {result.studentName}
                         </span>
-                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-sky-600 shadow-sm group-hover:bg-sky-100">
+                        <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-sky-600 shadow-sm group-hover:bg-sky-100">
                           칠판에서 보기
                         </span>
                       </button>
@@ -1272,7 +1272,7 @@ function HanjaWritingResultsModal({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-xs font-semibold text-amber-700">#{index + 1} · {entry.studentNumber}번 {entry.studentName}</p>
-                          <p className="mt-1 text-[11px] font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                          <p className="mt-1 text-xs font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
                           <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
                         </div>
                         <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
@@ -1300,17 +1300,17 @@ function HanjaWritingResultsModal({
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-xs font-semibold text-amber-700">{entry.studentNumber}번 {entry.studentName}</p>
                         <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
                             받은 ❤️ {entry.likeCount}
                           </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-600">
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600">
                             누른 ❤️ {entry.givenLikeCount}/{entry.maxReactionsPerStudent}
                           </span>
                         </div>
                       </div>
-                      <p className="mt-1 text-[11px] font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
+                      <p className="mt-1 text-xs font-medium text-gray-400">문장 {entry.sentenceIndex + 1}</p>
                       <p className="mt-2 text-sm leading-relaxed text-gray-800">{entry.content}</p>
-                      <p className="mt-3 text-[11px] text-gray-400">
+                      <p className="mt-3 text-xs text-gray-400">
                         {new Date(entry.createdAt).toLocaleString("ko-KR")}
                       </p>
                     </div>
@@ -1564,7 +1564,7 @@ export default function LiveStudentPanel({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
           <div className="flex items-center gap-2">
             {isActive && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 실시간 갱신 중
               </span>
@@ -1630,7 +1630,7 @@ export default function LiveStudentPanel({
 
           return (
             <div className="rounded-xl bg-slate-50/80 border border-slate-200/70 p-3 space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-bold text-gray-500">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-500">
                 <span>학급 전체 진척도 (총 {totalCount}명)</span>
                 <span className="text-emerald-700 font-extrabold">{donePct}% 완료 ({doneSessions.length}명)</span>
               </div>
@@ -1657,23 +1657,23 @@ export default function LiveStudentPanel({
               {/* 3개 지표 인라인 카드 */}
               <div className="grid grid-cols-3 gap-2 text-center pt-0.5">
                 <div className="rounded-lg bg-white px-2 py-1.5 border border-emerald-200 shadow-2xs">
-                  <span className="text-[11px] font-bold text-emerald-700 block">🟢 완료</span>
+                  <span className="text-xs font-bold text-emerald-700 block">🟢 완료</span>
                   <span className="text-lg font-black text-emerald-800 leading-tight block mt-0.5">
-                    {doneSessions.length}<span className="text-[10px] font-normal text-gray-400">/{totalCount}</span>
+                    {doneSessions.length}<span className="text-xs font-normal text-gray-400">/{totalCount}</span>
                   </span>
                 </div>
 
                 <div className="rounded-lg bg-white px-2 py-1.5 border border-sky-200 shadow-2xs">
-                  <span className="text-[11px] font-bold text-sky-700 block">🔵 작성 중</span>
+                  <span className="text-xs font-bold text-sky-700 block">🔵 작성 중</span>
                   <span className="text-lg font-black text-sky-800 leading-tight block mt-0.5">
-                    {activeSessions.length}<span className="text-[10px] font-normal text-gray-400">명</span>
+                    {activeSessions.length}<span className="text-xs font-normal text-gray-400">명</span>
                   </span>
                 </div>
 
                 <div className="rounded-lg bg-white px-2 py-1.5 border border-gray-200 shadow-2xs">
-                  <span className="text-[11px] font-bold text-gray-500 block">⚪ 시작 전</span>
+                  <span className="text-xs font-bold text-gray-500 block">⚪ 시작 전</span>
                   <span className="text-lg font-black text-gray-700 leading-tight block mt-0.5">
-                    {notConnected.length}<span className="text-[10px] font-normal text-gray-400">명</span>
+                    {notConnected.length}<span className="text-xs font-normal text-gray-400">명</span>
                   </span>
                 </div>
               </div>
@@ -1689,7 +1689,7 @@ export default function LiveStudentPanel({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 ✅ 제출 완료 ({doneSessions.length}명)
               </p>
-              <p className="text-[11px] text-emerald-700 font-medium">
+              <p className="text-xs text-emerald-700 font-medium">
                 {activityType === "question_generator"
                   ? "보기 → 학생 질문 상세"
                   : activityType === "question_voting"
@@ -1710,7 +1710,7 @@ export default function LiveStudentPanel({
                   className="flex items-center justify-between gap-1.5 bg-white border border-emerald-200 rounded-lg px-2.5 py-1.5 shadow-2xs hover:border-emerald-300 transition-colors"
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-100 text-[11px] font-bold text-emerald-700 font-mono">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-100 text-xs font-bold text-emerald-700 font-mono">
                       {s.student_number}
                     </span>
                     <span className="text-xs font-bold text-gray-800 truncate">{s.student_name}</span>
@@ -1720,7 +1720,7 @@ export default function LiveStudentPanel({
                       <button
                         type="button"
                         onClick={() => setQrTarget(s)}
-                        className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded font-medium transition-colors"
+                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded font-medium transition-colors"
                         title="개인 결과 QR 보기"
                       >
                         QR
@@ -1729,7 +1729,7 @@ export default function LiveStudentPanel({
                     <button
                       type="button"
                       onClick={() => setActiveSessionResult(s)}
-                      className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-2xs transition-all active:scale-95"
+                      className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-2xs transition-all active:scale-95"
                     >
                       보기 →
                     </button>
@@ -1748,17 +1748,17 @@ export default function LiveStudentPanel({
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
                 ✏️ 작성 중인 학생 ({activeSessions.length}명)
               </p>
-              <span className="text-[11px] text-sky-600 font-medium">실시간 작성 진행</span>
+              <span className="text-xs text-sky-600 font-medium">실시간 작성 진행</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
               {activeSessions.map((s) => (
                 <div key={s.id} className="rounded-lg border border-sky-200 bg-white px-2 py-1.5 shadow-2xs flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sky-100 text-[11px] font-bold text-sky-700 font-mono">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-sky-100 text-xs font-bold text-sky-700 font-mono">
                     {s.student_number}
                   </span>
                   <span className="text-xs font-bold text-gray-800 truncate flex-1">{s.student_name}</span>
                   {s.level && (
-                    <span className={`text-[10px] px-1 rounded shrink-0 ${levelStyle(s.level)}`}>
+                    <span className={`text-xs px-1 rounded shrink-0 ${levelStyle(s.level)}`}>
                       {levelLabel(s.level)}
                     </span>
                   )}
@@ -1773,13 +1773,13 @@ export default function LiveStudentPanel({
           <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-bold text-gray-600">⬜ 시작 전 ({notConnected.length}명)</p>
-              <span className="text-[11px] text-gray-400">미참여 학생</span>
+              <span className="text-xs text-gray-400">미참여 학생</span>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-1">
               {notConnected.map((s) => (
                 <div key={s.id} className="flex items-center gap-1 bg-white border border-gray-200 rounded px-1.5 py-1 text-xs shadow-2xs">
-                  <span className="text-[10px] text-gray-400 font-mono w-3.5 shrink-0">{s.student_number}</span>
-                  <span className="text-[11px] text-gray-600 font-medium truncate">{s.student_name}</span>
+                  <span className="text-xs text-gray-400 font-mono w-3.5 shrink-0">{s.student_number}</span>
+                  <span className="text-xs text-gray-600 font-medium truncate">{s.student_name}</span>
                 </div>
               ))}
             </div>

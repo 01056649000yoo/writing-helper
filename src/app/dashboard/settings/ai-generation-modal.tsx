@@ -343,7 +343,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                             <div key={cardIdx} className="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-sm">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
-                                  <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">카드 묶음 이름</label>
+                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">카드 묶음 이름</label>
                                   <input
                                     type="text"
                                     value={cardSet.label}
@@ -352,7 +352,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">카드 설명</label>
+                                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">카드 설명</label>
                                   <input
                                     type="text"
                                     value={cardSet.description}
@@ -363,7 +363,7 @@ export default function AiGenerationModal({ isOpen, onClose, onSuccess }: AiGene
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-bold text-gray-400 uppercase mb-1">
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
                                   질문 카드 리스트 (한 줄에 하나씩)
                                 </label>
                                 <textarea

@@ -333,7 +333,7 @@ export default function SettingsPage() {
                             <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">
                               {card.label}
                             </h3>
-                            <span className="text-[11px] font-semibold text-gray-400 shrink-0">
+                            <span className="text-xs font-semibold text-gray-400 shrink-0">
                               (질문 {card.prompts.length}개)
                             </span>
                           </div>
@@ -378,7 +378,7 @@ export default function SettingsPage() {
                     {/* 1. 조회 모드: 질문 힌트 목록 펼침 */}
                     {card.isExpanded && !card.isEditing && (
                       <div className="px-5 pb-5 pt-1 border-t border-gray-100 bg-gray-50/50 space-y-2">
-                        <p className="text-[11px] font-bold text-gray-500 mt-2 mb-1">
+                        <p className="text-xs font-bold text-gray-500 mt-2 mb-1">
                           포함된 질문 힌트 목록 ({card.prompts.length}개)
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -387,7 +387,7 @@ export default function SettingsPage() {
                               key={pIdx}
                               className="p-3 rounded-xl bg-white border border-gray-200/80 shadow-2xs flex items-start gap-2.5 text-xs text-gray-800 leading-relaxed font-medium"
                             >
-                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold">
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-indigo-50 text-indigo-700 text-xs font-bold">
                                 {pIdx + 1}
                               </span>
                               <span className="flex-1">{prompt}</span>
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                           <div className="space-y-2">
                             {card.prompts.map((prompt, pIdx) => (
                               <div key={pIdx} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200">
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 text-[11px] font-bold">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 text-xs font-bold">
                                   {pIdx + 1}
                                 </span>
                                 <input

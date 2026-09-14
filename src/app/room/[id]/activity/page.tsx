@@ -1371,7 +1371,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               {coreKeywords.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-rose-500 text-white px-2 py-0.5 text-[11px] font-bold">필수</span>
+                    <span className="rounded-full bg-rose-500 text-white px-2 py-0.5 text-xs font-bold">필수</span>
                     <p className="text-xs font-bold uppercase tracking-wide text-rose-500">오늘의 핵심단어</p>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1396,7 +1396,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
               {auxiliaryKeywords.length > 0 && (
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-gray-200 text-gray-700 px-2 py-0.5 text-[11px] font-bold">선택</span>
+                    <span className="rounded-full bg-gray-200 text-gray-700 px-2 py-0.5 text-xs font-bold">선택</span>
                     <p className="text-xs font-bold uppercase tracking-wide text-gray-500">보조단어 (활용 가능)</p>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1561,7 +1561,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                         <span className="text-base font-bold text-gray-800">{r.word}</span>
                         {r.hanja && <span className="text-xs text-amber-700">{r.hanja}</span>}
                         {r.sharedChar && (
-                          <span className="ml-auto text-[10px] rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">공유 {r.sharedChar}</span>
+                          <span className="ml-auto text-xs rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">공유 {r.sharedChar}</span>
                         )}
                       </div>
                       <p className="mt-1 text-xs text-gray-600 leading-relaxed">{r.meaning}</p>
@@ -2067,7 +2067,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                       <section key={questionRoom.roomId} className="rounded-2xl border border-orange-100 bg-orange-50/40 p-4">
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                           <h3 className="text-sm font-bold text-gray-800">{questionRoom.title}</h3>
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
                             questionRoom.isActive
                               ? "bg-emerald-100 text-emerald-700"
                               : "bg-gray-200 text-gray-600"
@@ -2106,7 +2106,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-sm font-medium leading-relaxed text-gray-800">{question.text}</span>
                                   {(question.votes ?? 0) > 0 && (
-                                    <span className="mt-1 inline-block rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                                    <span className="mt-1 inline-block rounded-full bg-violet-50 px-2 py-0.5 text-xs font-bold text-violet-700">
                                       친구들 {question.votes}표
                                     </span>
                                   )}

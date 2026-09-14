@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 export type BadgeCircleSize = "sm" | "md" | "lg";
 
 const SIZE_CLASS: Record<BadgeCircleSize, string> = {
-  sm: "h-5 w-5 text-[0.68rem]",
+  sm: "h-5 w-5 text-xs",
   md: "h-6 w-6 text-xs",
   lg: "h-8 w-8 text-sm",
 };
