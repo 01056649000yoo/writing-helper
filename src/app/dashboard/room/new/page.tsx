@@ -50,6 +50,7 @@ type OutlineBuilderDraft = {
 
 type QuestionDestination = "unclassified" | "excluded" | "teacher" | "student" | "both";
 type QuestionDestinationFilter = "all" | QuestionDestination;
+type OutlineSectionKey = "처음" | "가운데" | "끝";
 
 function toggleQuestionDestination(
   current: QuestionDestination,
@@ -65,6 +66,10 @@ function toggleQuestionDestination(
   if (current === "both") return "teacher";
   if (current === "teacher") return "both";
   return "student";
+}
+
+function teacherQuestionItemId(questionId: string): string {
+  return `teacher-question-${questionId.replace(/[^a-zA-Z0-9]/g, "")}`;
 }
 
 type QuestionGeneratorMode = "direct" | "card_remix" | "ai_custom";
@@ -325,16 +330,18 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   // 질문 만들기 → 좋은 질문 고르기가 쓰는 원본 방 고르기와 같은 짜임이다.
   const [votingRooms, setVotingRooms] = useState<QuestionVotingSourceRoomSummary[]>([]);
   const [votingRoomId, setVotingRoomId] = useState("");
-  const [pickedQuestions, setPickedQuestions] = useState<Record<string, "처음" | "가운데" | "끝">>({});
+  const [pickedQuestions, setPickedQuestions] = useState<Record<string, OutlineSectionKey>>({});
   const [questionPanelOpen, setQuestionPanelOpen] = useState(false);
   const [generatorRooms, setGeneratorRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
   const [generatorRoomId, setGeneratorRoomId] = useState("");
   const [teacherQuestions, setTeacherQuestions] = useState<Record<string, {
     destination: QuestionDestination;
     text: string;
-    section: "처음" | "가운데" | "끝";
+    section: OutlineSectionKey;
   }>>({});
   const [teacherQuestionPanelOpen, setTeacherQuestionPanelOpen] = useState(false);
+  const [outlineOrderPanelOpen, setOutlineOrderPanelOpen] = useState(false);
+  const [draggedOutlineItem, setDraggedOutlineItem] = useState<{ section: OutlineSectionKey; itemId: string } | null>(null);
   const [teacherQuestionSearch, setTeacherQuestionSearch] = useState("");
   const [teacherQuestionFilter, setTeacherQuestionFilter] = useState<QuestionDestinationFilter>("all");
   const [studentSharedQuestions, setStudentSharedQuestions] = useState<Array<{ text: string }>>([]);
@@ -355,18 +362,21 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   }, [classId]);
 
   useEffect(() => {
-    if (!teacherQuestionPanelOpen) return undefined;
+    if (!teacherQuestionPanelOpen && !outlineOrderPanelOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setTeacherQuestionPanelOpen(false);
+      if (event.key === "Escape") {
+        setTeacherQuestionPanelOpen(false);
+        setOutlineOrderPanelOpen(false);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [teacherQuestionPanelOpen]);
+  }, [teacherQuestionPanelOpen, outlineOrderPanelOpen]);
 
   const initialDraft = useMemo<OutlineBuilderDraft>(() => ({
     topic: "",
@@ -479,26 +489,77 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     }])));
   }
 
+  function moveOutlineItem(
+    sourceSection: OutlineSectionKey,
+    itemId: string,
+    targetSection: OutlineSectionKey,
+    targetIndex?: number,
+  ) {
+    setCustomTemplate((prev) => {
+      const base = prev ?? getDefaultOutlineTemplate(subjectType);
+      const sourceItems = base.sections.find((section) => section.key === sourceSection)?.items ?? [];
+      const movingItem = sourceItems.find((item) => item.id === itemId);
+      if (!movingItem) return base;
+      const sourceIndex = sourceItems.findIndex((item) => item.id === itemId);
+
+      const sectionsWithoutItem = base.sections.map((section) => ({
+        ...section,
+        items: section.items.filter((item) => item.id !== itemId),
+      }));
+      return {
+        sections: sectionsWithoutItem.map((section) => {
+          if (section.key !== targetSection) return section;
+          const nextItems = [...section.items];
+          const adjustedTargetIndex = targetIndex !== undefined
+            && sourceSection === targetSection
+            && sourceIndex < targetIndex
+            ? targetIndex - 1
+            : targetIndex;
+          const insertAt = Math.min(Math.max(adjustedTargetIndex ?? nextItems.length, 0), nextItems.length);
+          nextItems.splice(insertAt, 0, movingItem);
+          return { ...section, items: nextItems };
+        }),
+      };
+    });
+    setDraggedOutlineItem(null);
+  }
+
   function addTeacherQuestions() {
     if (!selectedGeneratorRoom) return;
 
     setCustomTemplate((prev) => {
       const base = prev ?? getDefaultOutlineTemplate(subjectType);
-      return {
-        sections: base.sections.map((section) => {
-          const withoutPreviousTeacherQuestions = section.items
-            .filter((item) => !item.id.startsWith("teacher-question-"));
-          const added = Object.entries(teacherQuestions)
-            .filter(([, question]) => (
-              question.destination === "teacher" || question.destination === "both"
-            ) && question.section === section.key && question.text.trim())
-            .map(([questionId, question], index) => ({
-              id: `teacher-question-${questionId.replace(/[^a-zA-Z0-9]/g, "").slice(-12)}-${index}`,
-              label: question.text.trim(),
-              placeholder: "친구가 만든 질문이에요. 내 생각을 자유롭게 적어 보세요.",
-            }));
-          return { ...section, items: [...withoutPreviousTeacherQuestions, ...added] };
+      const selectedQuestions = new Map(Object.entries(teacherQuestions)
+        .filter(([, question]) => (
+          question.destination === "teacher" || question.destination === "both"
+        ) && question.text.trim())
+        .map(([questionId, question]) => [teacherQuestionItemId(questionId), question] as const));
+      const existingQuestionIds = new Set<string>();
+      const sections = base.sections.map((section) => ({
+        ...section,
+        items: section.items.flatMap((item) => {
+          if (!item.id.startsWith("teacher-question-")) return [item];
+          const selectedQuestion = selectedQuestions.get(item.id);
+          if (!selectedQuestion) return [];
+          existingQuestionIds.add(item.id);
+          return [{
+            ...item,
+            label: selectedQuestion.text.trim(),
+            placeholder: "친구가 만든 질문이에요. 내 생각을 자유롭게 적어 보세요.",
+          }];
         }),
+      }));
+      const newQuestions = [...selectedQuestions.entries()]
+        .filter(([itemId]) => !existingQuestionIds.has(itemId))
+        .map(([itemId, question]) => ({
+          id: itemId,
+          label: question.text.trim(),
+          placeholder: "친구가 만든 질문이에요. 내 생각을 자유롭게 적어 보세요.",
+        }));
+      return {
+        sections: sections.map((section) => section.key === "가운데"
+          ? { ...section, items: [...section.items, ...newQuestions] }
+          : section),
       };
     });
     setStudentSharedQuestions(Object.values(teacherQuestions)
@@ -668,9 +729,17 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
       </div>
 
       <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-base font-semibold text-gray-800">개요 항목</h3>
-          {customTemplate && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOutlineOrderPanelOpen(true)}
+              className="lab-button lab-button--quiet text-sm"
+            >
+              ↕ 개요 순서 편집하기
+            </button>
+            {customTemplate && (
             <button
               type="button"
               onClick={() => setCustomTemplate(null)}
@@ -678,8 +747,122 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
             >
               기본값으로 초기화
             </button>
-          )}
+            )}
+          </div>
         </div>
+
+        {outlineOrderPanelOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="outline-order-editor-title"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setOutlineOrderPanelOpen(false);
+            }}
+          >
+            <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+              <header className="flex items-start justify-between gap-4 border-b border-indigo-100 px-5 py-4 sm:px-7">
+                <div>
+                  <p className="text-sm font-bold text-indigo-600">학생에게 보여 줄 개요</p>
+                  <h3 id="outline-order-editor-title" className="mt-1 text-xl font-bold text-gray-900">
+                    처음·가운데·끝을 한눈에 정리하세요
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    항목을 잡아 원하는 자리로 옮기세요. 같은 칸 안에서도 순서를 바꿀 수 있습니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOutlineOrderPanelOpen(false)}
+                  aria-label="개요 순서 편집 창 닫기"
+                  className="rounded-full px-3 py-1.5 text-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </header>
+
+              <div className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6">
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {effectiveTemplate.sections.map((section) => (
+                    <section
+                      key={section.key}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (draggedOutlineItem) {
+                          moveOutlineItem(draggedOutlineItem.section, draggedOutlineItem.itemId, section.key);
+                        }
+                      }}
+                      className="min-h-48 rounded-2xl border-2 border-dashed border-indigo-200 bg-white p-3"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <h4 className="font-bold text-indigo-700">{section.key}</h4>
+                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-sm font-semibold text-indigo-600">
+                          {section.items.length}개
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {section.items.map((item, itemIndex) => (
+                          <div
+                            key={item.id}
+                            draggable
+                            onDragStart={(event) => {
+                              event.dataTransfer.effectAllowed = "move";
+                              setDraggedOutlineItem({ section: section.key, itemId: item.id });
+                            }}
+                            onDragEnd={() => setDraggedOutlineItem(null)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (draggedOutlineItem) {
+                                moveOutlineItem(draggedOutlineItem.section, draggedOutlineItem.itemId, section.key, itemIndex);
+                              }
+                            }}
+                            className={`group rounded-xl border bg-white p-3 shadow-sm transition-all ${
+                              draggedOutlineItem?.itemId === item.id
+                                ? "border-indigo-400 opacity-50"
+                                : "border-gray-200 hover:border-indigo-300 hover:shadow"
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className="mt-0.5 cursor-grab select-none text-gray-400 group-active:cursor-grabbing" aria-hidden="true">⠿</span>
+                              <p className="min-w-0 flex-1 text-sm font-medium leading-relaxed text-gray-800">{item.label || "이름 없는 항목"}</p>
+                            </div>
+                            <div className="mt-2 flex items-center gap-1 pl-6 lg:hidden">
+                              {(["처음", "가운데", "끝"] as OutlineSectionKey[]).map((targetSection) => (
+                                <button
+                                  key={targetSection}
+                                  type="button"
+                                  onClick={() => moveOutlineItem(section.key, item.id, targetSection)}
+                                  disabled={targetSection === section.key}
+                                  className="rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-600 disabled:bg-indigo-50 disabled:font-bold disabled:text-indigo-700"
+                                >
+                                  {targetSection}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {section.items.length === 0 && (
+                          <p className="py-10 text-center text-sm text-gray-400">여기로 항목을 끌어오세요</p>
+                        )}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </div>
+
+              <footer className="flex items-center justify-between gap-3 border-t border-gray-200 bg-white px-5 py-4 sm:px-7">
+                <p className="text-sm text-gray-500">모바일에서는 항목 아래의 처음·가운데·끝 버튼으로 옮길 수 있어요.</p>
+                <button type="button" onClick={() => setOutlineOrderPanelOpen(false)} className="lab-button text-sm">
+                  순서 편집 완료
+                </button>
+              </footer>
+            </div>
+          </div>
+        )}
 
         {/* 학생 질문 원문과 좋은 질문 고르기 결과를 서로 다른 경로로 가져온다.
             해당 활동이 하나도 없으면 그 칸은 그리지 않는다 — 빈 안내는 화면만 늘린다. */}
@@ -826,7 +1009,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
 
                   <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-4 sm:px-7">
                     {visibleGeneratorQuestions.length > 0 && (
-                      <div className="mb-2 hidden grid-cols-[minmax(0,1fr)_10rem_9rem_5.5rem] gap-2 px-3 text-sm font-bold text-gray-500 lg:grid">
+                      <div className="mb-2 hidden grid-cols-[minmax(0,1fr)_9rem_9rem_5.5rem] gap-2 px-3 text-sm font-bold text-gray-500 lg:grid">
                         <span>질문 문장</span>
                         <span className="text-center text-indigo-700">🧩 개요에 미리</span>
                         <span className="text-center text-emerald-700">🙋 학생이 선택</span>
@@ -858,7 +1041,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                           draftQuestion.destination === "excluded" ? "bg-gray-50 opacity-65" : "bg-white"
                         } ${destinationTone}`}
                       >
-                        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_10rem_9rem_5.5rem] lg:items-start">
+                        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_9rem_9rem_5.5rem] lg:items-start">
                           <label className="flex min-w-0 items-center gap-2">
                             <span className="w-6 shrink-0 text-center text-sm font-bold text-gray-400">{index + 1}</span>
                             <input
@@ -873,7 +1056,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                             />
                           </label>
 
-                          <div className="grid grid-cols-2 gap-2 lg:block">
+                          <div>
                             <button
                               type="button"
                               onClick={() => setTeacherQuestions((prev) => ({
@@ -893,25 +1076,8 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                             >
                               {includesTeacher ? "✓ 개요에 넣음" : "+ 개요에 넣기"}
                             </button>
-                            {includesTeacher ? (
-                              <select
-                                value={draftQuestion.section}
-                                onChange={(event) => setTeacherQuestions((prev) => ({
-                                  ...prev,
-                                  [question.id]: {
-                                    ...draftQuestion,
-                                    section: event.target.value as "처음" | "가운데" | "끝",
-                                  },
-                                }))}
-                                aria-label="질문을 넣을 개요 위치"
-                                className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-2 text-sm font-semibold text-indigo-800 lg:mt-1.5"
-                              >
-                                <option value="처음">처음에</option>
-                                <option value="가운데">가운데에</option>
-                                <option value="끝">끝에</option>
-                              </select>
-                            ) : (
-                              <span className="hidden text-center text-sm text-gray-400 lg:mt-2 lg:block">위치 없음</span>
+                            {includesTeacher && (
+                              <p className="mt-1.5 text-center text-sm font-medium text-indigo-600">가운데에 담긴 뒤 순서를 편집해요</p>
                             )}
                           </div>
 
