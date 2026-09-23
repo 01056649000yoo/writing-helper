@@ -51,16 +51,21 @@ type OutlineBuilderDraft = {
 type QuestionDestination = "unclassified" | "excluded" | "teacher" | "student" | "both";
 type QuestionDestinationFilter = "all" | QuestionDestination;
 
-const QUESTION_DESTINATIONS: Array<{
-  id: QuestionDestination;
-  label: string;
-  activeClass: string;
-}> = [
-  { id: "excluded", label: "제외", activeClass: "border-gray-500 bg-gray-700 text-white" },
-  { id: "teacher", label: "선생님 개요", activeClass: "border-indigo-500 bg-indigo-600 text-white" },
-  { id: "student", label: "학생 불러오기", activeClass: "border-emerald-500 bg-emerald-600 text-white" },
-  { id: "both", label: "둘 다", activeClass: "border-sky-500 bg-sky-600 text-white" },
-];
+function toggleQuestionDestination(
+  current: QuestionDestination,
+  target: "teacher" | "student",
+): QuestionDestination {
+  if (target === "teacher") {
+    if (current === "teacher") return "unclassified";
+    if (current === "both") return "student";
+    if (current === "student") return "both";
+    return "teacher";
+  }
+  if (current === "student") return "unclassified";
+  if (current === "both") return "teacher";
+  if (current === "teacher") return "both";
+  return "student";
+}
 
 type QuestionGeneratorMode = "direct" | "card_remix" | "ai_custom";
 
@@ -722,10 +727,10 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                       <div>
                         <p className="text-sm font-bold text-sky-600">학생 질문 정리</p>
                         <h3 id="student-question-organizer-title" className="mt-1 text-xl font-bold text-gray-900">
-                          어떤 질문을 어디에서 쓸까요?
+                          질문을 어떻게 보여 줄까요?
                         </h3>
                         <p className="mt-1 text-sm text-gray-500">
-                          문장을 다듬은 뒤 선생님 개요 틀과 학생 불러오기 중 하나 또는 둘 다 선택할 수 있어요.
+                          질문마다 아래 두 행동을 따로 켤 수 있어요. 둘 다 켜면 두 곳에서 모두 사용됩니다.
                         </p>
                       </div>
                       <button
@@ -772,9 +777,9 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                           label: `미분류 ${Math.max((selectedGeneratorRoom?.questions.length ?? 0) - classifiedQuestionCount, 0)}`,
                         },
                         { id: "excluded" as const, label: "제외" },
-                        { id: "teacher" as const, label: "선생님만" },
-                        { id: "student" as const, label: "학생만" },
-                        { id: "both" as const, label: "둘 다" },
+                        { id: "teacher" as const, label: "개요에만 넣음" },
+                        { id: "student" as const, label: "학생 선택만" },
+                        { id: "both" as const, label: "두 곳 모두" },
                       ]).map((filter) => (
                         <button
                           key={filter.id}
@@ -800,10 +805,10 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                         분류 완료 <strong>{classifiedQuestionCount}</strong>
                       </div>
                       <div className="rounded-xl bg-indigo-50 px-3 py-2 text-indigo-700">
-                        선생님 개요 <strong>{selectedTeacherQuestionCount}</strong>
+                        개요에 미리 넣기 <strong>{selectedTeacherQuestionCount}</strong>
                       </div>
                       <div className="col-span-2 rounded-xl bg-emerald-50 px-3 py-2 text-emerald-700 sm:col-span-1">
-                        학생 불러오기 <strong>{selectedStudentQuestionCount}</strong>
+                        학생이 직접 고르기 <strong>{selectedStudentQuestionCount}</strong>
                       </div>
                     </div>
                   </header>
@@ -817,6 +822,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                       section: "가운데" as const,
                     };
                     const includesTeacher = draftQuestion.destination === "teacher" || draftQuestion.destination === "both";
+                    const includesStudent = draftQuestion.destination === "student" || draftQuestion.destination === "both";
                     const destinationTone = draftQuestion.destination === "teacher"
                       ? "border-l-indigo-500"
                       : draftQuestion.destination === "student"
@@ -842,35 +848,68 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                             aria-label="개요에 넣을 질문 문장"
                             className="min-w-0 rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-sky-400"
                           />
-                          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-                            <div
-                              className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1 sm:grid-cols-4"
-                              role="group"
-                              aria-label="질문 사용처"
+                          <div className="grid gap-2 md:grid-cols-2">
+                            <button
+                              type="button"
+                              onClick={() => setTeacherQuestions((prev) => ({
+                                ...prev,
+                                [question.id]: {
+                                  ...draftQuestion,
+                                  destination: toggleQuestionDestination(draftQuestion.destination, "teacher"),
+                                },
+                              }))}
+                              aria-pressed={includesTeacher}
+                              className={`rounded-xl border-2 p-3 text-left transition-all ${
+                                includesTeacher
+                                  ? "border-indigo-500 bg-indigo-50 shadow-sm"
+                                  : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40"
+                              }`}
                             >
-                              {QUESTION_DESTINATIONS.map((destination) => {
-                                const active = draftQuestion.destination === destination.id;
-                                return (
-                                  <button
-                                    key={destination.id}
-                                    type="button"
-                                    onClick={() => setTeacherQuestions((prev) => ({
-                                      ...prev,
-                                      [question.id]: { ...draftQuestion, destination: destination.id },
-                                    }))}
-                                    aria-pressed={active}
-                                    className={`rounded-lg border px-3 py-2 text-sm font-bold transition-all ${
-                                      active
-                                        ? destination.activeClass
-                                        : "border-transparent bg-transparent text-gray-500 hover:bg-white hover:text-gray-800"
-                                    }`}
-                                  >
-                                    {destination.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            {includesTeacher && (
+                              <span className="flex items-center justify-between gap-3">
+                                <strong className="text-sm text-gray-900">🧩 개요에 미리 넣기</strong>
+                                <span className={`grid h-6 w-6 place-items-center rounded-full text-sm font-bold ${
+                                  includesTeacher ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-400"
+                                }`}>
+                                  {includesTeacher ? "✓" : "+"}
+                                </span>
+                              </span>
+                              <span className="mt-1 block text-sm leading-relaxed text-gray-500">
+                                학생이 개요를 열면 이 질문이 처음부터 보여요.
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setTeacherQuestions((prev) => ({
+                                ...prev,
+                                [question.id]: {
+                                  ...draftQuestion,
+                                  destination: toggleQuestionDestination(draftQuestion.destination, "student"),
+                                },
+                              }))}
+                              aria-pressed={includesStudent}
+                              className={`rounded-xl border-2 p-3 text-left transition-all ${
+                                includesStudent
+                                  ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                                  : "border-gray-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+                              }`}
+                            >
+                              <span className="flex items-center justify-between gap-3">
+                                <strong className="text-sm text-gray-900">🙋 학생이 직접 고르기</strong>
+                                <span className={`grid h-6 w-6 place-items-center rounded-full text-sm font-bold ${
+                                  includesStudent ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-400"
+                                }`}>
+                                  {includesStudent ? "✓" : "+"}
+                                </span>
+                              </span>
+                              <span className="mt-1 block text-sm leading-relaxed text-gray-500">
+                                학생이 ‘친구 질문 불러오기’에서 필요할 때 골라요.
+                              </span>
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            {includesTeacher ? (
                               <select
                                 value={draftQuestion.section}
                                 onChange={(event) => setTeacherQuestions((prev) => ({
@@ -887,7 +926,22 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                                 <option value="가운데">개요 위치 · 가운데</option>
                                 <option value="끝">개요 위치 · 끝</option>
                               </select>
-                            )}
+                            ) : <span />}
+                            <button
+                              type="button"
+                              onClick={() => setTeacherQuestions((prev) => ({
+                                ...prev,
+                                [question.id]: { ...draftQuestion, destination: "excluded" },
+                              }))}
+                              aria-pressed={draftQuestion.destination === "excluded"}
+                              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                                draftQuestion.destination === "excluded"
+                                  ? "bg-gray-700 text-white"
+                                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                              }`}
+                            >
+                              이 질문은 사용하지 않기
+                            </button>
                           </div>
                         </div>
                       </article>
