@@ -298,3 +298,16 @@ test("좋은 질문을 누가 고르는지 선생님이 정하고, 그 값이 �
   assert.match(contract, /raw\.selectionMode === "teacher_set" \|\| raw\.selectionMode === "student_vote"/);
   assert.match(types, /selectionMode\?: "student_vote" \| "teacher_set"/);
 });
+
+test("개요 짜기는 좋은 질문 고르기 방 없이 학생 질문을 교사가 직접 정리해 넣을 수 있다", async () => {
+  const form = await readFile("src/app/dashboard/room/new/page.tsx", "utf8");
+
+  assert.match(form, /Promise\.all\(\[[\s\S]*getQuestionVotingSourceRooms\(classId\)[\s\S]*getQuestionGeneratorSourceRooms\(classId\)/);
+  assert.match(form, /학생이 만든 질문 직접 가져오기/);
+  assert.match(form, /투표 활동 없이 선생님이 질문을 골라 다듬고 개요 위치를 정할 수 있어요/);
+  assert.match(form, /aria-label="개요에 넣을 질문 문장"/);
+  assert.match(form, /aria-label="질문을 넣을 개요 위치"/);
+  assert.match(form, /function addTeacherQuestions\(\)/);
+  assert.match(form, /label: question\.text\.trim\(\)/);
+  assert.match(form, /section: "처음" \| "가운데" \| "끝"/);
+});

@@ -308,13 +308,26 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   const [votingRoomId, setVotingRoomId] = useState("");
   const [pickedQuestions, setPickedQuestions] = useState<Record<string, "처음" | "가운데" | "끝">>({});
   const [questionPanelOpen, setQuestionPanelOpen] = useState(false);
+  const [generatorRooms, setGeneratorRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
+  const [generatorRoomId, setGeneratorRoomId] = useState("");
+  const [teacherQuestions, setTeacherQuestions] = useState<Record<string, {
+    included: boolean;
+    text: string;
+    section: "처음" | "가운데" | "끝";
+  }>>({});
+  const [teacherQuestionPanelOpen, setTeacherQuestionPanelOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
-    getQuestionVotingSourceRooms(classId).then((rooms) => {
+    Promise.all([
+      getQuestionVotingSourceRooms(classId),
+      getQuestionGeneratorSourceRooms(classId),
+    ]).then(([voting, generated]) => {
       if (!active) return;
-      setVotingRooms(rooms);
-      setVotingRoomId((prev) => prev || rooms[0]?.roomId || "");
+      setVotingRooms(voting);
+      setVotingRoomId((prev) => prev || voting[0]?.roomId || "");
+      setGeneratorRooms(generated);
+      setGeneratorRoomId((prev) => prev || generated[0]?.roomId || "");
     });
     return () => { active = false; };
   }, [classId]);
@@ -403,6 +416,41 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
 
   const selectedVotingRoom = votingRooms.find((room) => room.roomId === votingRoomId) ?? null;
   const pickedCount = Object.keys(pickedQuestions).length;
+  const selectedGeneratorRoom = generatorRooms.find((room) => room.roomId === generatorRoomId) ?? null;
+  const selectedTeacherQuestionCount = Object.values(teacherQuestions)
+    .filter((question) => question.included && question.text.trim()).length;
+
+  function selectGeneratorRoom(roomId: string) {
+    const room = generatorRooms.find((candidate) => candidate.roomId === roomId) ?? null;
+    setGeneratorRoomId(roomId);
+    setTeacherQuestions(Object.fromEntries((room?.questions ?? []).map((question) => [question.id, {
+      included: question.pickedForVoting,
+      text: question.text,
+      section: "가운데" as const,
+    }])));
+  }
+
+  function addTeacherQuestions() {
+    if (!selectedGeneratorRoom || selectedTeacherQuestionCount === 0) return;
+
+    setCustomTemplate((prev) => {
+      const base = prev ?? getDefaultOutlineTemplate(subjectType);
+      return {
+        sections: base.sections.map((section) => {
+          const added = Object.entries(teacherQuestions)
+            .filter(([, question]) => question.included && question.section === section.key && question.text.trim())
+            .map(([questionId, question], index) => ({
+              id: `teacher-question-${questionId.replace(/[^a-zA-Z0-9]/g, "").slice(-12)}-${index}`,
+              label: question.text.trim(),
+              placeholder: "친구가 만든 질문이에요. 내 생각을 자유롭게 적어 보세요.",
+            }));
+          return added.length > 0 ? { ...section, items: [...section.items, ...added] } : section;
+        }),
+      };
+    });
+    setTeacherQuestions({});
+    setTeacherQuestionPanelOpen(false);
+  }
 
   /** 고른 질문을 개요 항목으로 넣는다. 질문 자체가 학생이 답할 물음이므로 `label` 이 된다. */
   function addPickedQuestions() {
@@ -575,8 +623,113 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
           )}
         </div>
 
-        {/* 좋은 질문 고르기에서 학생들이 뽑은 질문을 개요 항목으로 가져온다.
-            활동이 하나도 없으면 이 칸 자체를 그리지 않는다 — 빈 안내는 화면만 늘린다. */}
+        {/* 학생 질문 원문과 좋은 질문 고르기 결과를 서로 다른 경로로 가져온다.
+            해당 활동이 하나도 없으면 그 칸은 그리지 않는다 — 빈 안내는 화면만 늘린다. */}
+        {generatorRooms.length > 0 && (
+          <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-bold text-sky-700">✍️ 학생이 만든 질문 직접 가져오기</p>
+                <p className="mt-0.5 text-sm text-sky-700/80">
+                  투표 활동 없이 선생님이 질문을 골라 다듬고 개요 위치를 정할 수 있어요.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTeacherQuestionPanelOpen((open) => {
+                    if (!open && Object.keys(teacherQuestions).length === 0) {
+                      selectGeneratorRoom(generatorRoomId || generatorRooms[0]?.roomId || "");
+                    }
+                    return !open;
+                  });
+                }}
+                className="lab-button lab-button--quiet text-sm"
+              >
+                {teacherQuestionPanelOpen ? "닫기" : "학생 질문 고르기"}
+              </button>
+            </div>
+
+            {teacherQuestionPanelOpen && (
+              <div className="mt-3 space-y-3">
+                <select
+                  value={generatorRoomId}
+                  onChange={(event) => selectGeneratorRoom(event.target.value)}
+                  className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-gray-900"
+                >
+                  {generatorRooms.map((room) => (
+                    <option key={room.roomId} value={room.roomId}>
+                      {room.title} · 질문 {room.questionCount}개
+                    </option>
+                  ))}
+                </select>
+
+                <div className="space-y-2">
+                  {selectedGeneratorRoom?.questions.map((question) => {
+                    const draftQuestion = teacherQuestions[question.id] ?? {
+                      included: false,
+                      text: question.text,
+                      section: "가운데" as const,
+                    };
+                    return (
+                      <div key={question.id} className="rounded-xl bg-white p-3">
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={draftQuestion.included}
+                            onChange={(event) => setTeacherQuestions((prev) => ({
+                              ...prev,
+                              [question.id]: { ...draftQuestion, included: event.target.checked },
+                            }))}
+                            className="mt-2"
+                          />
+                          <input
+                            type="text"
+                            value={draftQuestion.text}
+                            onChange={(event) => setTeacherQuestions((prev) => ({
+                              ...prev,
+                              [question.id]: { ...draftQuestion, text: event.target.value },
+                            }))}
+                            aria-label="개요에 넣을 질문 문장"
+                            className="min-w-0 flex-1 rounded-lg border border-sky-100 px-3 py-2 text-sm text-gray-900"
+                          />
+                          <select
+                            value={draftQuestion.section}
+                            onChange={(event) => setTeacherQuestions((prev) => ({
+                              ...prev,
+                              [question.id]: {
+                                ...draftQuestion,
+                                section: event.target.value as "처음" | "가운데" | "끝",
+                              },
+                            }))}
+                            aria-label="질문을 넣을 개요 위치"
+                            className="rounded-lg border border-sky-200 bg-white px-2 py-2 text-sm text-gray-900"
+                          >
+                            <option value="처음">처음</option>
+                            <option value="가운데">가운데</option>
+                            <option value="끝">끝</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addTeacherQuestions}
+                  disabled={selectedTeacherQuestionCount === 0}
+                  className="lab-button w-full text-sm disabled:opacity-50"
+                >
+                  {selectedTeacherQuestionCount > 0
+                    ? `${selectedTeacherQuestionCount}개를 개요 틀에 넣기`
+                    : "질문을 골라 주세요"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {votingRooms.length > 0 && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
