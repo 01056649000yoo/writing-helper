@@ -544,7 +544,7 @@ export async function getOutlineSharedQuestionCandidates(sessionId: string, room
     admin
       .schema("writing_helper")
       .from("rooms")
-      .select("id, teacher_id, class_id, agit_class_id, activity_type")
+      .select("id, title, topic, teacher_id, class_id, agit_class_id, activity_type, activity_config")
       .eq("id", roomId)
       .maybeSingle(),
   ]);
@@ -598,7 +598,22 @@ export async function getOutlineSharedQuestionCandidates(sessionId: string, room
     submissionsByRoom.set(row.room_id, bucket);
   }
 
-  let remainingQuestionCount = 100;
+  const rawOutlineConfig = outlineRoom.activity_config;
+  const directQuestions = typeof rawOutlineConfig === "object" && rawOutlineConfig !== null
+    && "sharedQuestions" in rawOutlineConfig && Array.isArray(rawOutlineConfig.sharedQuestions)
+    ? (rawOutlineConfig.sharedQuestions as unknown[])
+        .slice(0, 100)
+        .map((entry, index) => ({
+          id: `teacher-question-${index + 1}`,
+          text: typeof entry === "object" && entry !== null && "text" in entry
+            ? String(entry.text).trim()
+            : "",
+          votes: 0,
+        }))
+        .filter((entry) => entry.text.length > 0)
+    : [];
+
+  let remainingQuestionCount = 100 - directQuestions.length;
   const rooms = (votingRooms ?? []).flatMap((room) => {
     if (remainingQuestionCount <= 0) return [];
 
@@ -650,7 +665,18 @@ export async function getOutlineSharedQuestionCandidates(sessionId: string, room
     }];
   });
 
-  return { rooms };
+  const teacherRoom = directQuestions.length > 0
+    ? [{
+        roomId: `${outlineRoom.id}-teacher-curated`,
+        title: "선생님이 정리한 학생 질문",
+        topic: outlineRoom.topic?.trim() || outlineRoom.title?.trim() || "",
+        createdAt: "",
+        isActive: true,
+        questions: directQuestions,
+      }]
+    : [];
+
+  return { rooms: [...teacherRoom, ...rooms] };
 }
 
 export async function getStudentRoomEntry(roomId: string) {

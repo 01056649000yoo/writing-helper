@@ -197,6 +197,25 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 
     // 학생 편집 허용 여부. 값이 없으면 허용(기본)으로 둔다 — 옛 방과 같은 동작이다.
     const studentEditable = String(formData.get("student_editable") ?? "true") !== "false";
+    const sharedQuestionsJson = String(formData.get("outline_shared_questions") ?? "").trim();
+    let sharedQuestions: Array<{ id: string; text: string }> = [];
+    if (sharedQuestionsJson) {
+      try {
+        const parsed = JSON.parse(sharedQuestionsJson) as unknown;
+        if (!Array.isArray(parsed)) throw new Error("not an array");
+        sharedQuestions = parsed
+          .slice(0, 100)
+          .map((entry, index) => ({
+            id: `shared-${index + 1}`,
+            text: typeof entry === "object" && entry !== null && "text" in entry
+              ? String(entry.text).trim().slice(0, 500)
+              : "",
+          }))
+          .filter((entry) => entry.text.length > 0);
+      } catch {
+        return { error: "학생에게 보여 줄 질문을 읽지 못했습니다." };
+      }
+    }
 
     activityConfig = {
       subjectType,
@@ -204,6 +223,7 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
       outlineDepth,
       outlineTemplate,
       studentEditable,
+      sharedQuestions,
     };
   } else if (activityType === "question_generator") {
     // 시작 조건은 방식(mode)마다 다르다 — 판정의 원본은 features/activities/question-generator/config.ts.

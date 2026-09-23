@@ -104,6 +104,11 @@ export type OutlineBuilderConfig = {
    * `false`면 교사가 준 틀 그대로 채우기만 한다. 옛 방에는 이 값이 없어 기본값(허용)으로 읽는다.
    */
   studentEditable?: boolean;
+  /**
+   * 개요 방을 만들 때 교사가 학생 질문 원문에서 추려 문장을 다듬은 후보.
+   * 원본 학생·세션 ID는 저장하지 않고, 학생이 '친구들이 만든 질문'에서 볼 문장만 둔다.
+   */
+  sharedQuestions?: Array<{ id: string; text: string }>;
   /** @deprecated 이전 방식 호환용 — 새 방에는 사용 안 함 */
   questionSets?: QuestionSets | null;
   /** @deprecated 이전 방식 호환용 */

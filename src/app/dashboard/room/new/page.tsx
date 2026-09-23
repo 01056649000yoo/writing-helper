@@ -311,11 +311,14 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   const [generatorRooms, setGeneratorRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
   const [generatorRoomId, setGeneratorRoomId] = useState("");
   const [teacherQuestions, setTeacherQuestions] = useState<Record<string, {
-    included: boolean;
+    teacherIncluded: boolean;
+    studentIncluded: boolean;
     text: string;
     section: "처음" | "가운데" | "끝";
   }>>({});
   const [teacherQuestionPanelOpen, setTeacherQuestionPanelOpen] = useState(false);
+  const [teacherQuestionSearch, setTeacherQuestionSearch] = useState("");
+  const [studentSharedQuestions, setStudentSharedQuestions] = useState<Array<{ text: string }>>([]);
 
   useEffect(() => {
     let active = true;
@@ -331,6 +334,20 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     });
     return () => { active = false; };
   }, [classId]);
+
+  useEffect(() => {
+    if (!teacherQuestionPanelOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTeacherQuestionPanelOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [teacherQuestionPanelOpen]);
 
   const initialDraft = useMemo<OutlineBuilderDraft>(() => ({
     topic: "",
@@ -418,37 +435,50 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   const pickedCount = Object.keys(pickedQuestions).length;
   const selectedGeneratorRoom = generatorRooms.find((room) => room.roomId === generatorRoomId) ?? null;
   const selectedTeacherQuestionCount = Object.values(teacherQuestions)
-    .filter((question) => question.included && question.text.trim()).length;
+    .filter((question) => question.teacherIncluded && question.text.trim()).length;
+  const selectedStudentQuestionCount = Object.values(teacherQuestions)
+    .filter((question) => question.studentIncluded && question.text.trim()).length;
+  const visibleGeneratorQuestions = (selectedGeneratorRoom?.questions ?? []).filter((question) => {
+    const query = teacherQuestionSearch.trim().toLocaleLowerCase("ko-KR");
+    if (!query) return true;
+    const text = teacherQuestions[question.id]?.text ?? question.text;
+    return text.toLocaleLowerCase("ko-KR").includes(query);
+  });
 
   function selectGeneratorRoom(roomId: string) {
     const room = generatorRooms.find((candidate) => candidate.roomId === roomId) ?? null;
     setGeneratorRoomId(roomId);
     setTeacherQuestions(Object.fromEntries((room?.questions ?? []).map((question) => [question.id, {
-      included: question.pickedForVoting,
+      teacherIncluded: false,
+      studentIncluded: false,
       text: question.text,
       section: "가운데" as const,
     }])));
   }
 
   function addTeacherQuestions() {
-    if (!selectedGeneratorRoom || selectedTeacherQuestionCount === 0) return;
+    if (!selectedGeneratorRoom) return;
 
     setCustomTemplate((prev) => {
       const base = prev ?? getDefaultOutlineTemplate(subjectType);
       return {
         sections: base.sections.map((section) => {
+          const withoutPreviousTeacherQuestions = section.items
+            .filter((item) => !item.id.startsWith("teacher-question-"));
           const added = Object.entries(teacherQuestions)
-            .filter(([, question]) => question.included && question.section === section.key && question.text.trim())
+            .filter(([, question]) => question.teacherIncluded && question.section === section.key && question.text.trim())
             .map(([questionId, question], index) => ({
               id: `teacher-question-${questionId.replace(/[^a-zA-Z0-9]/g, "").slice(-12)}-${index}`,
               label: question.text.trim(),
               placeholder: "친구가 만든 질문이에요. 내 생각을 자유롭게 적어 보세요.",
             }));
-          return added.length > 0 ? { ...section, items: [...section.items, ...added] } : section;
+          return { ...section, items: [...withoutPreviousTeacherQuestions, ...added] };
         }),
       };
     });
-    setTeacherQuestions({});
+    setStudentSharedQuestions(Object.values(teacherQuestions)
+      .filter((question) => question.studentIncluded && question.text.trim())
+      .map((question) => ({ text: question.text.trim() })));
     setTeacherQuestionPanelOpen(false);
   }
 
@@ -497,6 +527,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     if (customTemplate) {
       fd.set("outline_template_json", JSON.stringify(customTemplate));
     }
+    fd.set("outline_shared_questions", JSON.stringify(studentSharedQuestions));
 
     draftControls.suspendAutosave();
     clearActivityDraft(storageKey);
@@ -631,58 +662,110 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
               <div>
                 <p className="text-sm font-bold text-sky-700">✍️ 학생이 만든 질문 직접 가져오기</p>
                 <p className="mt-0.5 text-sm text-sky-700/80">
-                  투표 활동 없이 선생님이 질문을 골라 다듬고 개요 위치를 정할 수 있어요.
+                  정리 창에서 선생님 개요용과 학생이 직접 불러볼 질문을 나눠 담아요.
                 </p>
+                {(selectedTeacherQuestionCount > 0 || studentSharedQuestions.length > 0) && (
+                  <p className="mt-2 text-sm font-semibold text-sky-800">
+                    선생님 개요 {selectedTeacherQuestionCount}개 · 학생 불러오기 {studentSharedQuestions.length}개
+                  </p>
+                )}
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  setTeacherQuestionPanelOpen((open) => {
-                    if (!open && Object.keys(teacherQuestions).length === 0) {
-                      selectGeneratorRoom(generatorRoomId || generatorRooms[0]?.roomId || "");
-                    }
-                    return !open;
-                  });
+                  if (Object.keys(teacherQuestions).length === 0) {
+                    selectGeneratorRoom(generatorRoomId || generatorRooms[0]?.roomId || "");
+                  }
+                  setTeacherQuestionPanelOpen(true);
                 }}
                 className="lab-button lab-button--quiet text-sm"
               >
-                {teacherQuestionPanelOpen ? "닫기" : "학생 질문 고르기"}
+                질문 정리하기
               </button>
             </div>
 
             {teacherQuestionPanelOpen && (
-              <div className="mt-3 space-y-3">
-                <select
-                  value={generatorRoomId}
-                  onChange={(event) => selectGeneratorRoom(event.target.value)}
-                  className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-gray-900"
-                >
-                  {generatorRooms.map((room) => (
-                    <option key={room.roomId} value={room.roomId}>
-                      {room.title} · 질문 {room.questionCount}개
-                    </option>
-                  ))}
-                </select>
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 sm:p-6"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="student-question-organizer-title"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) setTeacherQuestionPanelOpen(false);
+                }}
+              >
+                <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+                  <header className="border-b border-sky-100 px-5 py-4 sm:px-7">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-sky-600">학생 질문 정리</p>
+                        <h3 id="student-question-organizer-title" className="mt-1 text-xl font-bold text-gray-900">
+                          어떤 질문을 어디에서 쓸까요?
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          문장을 다듬은 뒤 선생님 개요 틀과 학생 불러오기 중 하나 또는 둘 다 선택할 수 있어요.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTeacherQuestionPanelOpen(false)}
+                        aria-label="학생 질문 정리 창 닫기"
+                        className="rounded-full px-3 py-1.5 text-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      >
+                        ×
+                      </button>
+                    </div>
 
-                <div className="space-y-2">
-                  {selectedGeneratorRoom?.questions.map((question) => {
+                    <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                      <select
+                        value={generatorRoomId}
+                        onChange={(event) => {
+                          selectGeneratorRoom(event.target.value);
+                          setTeacherQuestionSearch("");
+                        }}
+                        className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2.5 text-sm text-gray-900"
+                      >
+                        {generatorRooms.map((room) => (
+                          <option key={room.roomId} value={room.roomId}>
+                            {room.title} · 질문 {room.questionCount}개
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="search"
+                        value={teacherQuestionSearch}
+                        onChange={(event) => setTeacherQuestionSearch(event.target.value)}
+                        placeholder="질문 문장 찾기"
+                        aria-label="학생 질문 검색"
+                        className="w-full rounded-xl border border-sky-200 px-3 py-2.5 text-sm text-gray-900"
+                      />
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                      <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-700">
+                        선생님 개요 {selectedTeacherQuestionCount}개
+                      </span>
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
+                        학생 불러오기 {selectedStudentQuestionCount}개
+                      </span>
+                      <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">
+                        현재 {visibleGeneratorQuestions.length}개 표시
+                      </span>
+                    </div>
+                  </header>
+
+                  <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-4 sm:px-7">
+                    <div className="space-y-3">
+                  {visibleGeneratorQuestions.map((question) => {
                     const draftQuestion = teacherQuestions[question.id] ?? {
-                      included: false,
+                      teacherIncluded: false,
+                      studentIncluded: false,
                       text: question.text,
                       section: "가운데" as const,
                     };
                     return (
-                      <div key={question.id} className="rounded-xl bg-white p-3">
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="checkbox"
-                            checked={draftQuestion.included}
-                            onChange={(event) => setTeacherQuestions((prev) => ({
-                              ...prev,
-                              [question.id]: { ...draftQuestion, included: event.target.checked },
-                            }))}
-                            className="mt-2"
-                          />
+                      <article key={question.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_11rem]">
                           <input
                             type="text"
                             value={draftQuestion.text}
@@ -691,40 +774,83 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                               [question.id]: { ...draftQuestion, text: event.target.value },
                             }))}
                             aria-label="개요에 넣을 질문 문장"
-                            className="min-w-0 flex-1 rounded-lg border border-sky-100 px-3 py-2 text-sm text-gray-900"
+                            className="min-w-0 rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-sky-400"
                           />
-                          <select
-                            value={draftQuestion.section}
-                            onChange={(event) => setTeacherQuestions((prev) => ({
-                              ...prev,
-                              [question.id]: {
-                                ...draftQuestion,
-                                section: event.target.value as "처음" | "가운데" | "끝",
-                              },
-                            }))}
-                            aria-label="질문을 넣을 개요 위치"
-                            className="rounded-lg border border-sky-200 bg-white px-2 py-2 text-sm text-gray-900"
-                          >
-                            <option value="처음">처음</option>
-                            <option value="가운데">가운데</option>
-                            <option value="끝">끝</option>
-                          </select>
+                          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-2.5">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-indigo-800">
+                              <input
+                                type="checkbox"
+                                checked={draftQuestion.teacherIncluded}
+                                onChange={(event) => setTeacherQuestions((prev) => ({
+                                  ...prev,
+                                  [question.id]: { ...draftQuestion, teacherIncluded: event.target.checked },
+                                }))}
+                              />
+                              선생님 개요
+                            </label>
+                            {draftQuestion.teacherIncluded && (
+                              <select
+                                value={draftQuestion.section}
+                                onChange={(event) => setTeacherQuestions((prev) => ({
+                                  ...prev,
+                                  [question.id]: {
+                                    ...draftQuestion,
+                                    section: event.target.value as "처음" | "가운데" | "끝",
+                                  },
+                                }))}
+                                aria-label="질문을 넣을 개요 위치"
+                                className="mt-2 w-full rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              >
+                                <option value="처음">처음</option>
+                                <option value="가운데">가운데</option>
+                                <option value="끝">끝</option>
+                              </select>
+                            )}
+                          </div>
+                          <label className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 text-sm font-semibold text-emerald-800">
+                            <input
+                              type="checkbox"
+                              checked={draftQuestion.studentIncluded}
+                              onChange={(event) => setTeacherQuestions((prev) => ({
+                                ...prev,
+                                [question.id]: { ...draftQuestion, studentIncluded: event.target.checked },
+                              }))}
+                            />
+                            학생 불러오기
+                          </label>
                         </div>
-                      </div>
+                      </article>
                     );
                   })}
-                </div>
+                    </div>
+                    {visibleGeneratorQuestions.length === 0 && (
+                      <p className="py-12 text-center text-sm text-gray-500">찾는 질문이 없습니다.</p>
+                    )}
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={addTeacherQuestions}
-                  disabled={selectedTeacherQuestionCount === 0}
-                  className="lab-button w-full text-sm disabled:opacity-50"
-                >
-                  {selectedTeacherQuestionCount > 0
-                    ? `${selectedTeacherQuestionCount}개를 개요 틀에 넣기`
-                    : "질문을 골라 주세요"}
-                </button>
+                  <footer className="flex flex-col-reverse gap-2 border-t border-gray-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                    <p className="text-sm text-gray-500">
+                      아무 곳에도 선택하지 않은 질문은 이 개요 활동에 포함되지 않습니다.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTeacherQuestionPanelOpen(false)}
+                        className="lab-button lab-button--quiet text-sm"
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        onClick={addTeacherQuestions}
+                        disabled={selectedTeacherQuestionCount + selectedStudentQuestionCount === 0}
+                        className="lab-button text-sm disabled:opacity-50"
+                      >
+                        질문 정리 완료
+                      </button>
+                    </div>
+                  </footer>
+                </div>
               </div>
             )}
           </div>

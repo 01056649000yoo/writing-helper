@@ -304,10 +304,21 @@ test("개요 짜기는 좋은 질문 고르기 방 없이 학생 질문을 교�
 
   assert.match(form, /Promise\.all\(\[[\s\S]*getQuestionVotingSourceRooms\(classId\)[\s\S]*getQuestionGeneratorSourceRooms\(classId\)/);
   assert.match(form, /학생이 만든 질문 직접 가져오기/);
-  assert.match(form, /투표 활동 없이 선생님이 질문을 골라 다듬고 개요 위치를 정할 수 있어요/);
+  assert.match(form, /role="dialog"/);
+  assert.match(form, /학생 질문 정리/);
+  assert.match(form, /선생님 개요/);
+  assert.match(form, /학생 불러오기/);
+  assert.match(form, /max-h-\[92vh\]/);
+  assert.match(form, /overflow-y-auto/);
+  assert.match(form, /aria-label="학생 질문 검색"/);
   assert.match(form, /aria-label="개요에 넣을 질문 문장"/);
   assert.match(form, /aria-label="질문을 넣을 개요 위치"/);
   assert.match(form, /function addTeacherQuestions\(\)/);
   assert.match(form, /label: question\.text\.trim\(\)/);
   assert.match(form, /section: "처음" \| "가운데" \| "끝"/);
+  assert.match(form, /fd\.set\("outline_shared_questions", JSON\.stringify\(studentSharedQuestions\)\)/);
+  assert.match(roomActions, /sharedQuestionsJson/);
+  assert.match(roomActions, /id: `shared-\$\{index \+ 1\}`/);
+  assert.match(studentActions, /"sharedQuestions" in rawOutlineConfig/);
+  assert.match(studentActions, /선생님이 정리한 학생 질문/);
 });
