@@ -1074,11 +1074,8 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                                   : "border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:bg-indigo-50"
                               }`}
                             >
-                              {includesTeacher ? "✓ 개요에 넣음" : "+ 개요에 넣기"}
+                              {includesTeacher ? "✓ 개요에 담김" : "+ 개요에 넣기"}
                             </button>
-                            {includesTeacher && (
-                              <p className="mt-1.5 text-center text-sm font-medium text-indigo-600">가운데에 담긴 뒤 순서를 편집해요</p>
-                            )}
                           </div>
 
                           <button

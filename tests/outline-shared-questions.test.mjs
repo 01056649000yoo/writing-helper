@@ -329,7 +329,8 @@ test("개요 짜기는 좋은 질문 고르기 방 없이 학생 질문을 교�
   assert.match(form, /draggable/);
   assert.match(form, /function moveOutlineItem\(/);
   assert.match(form, /moveOutlineItem\(draggedOutlineItem\.section, draggedOutlineItem\.itemId, section\.key, itemIndex\)/);
-  assert.match(form, /가운데에 담긴 뒤 순서를 편집해요/);
+  assert.match(form, /includesTeacher \? "✓ 개요에 담김" : "\+ 개요에 넣기"/);
+  assert.doesNotMatch(form, /가운데에 담긴 뒤 순서를 편집해요/);
   assert.match(form, /existingQuestionIds\.add\(item\.id\)/);
   assert.match(form, /section\.key === "가운데"/);
   assert.match(form, /function addTeacherQuestions\(\)/);
