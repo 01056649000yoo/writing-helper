@@ -306,8 +306,15 @@ test("개요 짜기는 좋은 질문 고르기 방 없이 학생 질문을 교�
   assert.match(form, /학생이 만든 질문 직접 가져오기/);
   assert.match(form, /role="dialog"/);
   assert.match(form, /학생 질문 정리/);
+  assert.match(form, /QUESTION_DESTINATIONS/);
+  assert.match(form, /role="group"/);
+  assert.match(form, /aria-label="질문 사용처"/);
+  assert.match(form, /aria-pressed=\{active\}/);
+  assert.match(form, /제외/);
   assert.match(form, /선생님 개요/);
   assert.match(form, /학생 불러오기/);
+  assert.match(form, /둘 다/);
+  assert.match(form, /미분류/);
   assert.match(form, /max-h-\[92vh\]/);
   assert.match(form, /overflow-y-auto/);
   assert.match(form, /aria-label="학생 질문 검색"/);

@@ -48,6 +48,20 @@ type OutlineBuilderDraft = {
   student_editable: boolean;
 };
 
+type QuestionDestination = "unclassified" | "excluded" | "teacher" | "student" | "both";
+type QuestionDestinationFilter = "all" | QuestionDestination;
+
+const QUESTION_DESTINATIONS: Array<{
+  id: QuestionDestination;
+  label: string;
+  activeClass: string;
+}> = [
+  { id: "excluded", label: "제외", activeClass: "border-gray-500 bg-gray-700 text-white" },
+  { id: "teacher", label: "선생님 개요", activeClass: "border-indigo-500 bg-indigo-600 text-white" },
+  { id: "student", label: "학생 불러오기", activeClass: "border-emerald-500 bg-emerald-600 text-white" },
+  { id: "both", label: "둘 다", activeClass: "border-sky-500 bg-sky-600 text-white" },
+];
+
 type QuestionGeneratorMode = "direct" | "card_remix" | "ai_custom";
 
 type QuestionGeneratorDraft = {
@@ -311,13 +325,13 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   const [generatorRooms, setGeneratorRooms] = useState<QuestionGeneratorSourceRoomSummary[]>([]);
   const [generatorRoomId, setGeneratorRoomId] = useState("");
   const [teacherQuestions, setTeacherQuestions] = useState<Record<string, {
-    teacherIncluded: boolean;
-    studentIncluded: boolean;
+    destination: QuestionDestination;
     text: string;
     section: "처음" | "가운데" | "끝";
   }>>({});
   const [teacherQuestionPanelOpen, setTeacherQuestionPanelOpen] = useState(false);
   const [teacherQuestionSearch, setTeacherQuestionSearch] = useState("");
+  const [teacherQuestionFilter, setTeacherQuestionFilter] = useState<QuestionDestinationFilter>("all");
   const [studentSharedQuestions, setStudentSharedQuestions] = useState<Array<{ text: string }>>([]);
 
   useEffect(() => {
@@ -435,22 +449,26 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
   const pickedCount = Object.keys(pickedQuestions).length;
   const selectedGeneratorRoom = generatorRooms.find((room) => room.roomId === generatorRoomId) ?? null;
   const selectedTeacherQuestionCount = Object.values(teacherQuestions)
-    .filter((question) => question.teacherIncluded && question.text.trim()).length;
+    .filter((question) => (question.destination === "teacher" || question.destination === "both") && question.text.trim()).length;
   const selectedStudentQuestionCount = Object.values(teacherQuestions)
-    .filter((question) => question.studentIncluded && question.text.trim()).length;
+    .filter((question) => (question.destination === "student" || question.destination === "both") && question.text.trim()).length;
+  const classifiedQuestionCount = Object.values(teacherQuestions)
+    .filter((question) => question.destination !== "unclassified" && question.text.trim()).length;
   const visibleGeneratorQuestions = (selectedGeneratorRoom?.questions ?? []).filter((question) => {
     const query = teacherQuestionSearch.trim().toLocaleLowerCase("ko-KR");
-    if (!query) return true;
-    const text = teacherQuestions[question.id]?.text ?? question.text;
-    return text.toLocaleLowerCase("ko-KR").includes(query);
+    const draftQuestion = teacherQuestions[question.id];
+    const text = draftQuestion?.text ?? question.text;
+    const matchesSearch = !query || text.toLocaleLowerCase("ko-KR").includes(query);
+    const matchesFilter = teacherQuestionFilter === "all"
+      || (draftQuestion?.destination ?? "unclassified") === teacherQuestionFilter;
+    return matchesSearch && matchesFilter;
   });
 
   function selectGeneratorRoom(roomId: string) {
     const room = generatorRooms.find((candidate) => candidate.roomId === roomId) ?? null;
     setGeneratorRoomId(roomId);
     setTeacherQuestions(Object.fromEntries((room?.questions ?? []).map((question) => [question.id, {
-      teacherIncluded: false,
-      studentIncluded: false,
+      destination: "unclassified" as const,
       text: question.text,
       section: "가운데" as const,
     }])));
@@ -466,7 +484,9 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
           const withoutPreviousTeacherQuestions = section.items
             .filter((item) => !item.id.startsWith("teacher-question-"));
           const added = Object.entries(teacherQuestions)
-            .filter(([, question]) => question.teacherIncluded && question.section === section.key && question.text.trim())
+            .filter(([, question]) => (
+              question.destination === "teacher" || question.destination === "both"
+            ) && question.section === section.key && question.text.trim())
             .map(([questionId, question], index) => ({
               id: `teacher-question-${questionId.replace(/[^a-zA-Z0-9]/g, "").slice(-12)}-${index}`,
               label: question.text.trim(),
@@ -477,7 +497,9 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
       };
     });
     setStudentSharedQuestions(Object.values(teacherQuestions)
-      .filter((question) => question.studentIncluded && question.text.trim())
+      .filter((question) => (
+        question.destination === "student" || question.destination === "both"
+      ) && question.text.trim())
       .map((question) => ({ text: question.text.trim() })));
     setTeacherQuestionPanelOpen(false);
   }
@@ -722,6 +744,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                         onChange={(event) => {
                           selectGeneratorRoom(event.target.value);
                           setTeacherQuestionSearch("");
+                          setTeacherQuestionFilter("all");
                         }}
                         className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2.5 text-sm text-gray-900"
                       >
@@ -741,16 +764,47 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                       />
                     </div>
 
-                    <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                      <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-700">
-                        선생님 개요 {selectedTeacherQuestionCount}개
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      {([
+                        { id: "all" as const, label: `전체 ${selectedGeneratorRoom?.questions.length ?? 0}` },
+                        {
+                          id: "unclassified" as const,
+                          label: `미분류 ${Math.max((selectedGeneratorRoom?.questions.length ?? 0) - classifiedQuestionCount, 0)}`,
+                        },
+                        { id: "excluded" as const, label: "제외" },
+                        { id: "teacher" as const, label: "선생님만" },
+                        { id: "student" as const, label: "학생만" },
+                        { id: "both" as const, label: "둘 다" },
+                      ]).map((filter) => (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          onClick={() => setTeacherQuestionFilter(filter.id)}
+                          aria-pressed={teacherQuestionFilter === filter.id}
+                          className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                            teacherQuestionFilter === filter.id
+                              ? "border-slate-700 bg-slate-800 text-white"
+                              : "border-gray-200 bg-white text-gray-600 hover:border-gray-400"
+                          }`}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                      <span className="ml-auto text-sm font-medium text-gray-500">
+                        현재 {visibleGeneratorQuestions.length}개
                       </span>
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                        학생 불러오기 {selectedStudentQuestionCount}개
-                      </span>
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">
-                        현재 {visibleGeneratorQuestions.length}개 표시
-                      </span>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+                      <div className="rounded-xl bg-slate-100 px-3 py-2 text-slate-700">
+                        분류 완료 <strong>{classifiedQuestionCount}</strong>
+                      </div>
+                      <div className="rounded-xl bg-indigo-50 px-3 py-2 text-indigo-700">
+                        선생님 개요 <strong>{selectedTeacherQuestionCount}</strong>
+                      </div>
+                      <div className="col-span-2 rounded-xl bg-emerald-50 px-3 py-2 text-emerald-700 sm:col-span-1">
+                        학생 불러오기 <strong>{selectedStudentQuestionCount}</strong>
+                      </div>
                     </div>
                   </header>
 
@@ -758,14 +812,26 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                     <div className="space-y-3">
                   {visibleGeneratorQuestions.map((question) => {
                     const draftQuestion = teacherQuestions[question.id] ?? {
-                      teacherIncluded: false,
-                      studentIncluded: false,
+                      destination: "unclassified" as const,
                       text: question.text,
                       section: "가운데" as const,
                     };
+                    const includesTeacher = draftQuestion.destination === "teacher" || draftQuestion.destination === "both";
+                    const destinationTone = draftQuestion.destination === "teacher"
+                      ? "border-l-indigo-500"
+                      : draftQuestion.destination === "student"
+                        ? "border-l-emerald-500"
+                        : draftQuestion.destination === "both"
+                          ? "border-l-sky-500"
+                          : draftQuestion.destination === "excluded"
+                            ? "border-l-gray-500"
+                            : "border-l-gray-200";
                     return (
-                      <article key={question.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_11rem]">
+                      <article
+                        key={question.id}
+                        className={`rounded-2xl border border-l-4 border-gray-200 bg-white p-4 shadow-sm transition-colors ${destinationTone}`}
+                      >
+                        <div className="flex flex-col gap-3">
                           <input
                             type="text"
                             value={draftQuestion.text}
@@ -776,19 +842,35 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                             aria-label="개요에 넣을 질문 문장"
                             className="min-w-0 rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-sky-400"
                           />
-                          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-2.5">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-indigo-800">
-                              <input
-                                type="checkbox"
-                                checked={draftQuestion.teacherIncluded}
-                                onChange={(event) => setTeacherQuestions((prev) => ({
-                                  ...prev,
-                                  [question.id]: { ...draftQuestion, teacherIncluded: event.target.checked },
-                                }))}
-                              />
-                              선생님 개요
-                            </label>
-                            {draftQuestion.teacherIncluded && (
+                          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+                            <div
+                              className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1 sm:grid-cols-4"
+                              role="group"
+                              aria-label="질문 사용처"
+                            >
+                              {QUESTION_DESTINATIONS.map((destination) => {
+                                const active = draftQuestion.destination === destination.id;
+                                return (
+                                  <button
+                                    key={destination.id}
+                                    type="button"
+                                    onClick={() => setTeacherQuestions((prev) => ({
+                                      ...prev,
+                                      [question.id]: { ...draftQuestion, destination: destination.id },
+                                    }))}
+                                    aria-pressed={active}
+                                    className={`rounded-lg border px-3 py-2 text-sm font-bold transition-all ${
+                                      active
+                                        ? destination.activeClass
+                                        : "border-transparent bg-transparent text-gray-500 hover:bg-white hover:text-gray-800"
+                                    }`}
+                                  >
+                                    {destination.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {includesTeacher && (
                               <select
                                 value={draftQuestion.section}
                                 onChange={(event) => setTeacherQuestions((prev) => ({
@@ -799,25 +881,14 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                                   },
                                 }))}
                                 aria-label="질문을 넣을 개요 위치"
-                                className="mt-2 w-full rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-sm text-gray-900"
+                                className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 xl:w-auto"
                               >
-                                <option value="처음">처음</option>
-                                <option value="가운데">가운데</option>
-                                <option value="끝">끝</option>
+                                <option value="처음">개요 위치 · 처음</option>
+                                <option value="가운데">개요 위치 · 가운데</option>
+                                <option value="끝">개요 위치 · 끝</option>
                               </select>
                             )}
                           </div>
-                          <label className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 text-sm font-semibold text-emerald-800">
-                            <input
-                              type="checkbox"
-                              checked={draftQuestion.studentIncluded}
-                              onChange={(event) => setTeacherQuestions((prev) => ({
-                                ...prev,
-                                [question.id]: { ...draftQuestion, studentIncluded: event.target.checked },
-                              }))}
-                            />
-                            학생 불러오기
-                          </label>
                         </div>
                       </article>
                     );
@@ -843,7 +914,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
                       <button
                         type="button"
                         onClick={addTeacherQuestions}
-                        disabled={selectedTeacherQuestionCount + selectedStudentQuestionCount === 0}
+                        disabled={classifiedQuestionCount === 0}
                         className="lab-button text-sm disabled:opacity-50"
                       >
                         질문 정리 완료
