@@ -308,10 +308,14 @@ test("개요 짜기는 좋은 질문 고르기 방 없이 학생 질문을 교�
   assert.match(form, /학생 질문 정리/);
   assert.match(form, /toggleQuestionDestination/);
   assert.match(form, /🧩 개요에 미리 넣기/);
-  assert.match(form, /학생이 개요를 열면 이 질문이 처음부터 보여요/);
+  assert.match(form, /학생이 개요를 열면 질문이 처음부터 보입니다/);
   assert.match(form, /🙋 학생이 직접 고르기/);
   assert.match(form, /친구 질문 불러오기/);
-  assert.match(form, /이 질문은 사용하지 않기/);
+  assert.match(form, /질문 문장/);
+  assert.match(form, /개요에 미리/);
+  assert.match(form, /학생이 선택/);
+  assert.match(form, /사용 안 함/);
+  assert.match(form, /\? "✓ 제외됨" : "제외"/);
   assert.match(form, /aria-pressed=\{includesTeacher\}/);
   assert.match(form, /aria-pressed=\{includesStudent\}/);
   assert.match(form, /미분류/);
