@@ -735,7 +735,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
             <button
               type="button"
               onClick={() => setOutlineOrderPanelOpen(true)}
-              className="lab-button lab-button--quiet text-sm"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-600 bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               ↕ 개요 순서 편집하기
             </button>
