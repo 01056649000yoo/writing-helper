@@ -20,6 +20,7 @@ import {
 } from "@/components/question-voting-ranking-summary";
 import { QuestionCardVisibilityButton } from "@/components/question-generator-result-cards";
 import { QuestionBoardFullscreen } from "@/components/question-board-fullscreen";
+import { TeacherQuestionAdder } from "@/components/teacher-question-adder";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 
 type Student = { id: string; student_number: number; student_name: string };
@@ -443,6 +444,9 @@ function QuestionResultsModal({
               </p>
             </div>
           )}
+
+          {/* 학생 질문이 모자랄 때 선생님이 더한다(2026-09-30). 학생 제출 수에는 섞이지 않는다. */}
+          <TeacherQuestionAdder roomId={roomId} />
 
           <section
             ref={boardRef}

@@ -20,6 +20,14 @@ import {
   type QuestionGeneratorSetupInput,
 } from "@/features/activities/question-generator/config";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
+import {
+  loadTeacherQuestionsByRoom,
+  normalizeTeacherQuestionText,
+  parseTeacherQuestionSourceId,
+  TEACHER_QUESTION_MAX_LENGTH,
+  teacherQuestionSourceId,
+  type RoomTeacherQuestion,
+} from "@/lib/room-teacher-questions";
 import { deterministicShuffle } from "@/lib/anonymous-order";
 import { buildQuestionVotingRanking, normalizeQuestionVotingSubmission, normalizeQuestionVotingConfig } from "@/lib/question-voting";
 import { buildOneLineShareBoard, normalizeKeywordText } from "@/lib/one-line-share";
@@ -279,6 +287,20 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
         if (!source) continue;
         const trimmed = entry.text.trim();
         if (!trimmed || trimmed === source.text) continue;
+        // 선생님 질문을 여기서 고치면 원본 표도 같이 고친다(학생 질문과 같은 규칙).
+        const teacherQuestionId = parseTeacherQuestionSourceId(source.id);
+        if (teacherQuestionId) {
+          const text = normalizeTeacherQuestionText(trimmed);
+          if (text && text.length <= TEACHER_QUESTION_MAX_LENGTH) {
+            await admin
+              .schema("writing_helper")
+              .from("room_teacher_questions")
+              .update({ text, updated_at: new Date().toISOString() })
+              .eq("id", teacherQuestionId)
+              .eq("room_id", sourceRoom.roomId);
+          }
+          continue;
+        }
         const sessionId = entry.sourceSessionId ?? source.sourceSessionId;
         const selectionId = entry.sourceSelectionId ?? source.sourceSelectionId;
         if (!sessionId || !selectionId) continue;
@@ -855,12 +877,27 @@ export type QuestionGeneratorSourceRoomSummary = {
   questions: Array<{
     id: string;
     text: string;
+    /** 선생님 질문은 학생 세션이 없어 빈 문자열이다. */
     sourceSessionId: string;
     sourceSelectionId: string;
-    /** 교사가 실시간 보기에서 미리 담아 둔 질문인가. */
+    /** 교사가 실시간 보기에서 미리 담아 둔 질문인가. 선생님 질문은 늘 담긴 채로 온다. */
     pickedForVoting: boolean;
+    /** 선생님이 실시간 보기에서 더한 질문인가(2026-09-30). 교사 화면에만 표시한다. */
+    fromTeacher?: boolean;
   }>;
 };
+
+/** 선생님 질문을 투표 원본 목록 모양으로. 학생 질문 앞에 둔다(모자라서 더한 것이라 먼저 보이게). */
+function teacherQuestionsAsSource(questions: RoomTeacherQuestion[]): QuestionGeneratorSourceRoomSummary["questions"] {
+  return questions.map((question) => ({
+    id: teacherQuestionSourceId(question.id),
+    text: question.text,
+    sourceSessionId: "",
+    sourceSelectionId: "",
+    pickedForVoting: true,
+    fromTeacher: true,
+  }));
+}
 
 /** 개요 짜기 방을 만들 때 고르는 `좋은 질문 고르기` 활동. 질문은 **득표 많은 순**으로 담는다. */
 export type QuestionVotingSourceRoomSummary = {
@@ -1111,14 +1148,20 @@ export async function getQuestionGeneratorSourceRooms(classId?: string): Promise
   if (!rooms || rooms.length === 0) return [];
 
   const roomIds = rooms.map((room) => room.id);
-  const { data: sessions } = await admin
-    .schema("writing_helper")
-    .from("student_sessions")
-    .select("id, room_id, submission")
-    .in("room_id", roomIds)
-    .eq("status", "done");
+  const [{ data: sessions }, teacherQuestionsByRoom] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, room_id, submission")
+      .in("room_id", roomIds)
+      .eq("status", "done"),
+    loadTeacherQuestionsByRoom(admin, roomIds),
+  ]);
 
   const questionsByRoom = new Map<string, QuestionGeneratorSourceRoomSummary["questions"]>();
+  for (const [roomId, teacherQuestions] of teacherQuestionsByRoom) {
+    questionsByRoom.set(roomId, teacherQuestionsAsSource(teacherQuestions));
+  }
 
   for (const session of sessions ?? []) {
     const submission = normalizeQuestionGeneratorSubmission(session.submission);
@@ -1599,14 +1642,17 @@ async function getQuestionGeneratorSourceRoomSummary(
     return null;
   }
 
-  const { data: sessions } = await admin
-    .schema("writing_helper")
-    .from("student_sessions")
-    .select("id, room_id, submission")
-    .eq("room_id", roomId)
-    .eq("status", "done");
+  const [{ data: sessions }, teacherQuestionsByRoom] = await Promise.all([
+    admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, room_id, submission")
+      .eq("room_id", roomId)
+      .eq("status", "done"),
+    loadTeacherQuestionsByRoom(admin, [roomId]),
+  ]);
 
-  const questions = (sessions ?? []).flatMap((session) => {
+  const studentQuestions = (sessions ?? []).flatMap((session) => {
     const submission = normalizeQuestionGeneratorSubmission(session.submission);
     if (!submission) return [];
 
@@ -1618,6 +1664,7 @@ async function getQuestionGeneratorSourceRoomSummary(
       pickedForVoting: selection.pickedForVoting === true,
     }));
   });
+  const questions = [...teacherQuestionsAsSource(teacherQuestionsByRoom.get(roomId) ?? []), ...studentQuestions];
 
   return questions.length > 0
     ? {

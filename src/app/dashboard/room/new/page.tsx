@@ -92,6 +92,8 @@ type VotingQuestionDraft = {
   included: boolean;
   sourceSessionId?: string;
   sourceSelectionId?: string;
+  /** 선생님이 질문 만들기 실시간 보기에서 더한 질문. 이 화면에만 표시하고 학생 투표 화면에는 드러내지 않는다. */
+  fromTeacher?: boolean;
 };
 
 type QuestionVotingDraft = {
@@ -2200,7 +2202,7 @@ function CardSetDetailModal({
 
 function mergeVotingQuestions(
   prev: VotingQuestionDraft[],
-  source: Array<{ id: string; text: string; sourceSessionId?: string; sourceSelectionId?: string; pickedForVoting?: boolean }>,
+  source: Array<{ id: string; text: string; sourceSessionId?: string; sourceSelectionId?: string; pickedForVoting?: boolean; fromTeacher?: boolean }>,
 ): VotingQuestionDraft[] {
   const prevById = new Map(prev.map((question) => [question.id, question] as const));
 
@@ -2217,6 +2219,7 @@ function mergeVotingQuestions(
         ...existing,
         sourceSessionId: existing.sourceSessionId ?? question.sourceSessionId,
         sourceSelectionId: existing.sourceSelectionId ?? question.sourceSelectionId,
+        fromTeacher: existing.fromTeacher ?? question.fromTeacher,
       };
     }
     return {
@@ -2227,6 +2230,7 @@ function mergeVotingQuestions(
       included: question.pickedForVoting === true,
       sourceSessionId: question.sourceSessionId,
       sourceSelectionId: question.sourceSelectionId,
+      fromTeacher: question.fromTeacher,
     };
   });
 }
@@ -2496,6 +2500,14 @@ function QuestionVotingSetup({ classId }: { classId: string }) {
                     <div className="flex items-center justify-between gap-2">
                       <span className={`text-sm font-bold ${question.included ? "text-amber-700" : "text-gray-500"}`}>
                         질문 {index + 1}
+                        {question.fromTeacher && (
+                          <span
+                            className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700"
+                            title="학생 투표 화면에는 누가 냈는지 보이지 않아요."
+                          >
+                            👩‍🏫 선생님 질문
+                          </span>
+                        )}
                       </span>
                       <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
                         question.included
