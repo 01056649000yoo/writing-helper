@@ -24,7 +24,7 @@ jobs:
       - name: Use Node.js 20
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Isolate npm cache
         run: echo "NPM_CONFIG_CACHE=$RUNNER_TEMP/npm-cache" >> "$GITHUB_ENV"

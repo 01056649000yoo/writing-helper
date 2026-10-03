@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 WORKDIR /app
 
 FROM base AS deps
@@ -25,8 +25,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
-# Node 20 이미지는 지원이 끝나 더 갱신되지 않는다(2026-10-03 점검: openssl 3.5.6 그대로). 실행 단계에서 알파인 보안 패치를 직접 받는다.
+FROM node:22-alpine AS runner
+# Node 20 은 지원이 끝나 2026-10-03 에 Node 22 로 옮겼다. 그래도 베이스 이미지가 늦게 갱신될 때를 대비해 알파인 보안 패치를 받는다.
 RUN apk upgrade --no-cache
 ARG BUILD_VERSION
 ARG NEXT_PUBLIC_BASE_PATH=""
