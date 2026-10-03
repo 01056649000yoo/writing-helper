@@ -26,6 +26,8 @@ COPY . .
 RUN npm run build
 
 FROM node:20-alpine AS runner
+# Node 20 이미지는 지원이 끝나 더 갱신되지 않는다(2026-10-03 점검: openssl 3.5.6 그대로). 실행 단계에서 알파인 보안 패치를 직접 받는다.
+RUN apk upgrade --no-cache
 ARG BUILD_VERSION
 ARG NEXT_PUBLIC_BASE_PATH=""
 ARG NEXT_PUBLIC_LAB_SIGNUP_ENABLED="true"
