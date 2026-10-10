@@ -1278,56 +1278,68 @@ button:not(:disabled),
   font-variant-numeric: tabular-nums;
 }
 
+/* 노트북 화면에서 처음·가운데·끝이 한 화면에 보이게 세 칸으로 나란히(2026-10-11 선생님 요청).
+   칸마다 넘치면 그 칸 안에서만 내려 보고, 상자는 칸 높이를 나눠 채운다. 글자 크기는 --outline-font-scale. */
 .outline-viewer__body {
   flex: 1;
-  overflow-y: auto;
-  padding: var(--ui-space-6) clamp(var(--ui-space-4), 6vw, 96px);
+  min-height: 0;
   display: grid;
-  gap: var(--ui-space-6);
-  align-content: start;
-  max-width: 1100px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-4);
   width: 100%;
-  margin: 0 auto;
 }
 
 .outline-viewer__section {
-  display: grid;
-  gap: var(--ui-space-3);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
 }
 
 .outline-viewer__section-title {
-  justify-self: start;
+  align-self: flex-start;
   padding: var(--ui-space-1) var(--ui-space-4);
   border-radius: var(--ui-radius-pill);
   background: var(--ui-primary-soft);
   color: var(--ui-primary-hover);
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 900;
 }
 
 .outline-viewer__items {
-  display: grid;
-  gap: var(--ui-space-3);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  padding-right: 2px;
 }
 
 .outline-viewer__items li {
-  display: grid;
-  gap: var(--ui-space-1);
-  padding: var(--ui-space-4) var(--ui-space-5);
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--ui-space-3) var(--ui-space-4);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
 }
 
 .outline-viewer__label {
-  color: var(--ui-ink-muted);
-  font-size: 1rem;
+  color: var(--ui-ink-strong);
+  font-size: calc(0.98rem * var(--outline-font-scale, 1));
   font-weight: 700;
+  line-height: 1.4;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--ui-border-strong);
 }
 
 .outline-viewer__answer {
   color: var(--ui-ink);
-  font-size: clamp(1.25rem, 2.4vw, 1.9rem);
+  font-size: calc(1.05rem * var(--outline-font-scale, 1));
   font-weight: 600;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -1336,7 +1348,39 @@ button:not(:disabled),
 
 .outline-viewer__blank {
   color: var(--ui-ink-subtle);
-  font-size: 1.05rem;
+  font-size: calc(1rem * var(--outline-font-scale, 1));
+  padding: var(--ui-space-4);
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+}
+
+.outline-viewer__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4);
+}
+
+.outline-viewer__font {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.outline-viewer__fit-note {
+  color: var(--ui-warning);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.outline-viewer__fit-note:empty { display: none; }
+
+.outline-viewer__font-value {
+  min-width: 3.2em;
+  text-align: center;
+  color: var(--ui-ink-muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 767px) {
@@ -1348,6 +1392,13 @@ button:not(:disabled),
   .outline-viewer__nav .lab-button { flex: 1; min-width: 0; }
   .outline-viewer__fullscreen { display: none; }
   .outline-viewer__peer { display: none; }
+  /* 휴대폰: 세 칸을 위아래로 쌓고 화면 전체를 내려 본다. */
+  .outline-viewer__body { display: flex; flex-direction: column; overflow-y: auto; padding: var(--ui-space-3); }
+  .outline-viewer__section { flex: none; min-height: auto; }
+  .outline-viewer__items { flex: none; overflow: visible; min-height: auto; }
+  .outline-viewer__items li { flex: none; }
+  .outline-viewer__font-value, .outline-viewer__fit-note { display: none; }
+  .outline-viewer__tools { gap: var(--ui-space-2); }
 }
 
 @media (max-width: 420px) {

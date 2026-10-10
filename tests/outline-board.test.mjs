@@ -13,6 +13,7 @@ import {
   normalizeStudentOutlineBoard,
   normalizeTeacherOutlineBoard,
   readOutlineBoardResponse,
+  readFontStep,
   outlinePreview,
   samlinkShortUrl,
 } from "../src/lib/outline-board.ts";
@@ -162,4 +163,28 @@ test("학생 쓰는 화면·완성 화면에 띠, 내 활동 확인 뒤에만 �
   assert.doesNotMatch(link, /setInterval|setTimeout/, "띠 상태는 들어올 때·모달을 닫을 때만 읽는다");
   const studentFn = actions.slice(actions.indexOf("export async function getStudentOutlineBoard"));
   assert.match(studentFn, /ownsIntegratedStudentSession[\s\S]*get_student_outline_board_v1/);
+});
+
+test("한 명씩 보기 글자 크기: 저장값이 없거나 이상하면 기본(100%), 있으면 그 단계", () => {
+  assert.equal(readFontStep(null), 2, "Number(null)=0 이 80% 로 읽히던 것(2026-10-11 화면 확인에서 찾음)");
+  assert.equal(readFontStep(""), 2);
+  assert.equal(readFontStep("9"), 2);
+  assert.equal(readFontStep("1.5"), 2);
+  assert.equal(readFontStep("4"), 4);
+  assert.equal(readFontStep("0"), 0);
+});
+
+test("한 명씩 보기: 노트북은 처음·가운데·끝 세 칸, 넘치면 그 학생만 저절로 줄이고, 휴대폰은 쌓아서 내려 본다", async () => {
+  const [client, css] = await Promise.all([
+    readFile("src/app/board/[token]/board-client.tsx", "utf8"),
+    readFile("src/app/globals.css", "utf8"),
+  ]);
+  const body = css.slice(css.indexOf(".outline-viewer__body {"), css.indexOf(".outline-viewer__section {"));
+  assert.match(body, /grid-template-columns:\s*repeat\(3,/);
+  assert.match(css, /\.outline-viewer__label \{[\s\S]{0,200}font-size:\s*calc\(0\.98rem \* var\(--outline-font-scale/);
+  assert.match(css, /\.outline-viewer__section \{ flex: none;/, "휴대폰에서 칸이 줄어들어 겹치지 않게(2026-10-11 화면 확인에서 찾음)");
+  assert.match(client, /fitToScreen/);
+  assert.match(client, /OUTLINE_VIEWER_FIT_MIN/);
+  assert.match(client, /try \{ return readFontStep\(window\.localStorage/);
+  assert.match(client, /aria-label="글자 크게"/);
 });

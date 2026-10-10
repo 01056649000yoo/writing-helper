@@ -9,6 +9,22 @@ export const OUTLINE_BOARD_SERVER_CACHE_MS = 5_000;
 export const OUTLINE_BOARD_FRESH_MS = 2 * 60_000;
 export const OUTLINE_BOARD_TOKEN_PATTERN = /^[a-f0-9]{48}$/;
 export const SAMLINK_DISPLAY_HOST = "샘링크.kr";
+/** 한 명씩 보기 글자 크기 단계(2026-10-11 선생님 요청: 기본은 조금 작게, 조절 가능). 기본은 1(100%). */
+export const OUTLINE_VIEWER_FONT_STEPS = [0.8, 0.9, 1, 1.15, 1.3, 1.5] as const;
+export const OUTLINE_VIEWER_FONT_DEFAULT_INDEX = 2;
+/** 글이 길어 세 칸이 넘치면 그 학생만 이 배율까지 저절로 줄인다(그래도 넘치면 칸 안에서 내려 본다). */
+export const OUTLINE_VIEWER_FIT_MIN = 0.72;
+export const OUTLINE_VIEWER_FONT_STORAGE_KEY = "outline-board-font-step";
+
+/** 저장된 글자 크기 단계 읽기 — 이상한 값이면 기본. */
+export function readFontStep(raw: string | null) {
+  // Number(null)·Number("") 는 0(가장 작은 80%)이 되므로 비어 있으면 먼저 기본으로 돌려보낸다.
+  if (raw === null || raw.trim() === "") return OUTLINE_VIEWER_FONT_DEFAULT_INDEX;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 && value < OUTLINE_VIEWER_FONT_STEPS.length
+    ? value
+    : OUTLINE_VIEWER_FONT_DEFAULT_INDEX;
+}
 
 export type OutlineBoardSection = "처음" | "가운데" | "끝";
 export const OUTLINE_BOARD_SECTIONS: OutlineBoardSection[] = ["처음", "가운데", "끝"];

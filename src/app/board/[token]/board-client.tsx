@@ -1,12 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { withBasePath } from "@/lib/app-path";
 import {
   OUTLINE_BOARD_FRESH_MS,
   OUTLINE_BOARD_MANUAL_COOLDOWN_MS,
   OUTLINE_BOARD_REFRESH_MS,
   OUTLINE_BOARD_SECTIONS,
+  OUTLINE_VIEWER_FIT_MIN,
+  OUTLINE_VIEWER_FONT_DEFAULT_INDEX,
+  OUTLINE_VIEWER_FONT_STEPS,
+  OUTLINE_VIEWER_FONT_STORAGE_KEY,
+  readFontStep,
   boardRemaining,
   changedStudentKeys,
   formatBoardDeadline,
@@ -261,6 +266,19 @@ function OutlineViewer({
   // 보기 창은 카드를 누른 뒤에만 그려져(서버 렌더 없음) 처음 값으로 바로 읽어도 된다.
   const [canFullscreen] = useState(() => typeof document !== "undefined" && Boolean(document.fullscreenEnabled));
   const [openedAt] = useState(() => Date.now());
+  // 글자 크기는 이 기기에만 기억한다(브라우저 저장소가 막혀 있어도 기본 크기로 동작).
+  const [fontStep, setFontStep] = useState(() => {
+    try { return readFontStep(window.localStorage.getItem(OUTLINE_VIEWER_FONT_STORAGE_KEY)); }
+    catch { return OUTLINE_VIEWER_FONT_DEFAULT_INDEX; }
+  });
+
+  const changeFont = useCallback((delta: number) => {
+    setFontStep((current) => {
+      const next = Math.min(OUTLINE_VIEWER_FONT_STEPS.length - 1, Math.max(0, current + delta));
+      try { window.localStorage.setItem(OUTLINE_VIEWER_FONT_STORAGE_KEY, String(next)); } catch { /* 기억 못 해도 지금 화면은 바뀐다 */ }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -277,10 +295,43 @@ function OutlineViewer({
       if (event.key === "Escape" && !document.fullscreenElement) onClose();
       if (event.key === "ArrowLeft" && prev) onMove(index - 1);
       if (event.key === "ArrowRight" && next) onMove(index + 1);
+      if (event.key === "+" || event.key === "=") changeFont(1);
+      if (event.key === "-" || event.key === "_") changeFont(-1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, prev, next, onMove, onClose]);
+  }, [index, prev, next, onMove, onClose, changeFont]);
+
+  // 노트북 화면에서 세 칸이 한 화면에 들어오게: 고른 크기로 그린 뒤 넘치는 칸이 있으면 그 학생만 조금씩 줄인다
+  // (최저 OUTLINE_VIEWER_FIT_MIN). 그려지기 전에 DOM 의 글자 배율만 바꿔 깜빡이지 않는다. 휴대폰은 쌓아서 내려 보니 줄이지 않는다.
+  const fitNoteRef = useRef<HTMLSpanElement | null>(null);
+  const fitToScreen = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const chosen = OUTLINE_VIEWER_FONT_STEPS[fontStep];
+    let scale: number = chosen;
+    root.style.setProperty("--outline-font-scale", String(scale));
+    if (!window.matchMedia("(max-width: 767px)").matches) {
+      const columns = [...root.querySelectorAll<HTMLElement>(".outline-viewer__items")];
+      const overflowing = () => columns.some((column) => column.scrollHeight > column.clientHeight + 1);
+      while (overflowing() && scale > OUTLINE_VIEWER_FIT_MIN) {
+        scale = Math.max(OUTLINE_VIEWER_FIT_MIN, Math.round((scale - 0.04) * 100) / 100);
+        root.style.setProperty("--outline-font-scale", String(scale));
+      }
+    }
+    if (fitNoteRef.current) {
+      fitNoteRef.current.textContent = scale < chosen ? `화면에 맞춰 ${Math.round(scale * 100)}%` : "";
+    }
+  }, [fontStep]);
+
+  useLayoutEffect(() => {
+    fitToScreen();
+  }, [fitToScreen, student]);
+
+  useEffect(() => {
+    window.addEventListener("resize", fitToScreen);
+    return () => window.removeEventListener("resize", fitToScreen);
+  }, [fitToScreen]);
 
   function toggleFullscreen() {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
@@ -312,7 +363,15 @@ function OutlineViewer({
           <span className="outline-board__number">{student.number}번</span> {student.name}
           {editedWhileOpen && <span className="outline-board__fresh-tag">방금 고쳐졌어요</span>}
         </p>
-        <p className="outline-viewer__pos">{index + 1} / {students.length}</p>
+        <div className="outline-viewer__tools">
+          <div className="outline-viewer__font" role="group" aria-label="글자 크기">
+            <button type="button" className="lab-button" onClick={() => changeFont(-1)} disabled={fontStep === 0} aria-label="글자 작게">가−</button>
+            <span className="outline-viewer__font-value">{Math.round(OUTLINE_VIEWER_FONT_STEPS[fontStep] * 100)}%</span>
+            <span ref={fitNoteRef} className="outline-viewer__fit-note" aria-live="polite" />
+            <button type="button" className="lab-button" onClick={() => changeFont(1)} disabled={fontStep === OUTLINE_VIEWER_FONT_STEPS.length - 1} aria-label="글자 크게">가+</button>
+          </div>
+          <p className="outline-viewer__pos">{index + 1} / {students.length}</p>
+        </div>
       </div>
 
       <div className="outline-viewer__body">
