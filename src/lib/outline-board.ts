@@ -132,6 +132,23 @@ export function normalizeTeacherOutlineBoard(raw: unknown): TeacherOutlineBoard 
   };
 }
 
+/** 학생 개요 화면 띠: 열린 판·기간 지난 판만(끈 판은 null → 띠 없음). token 은 모달에서 판을 읽는 데 쓴다. */
+export type StudentOutlineBoard = { state: "open" | "expired"; slug: string; expiresAt: string | null; token: string };
+
+export function normalizeStudentOutlineBoard(raw: unknown): StudentOutlineBoard | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const data = raw as Record<string, unknown>;
+  const slug = text(data.slug, 40);
+  const token = typeof data.token === "string" && OUTLINE_BOARD_TOKEN_PATTERN.test(data.token) ? data.token : "";
+  if (!slug || !token || (data.state !== "open" && data.state !== "expired")) return null;
+  return {
+    state: data.state,
+    slug,
+    expiresAt: typeof data.expires_at === "string" ? data.expires_at : null,
+    token,
+  };
+}
+
 export function samlinkShortUrl(slug: string) {
   return `https://${SAMLINK_DISPLAY_HOST}/${slug}`;
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { OutlineBoardLink } from "@/components/outline-board-link";
 import { useSearchParams } from "next/navigation";
 import { getStudentResult, toggleHanjaWritingReaction, toggleOneLineReaction } from "@/app/actions/student-actions";
 import { OneLineShareBoard, OneLineShareTopRanks } from "@/components/one-line-share-board";
@@ -635,6 +636,9 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
             <strong>{topic}</strong> 글쓰기 개요
           </p>
         </div>
+
+        {/* 선생님이 친구 개요 모음을 켰을 때만 보인다(2026-10-10). */}
+        <OutlineBoardLink sessionId={sessionId} roomId={roomId} variant="card" />
 
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           {groupedAnswers.map(({ section, items }, sectionIndex) => (

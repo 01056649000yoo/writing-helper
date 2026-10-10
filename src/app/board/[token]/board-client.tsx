@@ -22,10 +22,18 @@ import {
 
 type OpenBoard = Extract<OutlineBoardPayload, { state: "open" }>;
 
-export function OutlineBoardClient({ token, initial, loadedAt }: { token: string; initial: OutlineBoardPayload | null; loadedAt: string }) {
+export function OutlineBoardClient({
+  token, initial, loadedAt, embedded = false,
+}: {
+  token: string;
+  initial: OutlineBoardPayload | null;
+  loadedAt: string;
+  /** 학생 개요 화면의 모달 안(2026-10-10). 처음 자료 없이 열려 곧바로 불러온다. */
+  embedded?: boolean;
+}) {
   const [board, setBoard] = useState<OutlineBoardPayload | null>(initial);
   const [syncedAt, setSyncedAt] = useState<Date | null>(initial ? new Date(loadedAt) : null);
-  const [loadError, setLoadError] = useState(initial ? "" : "개요를 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요.");
+  const [loadError, setLoadError] = useState(initial || embedded ? "" : "개요를 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요.");
   const [refreshing, setRefreshing] = useState(false);
   const [coolingDown, setCoolingDown] = useState(false);
   const [fresh, setFresh] = useState<Map<string, number>>(new Map());
@@ -34,6 +42,7 @@ export function OutlineBoardClient({ token, initial, loadedAt }: { token: string
   const previousRef = useRef<OutlineBoardStudent[] | null>(initial?.state === "open" ? initial.students : null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshRef = useRef<() => void>(() => {});
+  const initialRef = useRef(initial);
 
   const schedule = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -75,7 +84,14 @@ export function OutlineBoardClient({ token, initial, loadedAt }: { token: string
     refreshRef.current = () => { void refresh(); };
   }, [refresh]);
 
-  // 1분 자동. 다른 탭·화면 꺼짐이면 멈추고, 돌아오면 곧바로 한 번.
+  // 1분 자동. 다른 탭·화면 꺼짐이면 멈추고, 돌아오면 곧바로 한 번. 모달은 열리자마자 한 번 읽는다.
+  useEffect(() => {
+    if (!initialRef.current) {
+      const first = setTimeout(() => refreshRef.current(), 0);
+      return () => clearTimeout(first);
+    }
+  }, []);
+
   useEffect(() => {
     schedule();
     const onVisible = () => {
@@ -106,9 +122,13 @@ export function OutlineBoardClient({ token, initial, loadedAt }: { token: string
     void refresh();
   }
 
+  if (!board && !loadError) {
+    return <BoardNotice emoji="⏳" title="친구 개요를 불러오고 있어요" body="잠깐만 기다려 주세요." embedded={embedded} />;
+  }
   if (!board) {
     return (
       <BoardNotice
+        embedded={embedded}
         emoji="📡"
         title="개요를 불러오지 못했어요"
         body={loadError}
@@ -117,17 +137,17 @@ export function OutlineBoardClient({ token, initial, loadedAt }: { token: string
     );
   }
   if (board.state === "expired") {
-    return <BoardNotice emoji="⏰" title="기간이 끝났어요" body="이 친구 개요 모음은 닫혔어요. 선생님께 새 주소를 받아 주세요." />;
+    return <BoardNotice emoji="⏰" title="기간이 끝났어요" body="이 친구 개요 모음은 닫혔어요. 선생님께 새 주소를 받아 주세요." embedded={embedded} />;
   }
   if (board.state !== "open") {
-    return <BoardNotice emoji="🔒" title="열 수 없는 주소예요" body="닫혔거나 없는 친구 개요 모음이에요. 선생님께 새 주소를 받아 주세요." />;
+    return <BoardNotice emoji="🔒" title="열 수 없는 주소예요" body="닫혔거나 없는 친구 개요 모음이에요. 선생님께 새 주소를 받아 주세요." embedded={embedded} />;
   }
 
   const students = board.students;
   const selectedIndex = selectedKey ? students.findIndex((student) => student.key === selectedKey) : -1;
 
   return (
-    <main className="outline-board">
+    <main className={`outline-board${embedded ? " outline-board--embedded" : ""}`}>
       <BoardHeader
         board={board}
         now={now}
@@ -332,9 +352,9 @@ function OutlineViewer({
   );
 }
 
-function BoardNotice({ emoji, title, body, action }: { emoji: string; title: string; body: string; action?: React.ReactNode }) {
+function BoardNotice({ emoji, title, body, action, embedded = false }: { emoji: string; title: string; body: string; action?: React.ReactNode; embedded?: boolean }) {
   return (
-    <main className="outline-board outline-board--notice">
+    <main className={`outline-board outline-board--notice${embedded ? " outline-board--embedded" : ""}`}>
       <section className="outline-board__empty lab-panel">
         <p className="text-5xl" aria-hidden="true">{emoji}</p>
         <h1 className="text-xl font-bold text-[var(--ui-ink)]">{title}</h1>

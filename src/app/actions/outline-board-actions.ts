@@ -2,10 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
-import { normalizeTeacherOutlineBoard, type TeacherOutlineBoard } from "@/lib/outline-board";
+import {
+  normalizeStudentOutlineBoard,
+  normalizeTeacherOutlineBoard,
+  type StudentOutlineBoard,
+  type TeacherOutlineBoard,
+} from "@/lib/outline-board";
+import { ownsIntegratedStudentSession } from "@/lib/lab-student-session";
 import { getCurrentUser } from "./auth-actions";
 
-// 친구 개요 모음 — 선생님 쪽(2026-10-10). 방 주인 확인은 DB 함수가 p_teacher_id 로 한다(migration 20261391).
+// 친구 개요 모음(2026-10-10). 선생님 쪽은 DB 함수가 p_teacher_id 로 방 주인을 확인한다(migration 20261391),
+// 학생 쪽 띠는 맨 아래 getStudentOutlineBoard(20261392).
 type BoardResult = { board: TeacherOutlineBoard | null; error?: string };
 
 const FRIENDLY_ERRORS: Array<[RegExp, string]> = [
@@ -52,4 +59,19 @@ export async function closeOutlineBoard(roomId: string): Promise<BoardResult> {
   const result = await callBoard("close_outline_board_v1", roomId);
   revalidatePath(`/dashboard/room/${roomId}`);
   return result.error ? result : { board: null };
+}
+
+/**
+ * 학생 개요 화면의 친구 개요 모음 띠(2026-10-10). 내 활동인지 먼저 확인하고, 열린 판·기간 지난 판만 준다.
+ * 끈 판·없는 판은 null(띠 없음). 화면에 들어올 때와 모달을 닫을 때 한 번씩만 부른다(상시 폴링 없음).
+ */
+export async function getStudentOutlineBoard(sessionId: string, roomId: string): Promise<StudentOutlineBoard | null> {
+  if (!sessionId || !roomId || sessionId.length > 100 || roomId.length > 100) return null;
+  const admin = createSupabaseAdminClient();
+  if (!await ownsIntegratedStudentSession(admin, sessionId, roomId)) return null;
+  const { data, error } = await admin
+    .schema("writing_helper")
+    .rpc("get_student_outline_board_v1", { p_room_id: roomId });
+  if (error) return null;
+  return normalizeStudentOutlineBoard(data);
 }

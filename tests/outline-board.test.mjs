@@ -10,6 +10,7 @@ import {
   formatBoardDeadline,
   groupOutlineAnswers,
   normalizeOutlineBoardPayload,
+  normalizeStudentOutlineBoard,
   normalizeTeacherOutlineBoard,
   readOutlineBoardResponse,
   outlinePreview,
@@ -134,4 +135,31 @@ test("선생님 상자: 1주 늘리기·새 주소(확인)·끄기(확인)·샘�
   assert.match(newRoom, /share_board: false/);
   assert.match(newRoom, /주소를 아는 사람은 누구나 볼 수 있어요/);
   assert.match(createRoom, /share_outline_board[\s\S]{0,200}open_outline_board_v1/);
+});
+
+test("학생 개요 화면 띠: 열린 판·기간 지난 판만, 긴 번호가 없거나 끈 판이면 띠 없음", () => {
+  const token = "a".repeat(48);
+  assert.deepEqual(normalizeStudentOutlineBoard({ state: "open", slug: "k7m2q", expires_at: "e", token }),
+    { state: "open", slug: "k7m2q", expiresAt: "e", token });
+  assert.equal(normalizeStudentOutlineBoard({ state: "expired", slug: "k7m2q", token }).state, "expired");
+  assert.equal(normalizeStudentOutlineBoard({ state: "closed", slug: "k7m2q", token }), null);
+  assert.equal(normalizeStudentOutlineBoard({ state: "open", slug: "k7m2q", token: "짧음" }), null);
+  assert.equal(normalizeStudentOutlineBoard(null), null);
+});
+
+test("학생 쓰는 화면·완성 화면에 띠, 내 활동 확인 뒤에만 판을 주고 상시 폴링은 없다", async () => {
+  const [activity, result, link, actions] = await Promise.all([
+    readFile("src/app/room/[id]/activity/page.tsx", "utf8"),
+    readFile("src/app/room/[id]/result/page.tsx", "utf8"),
+    readFile("src/components/outline-board-link.tsx", "utf8"),
+    readFile("src/app/actions/outline-board-actions.ts", "utf8"),
+  ]);
+  assert.match(activity, /<OutlineBoardLink[^>]*variant="strip"/);
+  assert.match(result, /<OutlineBoardLink[^>]*variant="card"/);
+  assert.match(link, /기간이 끝났어요/);
+  assert.match(link, /role="dialog"/);
+  assert.match(link, /embedded/);
+  assert.doesNotMatch(link, /setInterval|setTimeout/, "띠 상태는 들어올 때·모달을 닫을 때만 읽는다");
+  const studentFn = actions.slice(actions.indexOf("export async function getStudentOutlineBoard"));
+  assert.match(studentFn, /ownsIntegratedStudentSession[\s\S]*get_student_outline_board_v1/);
 });

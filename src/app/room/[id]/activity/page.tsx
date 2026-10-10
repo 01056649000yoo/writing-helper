@@ -28,6 +28,7 @@ import type { OutlineTemplateAnswer, OutlineTemplate } from "@/features/activiti
 import { getDefaultOutlineTemplate } from "@/lib/outline-templates";
 import { StudentSpellingTextarea } from "@/components/student-spelling-textarea";
 import { BadgeCircle } from "@/components/badge-circle";
+import { OutlineBoardLink } from "@/components/outline-board-link";
 import {
   QUESTION_GENERATOR_MODE_META,
   normalizeQuestionGeneratorConfig,
@@ -1677,6 +1678,8 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
                 ? "선생님이 준비한 항목에서 빼고 싶은 것은 빼고, 내 항목을 더해도 좋아요."
                 : "선생님이 준비한 처음·가운데·끝 항목에 맞춰 내용을 써 보세요."}
             </p>
+            {/* 선생님이 친구 개요 모음을 켰을 때만 보인다(2026-10-10). */}
+            <OutlineBoardLink sessionId={sessionId} roomId={roomId} variant="strip" />
           </div>
 
           {sections.map(({ key, items }) => {
