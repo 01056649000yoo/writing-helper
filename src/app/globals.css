@@ -1278,29 +1278,33 @@ button:not(:disabled),
   font-variant-numeric: tabular-nums;
 }
 
-/* 노트북 화면에서 처음·가운데·끝이 한 화면에 보이게 세 칸으로 나란히(2026-10-11 선생님 요청).
-   칸마다 넘치면 그 칸 안에서만 내려 보고, 상자는 칸 높이를 나눠 채운다. 글자 크기는 --outline-font-scale. */
+/* 처음·가운데·끝을 위에서 아래로 세 줄(2026-10-11 선생님 요청, 같은 날 세 칸 나란히에서 바꿈).
+   줄 높이는 글 양에 따라 나누고, 한 줄 안의 질문은 옆으로 나란히(--outline-item-cols, 최대 3).
+   넘치면 그 줄 안에서만 내려 보고, 글자 배율은 --outline-font-scale(넘치면 화면에 맞춰 저절로 줄임). */
 .outline-viewer__body {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--ui-space-3);
   padding: var(--ui-space-3) var(--ui-space-4);
   width: 100%;
 }
 
 .outline-viewer__section {
+  flex: 1 1 auto;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: var(--ui-space-3);
 }
 
 .outline-viewer__section-title {
-  align-self: flex-start;
-  padding: var(--ui-space-1) var(--ui-space-4);
-  border-radius: var(--ui-radius-pill);
+  align-self: start;
+  justify-self: stretch;
+  text-align: center;
+  padding: var(--ui-space-2) var(--ui-space-2);
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-primary-soft);
   color: var(--ui-primary-hover);
   font-size: 1.05rem;
@@ -1308,17 +1312,15 @@ button:not(:disabled),
 }
 
 .outline-viewer__items {
-  flex: 1;
   min-height: 0;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(var(--outline-item-cols, 1), minmax(0, 1fr));
   gap: var(--ui-space-2);
   padding-right: 2px;
 }
 
 .outline-viewer__items li {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1329,12 +1331,15 @@ button:not(:disabled),
 }
 
 .outline-viewer__label {
-  color: var(--ui-ink-strong);
+  /* 질문은 줄 이름과 같은 파란 계열 + 옅은 바탕 띠, 답은 진한 검정 — 한눈에 구분(2026-10-11 선생님 요청) */
+  align-self: stretch;
+  padding: 6px 10px;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary-hover);
   font-size: calc(0.98rem * var(--outline-font-scale, 1));
   font-weight: 700;
   line-height: 1.4;
-  padding-bottom: 6px;
-  border-bottom: 1px dashed var(--ui-border-strong);
 }
 
 .outline-viewer__answer {
@@ -1393,10 +1398,10 @@ button:not(:disabled),
   .outline-viewer__fullscreen { display: none; }
   .outline-viewer__peer { display: none; }
   /* 휴대폰: 세 칸을 위아래로 쌓고 화면 전체를 내려 본다. */
-  .outline-viewer__body { display: flex; flex-direction: column; overflow-y: auto; padding: var(--ui-space-3); }
-  .outline-viewer__section { flex: none; min-height: auto; }
-  .outline-viewer__items { flex: none; overflow: visible; min-height: auto; }
-  .outline-viewer__items li { flex: none; }
+  .outline-viewer__body { overflow-y: auto; padding: var(--ui-space-3); }
+  .outline-viewer__section { flex: none; min-height: auto; grid-template-columns: minmax(0, 1fr); }
+  .outline-viewer__section-title { justify-self: start; padding: var(--ui-space-1) var(--ui-space-4); border-radius: var(--ui-radius-pill); }
+  .outline-viewer__items { overflow: visible; min-height: auto; grid-template-columns: minmax(0, 1fr); }
   .outline-viewer__font-value, .outline-viewer__fit-note { display: none; }
   .outline-viewer__tools { gap: var(--ui-space-2); }
 }
@@ -1479,3 +1484,14 @@ button:not(:disabled),
 }
 
 .outline-board-modal__body { flex: 1; overflow-y: auto; }
+
+/* 종료된 개요짜기에서 친구 개요 모음만 보여 줄 때 위쪽 안내(2026-10-11) */
+.outline-board-ended-note {
+  margin: 0;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  background: var(--ui-warning-soft);
+  border-bottom: 1px solid #fde68a;
+  color: var(--ui-warning);
+  font-weight: 700;
+  text-align: center;
+}

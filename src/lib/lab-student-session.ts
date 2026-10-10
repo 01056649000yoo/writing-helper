@@ -19,6 +19,8 @@ export type IntegratedStudentEntry = {
   studentId?: string;
   sessionId?: string;
   status?: string;
+  /** 종료된 개요짜기인데 친구 개요 모음이 열려 있으면 그 판 번호 — 쓰기 없이 보기만(2026-10-11). */
+  peerBoardToken?: string;
 };
 
 async function getAuthenticatedIntegratedStudent(
@@ -88,9 +90,17 @@ export async function ensureIntegratedStudentRoomSession(
   if (room.agit_class_id !== student.class_id) {
     return { error: "내 학급의 활동이 아닙니다." };
   }
-  if (!room.is_active) return { error: "이미 종료된 활동입니다." };
-  if (room.expires_at && new Date(room.expires_at) < new Date()) {
-    return { error: "활동 시간이 만료됐습니다." };
+  const roomEnded = !room.is_active || Boolean(room.expires_at && new Date(room.expires_at) < new Date());
+  if (roomEnded) {
+    // 종료된 개요짜기라도 선생님이 친구 개요 모음을 열어 두었으면 그 판을 보여 준다(학생 목록에도 그동안 보인다, 아지트 20261393).
+    const { data: board } = await admin
+      .schema("writing_helper")
+      .rpc("get_student_outline_board_v1", { p_room_id: roomId });
+    const openBoard = board && typeof board === "object" && (board as { state?: string }).state === "open"
+      ? (board as { token?: string }).token
+      : null;
+    if (openBoard) return { studentId: student.id, peerBoardToken: openBoard };
+    return { error: room.is_active ? "활동 시간이 만료됐습니다." : "이미 종료된 활동입니다." };
   }
 
   const { data: existing } = await admin

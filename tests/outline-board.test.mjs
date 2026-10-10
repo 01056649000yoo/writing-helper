@@ -174,17 +174,34 @@ test("한 명씩 보기 글자 크기: 저장값이 없거나 이상하면 기�
   assert.equal(readFontStep("0"), 0);
 });
 
-test("한 명씩 보기: 노트북은 처음·가운데·끝 세 칸, 넘치면 그 학생만 저절로 줄이고, 휴대폰은 쌓아서 내려 본다", async () => {
+test("한 명씩 보기: 처음·가운데·끝을 위에서 아래로 세 줄, 한 줄 안 질문은 나란히, 넘치면 그 학생만 저절로 줄인다", async () => {
   const [client, css] = await Promise.all([
     readFile("src/app/board/[token]/board-client.tsx", "utf8"),
     readFile("src/app/globals.css", "utf8"),
   ]);
   const body = css.slice(css.indexOf(".outline-viewer__body {"), css.indexOf(".outline-viewer__section {"));
-  assert.match(body, /grid-template-columns:\s*repeat\(3,/);
-  assert.match(css, /\.outline-viewer__label \{[\s\S]{0,200}font-size:\s*calc\(0\.98rem \* var\(--outline-font-scale/);
-  assert.match(css, /\.outline-viewer__section \{ flex: none;/, "휴대폰에서 칸이 줄어들어 겹치지 않게(2026-10-11 화면 확인에서 찾음)");
+  assert.match(body, /flex-direction:\s*column/, "세 줄을 위아래로(2026-10-11 선생님 요청)");
+  assert.doesNotMatch(body, /grid-template-columns:\s*repeat\(3,/);
+  assert.match(css, /grid-template-columns:\s*repeat\(var\(--outline-item-cols, 1\)/);
+  assert.match(client, /--outline-item-cols/);
+  assert.match(css, /\.outline-viewer__label \{[\s\S]{0,400}font-size:\s*calc\(0\.98rem \* var\(--outline-font-scale/);
+  assert.match(css, /\.outline-viewer__section \{ flex: none;/, "휴대폰에서 줄이 줄어들어 겹치지 않게(2026-10-11 화면 확인에서 찾음)");
+  assert.match(css, /\.outline-viewer__label \{[\s\S]{0,300}background: var\(--ui-primary-soft\);\s*color: var\(--ui-primary-hover\)/, "질문은 파란 글자·옅은 바탕으로 답과 구분");
   assert.match(client, /fitToScreen/);
   assert.match(client, /OUTLINE_VIEWER_FIT_MIN/);
   assert.match(client, /try \{ return readFontStep\(window\.localStorage/);
   assert.match(client, /aria-label="글자 크게"/);
+});
+
+test("종료된 개요짜기: 친구 개요 모음이 열려 있으면 들어온 학생에게 쓰기 대신 판을 보여 준다", async () => {
+  const [session, roomPage, studentActions] = await Promise.all([
+    readFile("src/lib/lab-student-session.ts", "utf8"),
+    readFile("src/app/room/[id]/page.tsx", "utf8"),
+    readFile("src/app/actions/student-actions.ts", "utf8"),
+  ]);
+  assert.match(session, /roomEnded[\s\S]{0,400}get_student_outline_board_v1[\s\S]{0,300}state === "open"[\s\S]{0,200}peerBoardToken/);
+  assert.match(session, /이미 종료된 활동입니다/, "판이 없거나 기간이 지나면 예전처럼 종료 안내");
+  assert.match(roomPage, /peerBoardToken[\s\S]{0,300}<OutlineBoardClient/);
+  assert.match(roomPage, /이 활동은 끝났어요/);
+  assert.match(studentActions, /entry\.peerBoardToken\) return \{ error:/);
 });

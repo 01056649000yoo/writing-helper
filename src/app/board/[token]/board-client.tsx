@@ -302,7 +302,7 @@ function OutlineViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [index, prev, next, onMove, onClose, changeFont]);
 
-  // 노트북 화면에서 세 칸이 한 화면에 들어오게: 고른 크기로 그린 뒤 넘치는 칸이 있으면 그 학생만 조금씩 줄인다
+  // 노트북 화면에서 처음·가운데·끝 세 줄이 한 화면에 들어오게: 고른 크기로 그린 뒤 넘치는 줄이 있으면 그 학생만 조금씩 줄인다
   // (최저 OUTLINE_VIEWER_FIT_MIN). 그려지기 전에 DOM 의 글자 배율만 바꿔 깜빡이지 않는다. 휴대폰은 쌓아서 내려 보니 줄이지 않는다.
   const fitNoteRef = useRef<HTMLSpanElement | null>(null);
   const fitToScreen = useCallback(() => {
@@ -376,7 +376,12 @@ function OutlineViewer({
 
       <div className="outline-viewer__body">
         {OUTLINE_BOARD_SECTIONS.map((section) => (
-          <section key={section} className="outline-viewer__section">
+          <section
+            key={section}
+            className="outline-viewer__section"
+            // 한 줄 안의 질문은 옆으로 나란히(최대 3개) — 위아래로 쌓아도 한 화면에 들어오게.
+            style={{ "--outline-item-cols": Math.max(1, Math.min(3, student.sections[section].length)) } as React.CSSProperties}
+          >
             <h2 className="outline-viewer__section-title">{section}</h2>
             {student.sections[section].length === 0 ? (
               <p className="outline-viewer__blank">비어 있어요</p>

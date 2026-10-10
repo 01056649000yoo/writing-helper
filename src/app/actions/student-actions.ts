@@ -38,7 +38,10 @@ export async function verifyStudent(
 ): Promise<{ error?: string; studentId?: string; sessionId?: string; status?: string }> {
   if (!roomId || typeof roomId !== "string" || roomId.length > 100) return { error: "잘못된 요청입니다." };
   if (isIntegratedLab()) {
-    return ensureIntegratedStudentRoomSession(roomId);
+    const entry = await ensureIntegratedStudentRoomSession(roomId);
+    // 종료된 방의 친구 개요 모음은 활동 주소 화면에서 보여 준다 — 여기서는 쓸 활동이 없다.
+    if (entry.peerBoardToken) return { error: "이 활동은 끝났어요. 친구 개요 모음은 활동 주소에서 볼 수 있어요." };
+    return entry;
   }
 
   // 구 helper의 번호·이름 입장 호환 경로
