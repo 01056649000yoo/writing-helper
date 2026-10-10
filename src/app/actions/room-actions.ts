@@ -457,6 +457,15 @@ export async function createRoom(formData: FormData): Promise<{ error?: string }
 
   await ensureShortLinkForRoom(room.id, user.id, null);
 
+  // 친구 개요 모음(2026-10-10): 만들 때 골랐으면 공유판·샘링크 주소를 함께 만든다.
+  // 실패해도 방 만들기는 그대로 둔다 — 활동 화면의 친구 개요 모음 상자에서 다시 켤 수 있다.
+  if (activityType === "outline_builder" && String(formData.get("share_outline_board") ?? "") === "true") {
+    const { error: boardError } = await admin
+      .schema("writing_helper")
+      .rpc("open_outline_board_v1", { p_room_id: room.id, p_teacher_id: user.id });
+    if (boardError) console.error("[outline-board] open on create failed", boardError.code ?? "unknown");
+  }
+
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/class/${classId}`);
   redirect(`/dashboard/room/${room.id}`);

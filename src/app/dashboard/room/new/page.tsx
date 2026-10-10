@@ -46,6 +46,8 @@ type OutlineBuilderDraft = {
   grade_level: string;
   /** 학생이 개요 틀을 고칠 수 있는가(기본 허용). */
   student_editable: boolean;
+  /** 제출한 개요를 친구 개요 모음(공개 페이지 + 샘링크)으로 함께 보는가(기본 꺼짐, 2026-10-10). */
+  share_board?: boolean;
 };
 
 type QuestionDestination = "unclassified" | "excluded" | "teacher" | "student" | "both";
@@ -386,6 +388,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     subject_type: "생활문",
     grade_level: "중학년",
     student_editable: true,
+    share_board: false,
       }), []);
   const [draft, setDraft, draftControls] = useActivityDraft<OutlineBuilderDraft>(
     buildDraftStorageKey(classId, "outline_builder"),
@@ -614,6 +617,7 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
     fd.set("subject_type", draft.subject_type);
     fd.set("grade_level", draft.grade_level);
     fd.set("student_editable", draft.student_editable === false ? "false" : "true");
+    fd.set("share_outline_board", draft.share_board === true ? "true" : "false");
     if (customTemplate) {
       fd.set("outline_template_json", JSON.stringify(customTemplate));
     }
@@ -729,6 +733,27 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
           </label>
         </div>
       </div>
+
+      {/* 친구 개요 모음(2026-10-10 선생님 결정): 제출한 개요를 번호·이름과 함께 보는 공개 페이지 + 샘링크 5글자 주소(1주). */}
+      <label className={`flex items-start gap-3 rounded-2xl border-2 p-4 cursor-pointer transition-all ${
+        draft.share_board === true ? "border-indigo-500 bg-indigo-50/70" : "border-gray-200 bg-white hover:border-gray-300"
+      }`}>
+        <input
+          type="checkbox"
+          name="share_outline_board"
+          checked={draft.share_board === true}
+          onChange={(event) => setDraft((prev) => ({ ...prev, share_board: event.target.checked }))}
+          className="mt-1 h-5 w-5 shrink-0 text-indigo-500"
+        />
+        <span className="flex flex-col gap-1">
+          <span className="text-sm font-bold text-gray-800">👀 학생들이 제출한 개요를 친구들과 함께 보기</span>
+          <span className="text-sm leading-relaxed text-gray-600">
+            제출한 개요를 번호·이름과 함께 모아 보여 주는 페이지와 <strong>샘링크 짧은 주소(1주)</strong>를 만들어요.
+            친구들과 돌려 보며 토의할 때 씁니다. 만든 뒤에도 활동 화면에서 켜고 끌 수 있어요.
+          </span>
+          <span className="text-sm leading-relaxed text-amber-700">주소를 아는 사람은 누구나 볼 수 있어요.</span>
+        </span>
+      </label>
 
       <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">

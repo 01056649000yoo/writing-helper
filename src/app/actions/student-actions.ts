@@ -6,7 +6,6 @@ import {
   ensureIntegratedStudentRoomSession,
   ownsIntegratedStudentSession,
 } from "@/lib/lab-student-session";
-import { parseOutlineResult } from "@/lib/result-format";
 import { persistPortableResult } from "@/lib/portable-results";
 import { normalizeQuestionGeneratorSubmission } from "@/lib/question-generator-submission";
 import { normalizeQuestionGeneratorConfig } from "@/features/activities/question-generator/config";
@@ -383,29 +382,6 @@ export async function requestOutline(
   }
 
   return { done: true };
-}
-
-// 공유 결과 조회 (인증 불필요 — /share/[sessionId] 공개 페이지용)
-export async function getShareableResult(sessionId: string) {
-  const admin = createSupabaseAdminClient();
-  const [queueRes, sessionRes] = await Promise.all([
-    admin.schema("writing_helper").from("outline_queue")
-      .select("result").eq("session_id", sessionId).eq("status", "done")
-      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    admin.schema("writing_helper").from("student_sessions")
-      .select("student_name, student_number, room_id")
-      .eq("id", sessionId).maybeSingle(),
-  ]);
-  if (!sessionRes.data) return null;
-  const { data: roomRes } = await admin.schema("writing_helper").from("rooms")
-    .select("topic, title").eq("id", sessionRes.data.room_id).maybeSingle();
-  return {
-    ...parseOutlineResult(queueRes.data?.result ?? null),
-    studentName: sessionRes.data.student_name,
-    studentNumber: sessionRes.data.student_number,
-    topic: roomRes?.topic ?? "",
-    title: roomRes?.title ?? "",
-  };
 }
 
 // 학생 세션 가져오기

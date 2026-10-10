@@ -5,6 +5,7 @@ import os from "os";
 import QRCodeSection from "./qr-section";
 import { RoomWorkspace } from "./room-workspace";
 import LiveStudentPanel from "./live-student-panel";
+import { OutlineBoardPanel } from "./outline-board-panel";
 import {
   getHanjaWritingRoomResults,
   getRoom,
@@ -15,6 +16,7 @@ import {
   closeRoom,
 } from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
+import { getOutlineBoard } from "@/app/actions/outline-board-actions";
 import { withBasePath } from "@/lib/app-path";
 import { isIntegratedLab } from "@/lib/lab-roster";
 
@@ -40,6 +42,8 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
   const hanjaWritingResults = room.activity_type === "hanja_writing"
     ? await getHanjaWritingRoomResults(id)
     : [];
+  const isOutlineBuilder = !room.activity_type || room.activity_type === "outline_builder";
+  const outlineBoard = isOutlineBuilder ? (await getOutlineBoard(id)).board : null;
   const integratedLab = isIntegratedLab();
   let sessionJoinUrl = "";
   let shortUrl: string | null = null;
@@ -114,6 +118,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
               {!integratedLab && room.is_active && (
                 <QRCodeSection roomUrl={sessionJoinUrl} shortUrl={shortUrl} />
               )}
+              {isOutlineBuilder && <OutlineBoardPanel roomId={id} initialBoard={outlineBoard} />}
               <LiveStudentPanel
                 roomId={id}
                 students={students}

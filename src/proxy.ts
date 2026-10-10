@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { withoutBasePath } from "@/lib/app-path";
 import { getServerAuthCookieOptions } from "@/lib/auth-config";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/access-denied", "/room", "/auth", "/share"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password", "/access-denied", "/room", "/auth", "/share", "/board"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
