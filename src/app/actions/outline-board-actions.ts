@@ -9,6 +9,7 @@ import {
   type TeacherOutlineBoard,
 } from "@/lib/outline-board";
 import { ownsIntegratedStudentSession } from "@/lib/lab-student-session";
+import { clearOutlineBoardCache } from "@/lib/outline-board-server";
 import { getCurrentUser } from "./auth-actions";
 
 // 친구 개요 모음(2026-10-10). 선생님 쪽은 DB 함수가 p_teacher_id 로 방 주인을 확인한다(migration 20261391),
@@ -47,16 +48,20 @@ export async function getOutlineBoard(roomId: string) {
 /** 처음 켜기와 `새 주소 만들기` 모두 이것 — 열린 판이 있으면 닫고 새로 만든다(옛 주소는 곧바로 닫힘). */
 export async function openOutlineBoard(roomId: string) {
   const result = await callBoard("open_outline_board_v1", roomId);
+  clearOutlineBoardCache(); // 옛 주소가 곧바로 닫힌 것으로 보이게(캐시된 열린 자료를 비운다)
   revalidatePath(`/dashboard/room/${roomId}`);
   return result;
 }
 
 export async function extendOutlineBoard(roomId: string) {
-  return callBoard("extend_outline_board_v1", roomId);
+  const result = await callBoard("extend_outline_board_v1", roomId);
+  clearOutlineBoardCache(); // 만료로 캐시된 자료가 늘린 뒤에도 남지 않게
+  return result;
 }
 
 export async function closeOutlineBoard(roomId: string): Promise<BoardResult> {
   const result = await callBoard("close_outline_board_v1", roomId);
+  clearOutlineBoardCache(); // 끈 뒤 5초 동안 옛 실명·개요가 나가지 않게
   revalidatePath(`/dashboard/room/${roomId}`);
   return result.error ? result : { board: null };
 }

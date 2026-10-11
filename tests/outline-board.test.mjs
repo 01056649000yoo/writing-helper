@@ -251,3 +251,19 @@ test("종료된 개요짜기: 서버가 저장·제출을 거절하고, 학생�
   assert.match(teacherPage, /<CloseRoomButton/);
   assert.doesNotMatch(teacherPage, /await closeRoom\(id\)/, "확인 없이 바로 종료하던 단추를 없앴다");
 });
+
+test("서버 캐시: 오류 때 옛 자료를 돌려주지 않고, 끄기·새 주소·늘리기 직후 비우며, 동시 조회는 하나로 합친다(2026-10-11 Codex 검토 재현)", async () => {
+  const [server, actions] = await Promise.all([
+    readFile("src/lib/outline-board-server.ts", "utf8"),
+    readFile("src/app/actions/outline-board-actions.ts", "utf8"),
+  ]);
+  assert.doesNotMatch(server, /if \(hit\) return hit\.payload;\s*\n\s*throw/, "오류 때 옛 자료 반환 금지");
+  assert.match(server, /if \(error\) throw new Error\("outline board unavailable"\)/);
+  assert.match(server, /globalStore\.__outlineBoardStore/, "서버 기능과 공개 읽기가 같은 캐시를 본다");
+  assert.match(server, /store\.inflight\.get\(token\)/, "동시 조회를 하나로");
+  assert.match(server, /generation !== store\.generation\) return payload/, "비우기 전에 시작한 조회가 옛 자료를 다시 저장하지 않게");
+  for (const fn of ["openOutlineBoard", "extendOutlineBoard", "closeOutlineBoard"]) {
+    const body = actions.slice(actions.indexOf(`export async function ${fn}(`));
+    assert.match(body.slice(0, 520), /clearOutlineBoardCache\(\)/, `${fn} 은 캐시를 비운다`);
+  }
+});
