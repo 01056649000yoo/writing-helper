@@ -749,7 +749,8 @@ function OutlineBuilderSetup({ classId }: { classId: string }) {
           <span className="text-sm font-bold text-gray-800">👀 학생들이 제출한 개요를 친구들과 함께 보기</span>
           <span className="text-sm leading-relaxed text-gray-600">
             제출한 개요를 번호·이름과 함께 모아 보여 주는 페이지와 <strong>샘링크 짧은 주소(1주)</strong>를 만들어요.
-            친구들과 돌려 보며 토의할 때 씁니다. 만든 뒤에도 활동 화면에서 켜고 끌 수 있어요.
+            친구들과 돌려 보며 토의할 때 씁니다. 학생은 <strong>아지트 학생 대시보드(글쓰기 연구소)</strong>에서 바로 열거나,
+            주소·QR 코드로 들어와 볼 수 있어요. 만든 뒤에도 활동 화면에서 켜고 끌 수 있어요.
           </span>
           <span className="text-sm leading-relaxed text-amber-700">주소를 아는 사람은 누구나 볼 수 있어요.</span>
         </span>

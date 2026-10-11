@@ -205,3 +205,14 @@ test("종료된 개요짜기: 친구 개요 모음이 열려 있으면 들어온
   assert.match(roomPage, /이 활동은 끝났어요/);
   assert.match(studentActions, /entry\.peerBoardToken\) return \{ error:/);
 });
+
+test("선생님 상자·방 만들기에 학생이 들어오는 길(학생 대시보드·주소·QR)을 안내한다", async () => {
+  const [panel, newRoom] = await Promise.all([
+    readFile("src/app/dashboard/room/[id]/outline-board-panel.tsx", "utf8"),
+    readFile("src/app/dashboard/room/new/page.tsx", "utf8"),
+  ]);
+  assert.match(panel, /학생 대시보드/);
+  assert.match(panel, /<strong>주소<\/strong>/);
+  assert.match(panel, /<strong>QR 코드<\/strong>/);
+  assert.match(newRoom, /아지트 학생 대시보드\(글쓰기 연구소\)/);
+});

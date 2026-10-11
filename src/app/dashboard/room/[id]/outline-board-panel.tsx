@@ -75,6 +75,12 @@ export function OutlineBoardPanel({ roomId, initialBoard }: { roomId: string; in
           <p className="text-sm text-gray-500 mt-1">
             학생들이 <strong>제출한</strong> 개요를 번호·이름과 함께 모아 보여 줘요. 친구들과 돌려 보며 토의할 때 쓰세요.
           </p>
+          {/* 학생이 들어오는 길 세 가지(2026-10-11 선생님 요청: 학생 대시보드에서도 볼 수 있다는 안내가 없었다) */}
+          <ul className="mt-2 space-y-1 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-900">
+            <li>📋 <strong>학생 대시보드</strong> — 아지트 <strong>글쓰기 연구소</strong> 목록과 개요 쓰는 화면·완성 화면에 <strong>친구 개요 보기</strong>가 생겨요(종료한 활동도 공유 기간 동안 보여요).</li>
+            <li>🔗 <strong>주소</strong> — 샘링크 짧은 주소를 칠판에 적어 주면 아무 기기에서나 열 수 있어요.</li>
+            <li>📱 <strong>QR 코드</strong> — QR을 크게 띄우면 태블릿으로 찍어 바로 들어와요.</li>
+          </ul>
         </div>
         {isOpen && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">공유 중</span>}
       </div>
