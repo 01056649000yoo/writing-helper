@@ -1278,12 +1278,13 @@ button:not(:disabled),
   font-variant-numeric: tabular-nums;
 }
 
-/* 처음·가운데·끝을 위에서 아래로 세 줄(2026-10-11 선생님 요청, 같은 날 세 칸 나란히에서 바꿈).
-   줄 높이는 글 양에 따라 나누고, 한 줄 안의 질문은 옆으로 나란히(--outline-item-cols, 최대 3).
-   넘치면 그 줄 안에서만 내려 보고, 글자 배율은 --outline-font-scale(넘치면 화면에 맞춰 저절로 줄임). */
+/* 처음·가운데·끝을 위에서 아래로, 칸 높이는 답 길이만큼(2026-10-11 선생님 요청: 빈칸이 크면 덜 쓴 것처럼 보인다).
+   한 줄 안의 질문도 위에서 아래로 차례대로 쌓는다(옆으로 나누면 길이가 달라 빈 공간이 생겼다).
+   화면을 넘치면 그 학생만 글자를 줄이고(--outline-font-scale, fitToScreen), 그래도 넘치면 화면을 내려 본다. */
 .outline-viewer__body {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-3);
@@ -1292,10 +1293,10 @@ button:not(:disabled),
 }
 
 .outline-viewer__section {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: none;
   display: grid;
   grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-items: start;
   gap: var(--ui-space-3);
 }
 
@@ -1312,12 +1313,9 @@ button:not(:disabled),
 }
 
 .outline-viewer__items {
-  min-height: 0;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(var(--outline-item-cols, 1), minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--ui-space-2);
-  padding-right: 2px;
 }
 
 .outline-viewer__items li {
@@ -1399,9 +1397,8 @@ button:not(:disabled),
   .outline-viewer__peer { display: none; }
   /* 휴대폰: 세 칸을 위아래로 쌓고 화면 전체를 내려 본다. */
   .outline-viewer__body { overflow-y: auto; padding: var(--ui-space-3); }
-  .outline-viewer__section { flex: none; min-height: auto; grid-template-columns: minmax(0, 1fr); }
+  .outline-viewer__section { flex: none; grid-template-columns: minmax(0, 1fr); }
   .outline-viewer__section-title { justify-self: start; padding: var(--ui-space-1) var(--ui-space-4); border-radius: var(--ui-radius-pill); }
-  .outline-viewer__items { overflow: visible; min-height: auto; grid-template-columns: minmax(0, 1fr); }
   .outline-viewer__font-value, .outline-viewer__fit-note { display: none; }
   .outline-viewer__tools { gap: var(--ui-space-2); }
 }

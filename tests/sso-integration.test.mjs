@@ -50,10 +50,12 @@ test("통합 /lab만 SSO 모드를 켜고 구 helper 로그인은 롤백용으�
   assert.match(dockerfile, /ENV NEXT_PUBLIC_LAB_SSO_ENABLED=\$\{NEXT_PUBLIC_LAB_SSO_ENABLED\}/);
 });
 
-test("통합 모드는 별도 비밀번호 인증을 막고 DB 승인 교사 RPC를 통과시킨다", () => {
+test("통합 모드는 별도 비밀번호 인증을 막고 DB 승인 교사 RPC를 통과시킨다", async () => {
   assert.match(authActions, /isSsoEnabled/);
-  assert.match(authActions, /ensure_lab_teacher_profile_v1/);
-  assert.match(authActions, /access\?\.allowed !== true/);
+  // 2026-10-11: 선생님 확인을 한 요청 안에서 한 번만 하려고 lib/current-user.ts 로 옮겼다.
+  const currentUser = await readFile("src/lib/current-user.ts", "utf8");
+  assert.match(currentUser, /ensure_lab_teacher_profile_v1/);
+  assert.match(currentUser, /access\?\.allowed !== true/);
   assert.match(authActions, /통합 연구소는 끄적끄적 아지트에서 로그인한 승인 교사/);
   assert.match(loginPage, /await getCurrentUser\(\)/);
   assert.match(loginPage, /redirect\("\/dashboard"\)/);

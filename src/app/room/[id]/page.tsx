@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { isIntegratedLab } from "@/lib/lab-roster";
 import { ensureIntegratedStudentRoomSession } from "@/lib/lab-student-session";
@@ -34,6 +34,13 @@ export default async function RoomEntryPage({
   const integratedEntry = isIntegratedLab()
     ? await ensureIntegratedStudentRoomSession(roomId)
     : null;
+
+  // 아지트에서 들어온 학생은 서버에서 곧바로 내 활동·결과로 보낸다(2026-10-11).
+  // 전에는 이 화면을 먼저 그린 뒤 브라우저가 다시 이동해, 화면을 두 번 받느라 느렸다.
+  if (integratedEntry?.sessionId) {
+    const destination = integratedEntry.status === "done" ? "result" : "activity";
+    redirect(`/room/${roomId}/${destination}?session=${integratedEntry.sessionId}`);
+  }
 
   // 종료된 개요짜기 + 열린 친구 개요 모음: 쓰기 화면 대신 친구 개요 모음을 보여 준다(2026-10-11).
   if (integratedEntry?.peerBoardToken) {

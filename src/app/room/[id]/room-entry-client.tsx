@@ -65,14 +65,16 @@ function IntegratedEntry({
     );
   }
 
+  const ended = Boolean(entry.error && /종료된 활동|만료/.test(entry.error));
   const agitHomeUrl = process.env.NEXT_PUBLIC_AGIT_APP_URL
     ?? "https://xn--vz0ba242ncqcba79xhwx.site";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm text-center">
-        <div className="text-5xl mb-4" aria-hidden="true">🔐</div>
-        <h1 className="text-xl font-bold text-gray-800">학생 로그인이 필요해요</h1>
+        <div className="text-5xl mb-4" aria-hidden="true">{ended ? "🏁" : "🔐"}</div>
+        {/* 종료·만료된 활동에 로그인한 학생이 들어오면 로그인 안내가 아니라 끝났다고 알린다(2026-10-11 점검에서 찾음). */}
+        <h1 className="text-xl font-bold text-gray-800">{ended ? "활동이 끝났어요" : "학생 로그인이 필요해요"}</h1>
         <p className="mt-3 text-sm leading-relaxed text-gray-600">
           {entry.error ?? "끄적끄적 아지트 학생 계정으로 로그인한 뒤 다시 들어와 주세요."}
         </p>

@@ -38,9 +38,6 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${notoSansKr.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <script defer src="https://umami.xn--vz0ba242ncqcba79xhwx.site/script.js" data-website-id="db787ba7-05d5-481b-824f-54bd47ecd3de"></script>
-      </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <div className="flex-1">{children}</div>
         <footer className="border-t border-slate-200 bg-white px-4 py-4 text-center text-sm text-slate-500">

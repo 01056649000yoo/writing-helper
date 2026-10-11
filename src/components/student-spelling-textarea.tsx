@@ -59,6 +59,23 @@ export type SpellingLookupEntry = {
   source: { label: string; url: string } | null;
 };
 
+/** 공통 자료가 먼저, 같은 틀린 표현의 반별 자료는 뺀다. 켜진(approved) 것만. */
+export function combineSpellingEntries(common: unknown, classEntries: unknown): ClassSpellingEntry[] {
+  const seen = new Set<string>();
+  const result: ClassSpellingEntry[] = [];
+  for (const list of [common, classEntries]) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list as Array<ClassSpellingEntry & { status?: string }>) {
+      if (entry?.status && entry.status !== "approved") continue;
+      const key = String(entry?.wrong_expression ?? "").trim().toLocaleLowerCase("ko-KR");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      result.push(entry);
+    }
+  }
+  return result;
+}
+
 export type ClassSpellingEntry = {
   id: string;
   wrong_expression: string;
@@ -178,13 +195,15 @@ async function loadSpellingSources(): Promise<SpellingSources> {
           return compileCatalog(catalog);
         })
         .catch(() => null),
-      // `_v2` 는 배열이 아니라 `{ version, entries }` 를 준다. 같은 표현이 공통·학급 양쪽에 있으면
-      // 공통 것 하나만 남겨 주므로 아지트 화면과 같은 목록을 본다.
-      Promise.resolve(createSupabaseBrowserClient().rpc("get_student_spelling_entries_v2"))
+      // 아지트가 `_v2` 를 지우고 `_v3` 로 바꿨다(2026-10-11 연구소 점검에서 찾음 — 연구소만 `_v2` 를 불러 404,
+      // 우리 반·공통 자료 없이 밑줄을 긋고 있었다). `_v3` 는 `{ common, class_entries }` 를 준다.
+      // 연구소는 저장본이 없어 처음부터 받고(p_common_since=null), 아지트와 같은 규칙으로 합친다
+      // (공통이 먼저, 같은 틀린 표현의 반별 자료는 뺀다 — 아지트 checker/entryCache.js combineStudentEntries).
+      Promise.resolve(createSupabaseBrowserClient().rpc("get_student_spelling_entries_v3", { p_common_since: null }))
         .then(({ data, error }) => {
           if (error) throw error;
-          const entries = (data as { entries?: unknown } | null)?.entries;
-          return Array.isArray(entries) ? entries as ClassSpellingEntry[] : [];
+          const payload = (data ?? {}) as { common?: unknown; class_entries?: unknown };
+          return combineSpellingEntries(payload.common, payload.class_entries);
         })
         // 맞춤법 도움말은 있으면 좋은 것이라 실패해도 글쓰기를 막지 않는다.
         // 다만 조용히 비면 아무도 못 알아채므로 콘솔에는 남긴다.

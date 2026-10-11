@@ -10,6 +10,7 @@ import {
   getHanjaWritingRoomResults,
   getRoom,
   getRoomStudents,
+  getRoomSessions,
   getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
@@ -22,10 +23,11 @@ import { isIntegratedLab } from "@/lib/lab-roster";
 
 export default async function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [room, students, user] = await Promise.all([
+  const [room, students, user, initialSessions] = await Promise.all([
     getRoom(id),
     getRoomStudents(id),
     getCurrentUser(),
+    getRoomSessions(id),
   ]);
 
   if (!room || room.teacher_id !== user?.id) notFound();
@@ -129,6 +131,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
                 oneLineShareResults={oneLineShareResults}
                 hanjaWritingResults={hanjaWritingResults}
                 showResultQr={!integratedLab}
+                initialSessions={initialSessions as Parameters<typeof LiveStudentPanel>[0]["initialSessions"]}
               />
             </>
           }

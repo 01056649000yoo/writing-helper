@@ -1339,6 +1339,7 @@ export default function LiveStudentPanel({
   oneLineShareResults: initialOneLineShareResults,
   hanjaWritingResults: initialHanjaWritingResults,
   showResultQr,
+  initialSessions = [],
 }: {
   roomId: string;
   students: Student[];
@@ -1349,8 +1350,10 @@ export default function LiveStudentPanel({
   oneLineShareResults: OneLineShareResults;
   hanjaWritingResults: HanjaWritingResults;
   showResultQr: boolean;
+  /** 서버가 화면을 만들 때 함께 읽은 제출 현황(2026-10-11) — 첫 화면에 잠깐 "0명·미참여"로 보이던 것을 없앤다. */
+  initialSessions?: Session[];
 }) {
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<Session[]>(initialSessions);
   const [qrTarget, setQrTarget] = useState<Session | null>(null);
   const [activeSessionResult, setActiveSessionResult] = useState<Session | null>(null);
   const [isQuestionResultsOpen, setIsQuestionResultsOpen] = useState(false);

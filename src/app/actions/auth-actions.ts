@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, createSupabaseAdminClient } from "@/lib/supabase-server";
+import { getCachedCurrentUser } from "@/lib/current-user";
 
 type AuthResult = { error?: string; success?: boolean; email?: string };
 
@@ -124,16 +125,8 @@ export async function updatePassword(formData: FormData): Promise<AuthResult> {
 }
 
 export async function getCurrentUser() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) return null;
-
-  if (isSsoEnabled()) {
-    const { data: access, error: accessError } = await supabase.rpc("ensure_lab_teacher_profile_v1");
-    if (accessError || access?.version !== 1 || access?.allowed !== true) return null;
-  }
-
-  return user;
+  // 같은 요청 안에서는 한 번만 확인한다(lib/current-user.ts).
+  return getCachedCurrentUser();
 }
 
 export async function getTeacherProfile() {

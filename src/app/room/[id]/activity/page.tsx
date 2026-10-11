@@ -326,6 +326,11 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
         setStep("outline_sections");
       }
       setPageLoading(false);
+    }).catch(() => {
+      // 서버를 못 부르면(배포 직후 옛 화면·네트워크) "불러오는 중"에 멈추지 않고 다시 불러오기를 안내한다(2026-10-11).
+      if (!active) return;
+      setError("활동을 불러오지 못했어요. 화면을 새로 고쳐 주세요.");
+      setPageLoading(false);
     });
 
     return () => {
