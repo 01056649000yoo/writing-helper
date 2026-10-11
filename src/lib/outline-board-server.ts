@@ -28,14 +28,18 @@ export function clearOutlineBoardCache() {
   store.generation += 1;
 }
 
-async function fetchBoard(token: string): Promise<OutlineBoardPayload> {
+async function fetchBoard(token: string, retried = false): Promise<OutlineBoardPayload> {
   const generation = store.generation;
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin.schema("writing_helper").rpc("get_outline_board_v1", { p_token: token });
   if (error) throw new Error("outline board unavailable");
 
   const payload = normalizeOutlineBoardPayload(data);
-  if (generation !== store.generation) return payload; // 읽는 동안 끄기·새 주소가 있었다 — 이 자료는 저장하지 않는다
+  // 읽는 동안 끄기·새 주소가 있었다 — 이 자료는 저장하지도, 돌려주지도 않고 한 번 다시 읽는다.
+  if (generation !== store.generation) {
+    if (!retried) return fetchBoard(token, true);
+    return { state: "closed" };
+  }
   if (store.cache.size >= MAX_CACHED_BOARDS) {
     const oldest = store.cache.keys().next().value;
     if (oldest) store.cache.delete(oldest);
@@ -48,7 +52,10 @@ export async function loadOutlineBoard(token: string): Promise<OutlineBoardPaylo
   if (!OUTLINE_BOARD_TOKEN_PATTERN.test(token)) return { state: "missing" };
 
   const hit = store.cache.get(token);
-  if (hit && Date.now() - hit.at < OUTLINE_BOARD_SERVER_CACHE_MS) return hit.payload;
+  // 기간이 끝났으면 5초 캐시가 남아 있어도 쓰지 않는다(끝난 개요가 5초 더 나가지 않게).
+  const expiryMs = hit?.payload.state === "open" && hit.payload.expiresAt ? Date.parse(hit.payload.expiresAt) : NaN;
+  const hitExpired = Number.isFinite(expiryMs) && expiryMs <= Date.now();
+  if (hit && !hitExpired && Date.now() - hit.at < OUTLINE_BOARD_SERVER_CACHE_MS) return hit.payload;
 
   const running = store.inflight.get(token);
   if (running) return running;

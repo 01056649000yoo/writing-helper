@@ -110,6 +110,16 @@ export function OutlineBoardClient({
     };
   }, [schedule]);
 
+  // 공유 기간이 끝나는 순간 열려 있던 화면도 닫는다 — 다음 자동 조회(약 1분)까지, 또는 조회가 실패해도 개요가 남지 않게(2026-10-11 점검).
+  const openExpiresAt = board?.state === "open" ? board.expiresAt : null;
+  useEffect(() => {
+    if (!openExpiresAt) return;
+    const wait = Date.parse(openExpiresAt) - Date.now();
+    if (!Number.isFinite(wait)) return;
+    const id = setTimeout(() => setBoard({ state: "expired" }), Math.min(Math.max(wait, 0), 2_000_000_000));
+    return () => clearTimeout(id);
+  }, [openExpiresAt]);
+
   // 새 표시(노란 테두리)는 2분 뒤 사라진다.
   useEffect(() => {
     if (fresh.size === 0) return;

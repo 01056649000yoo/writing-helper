@@ -261,9 +261,16 @@ test("서버 캐시: 오류 때 옛 자료를 돌려주지 않고, 끄기·새 �
   assert.match(server, /if \(error\) throw new Error\("outline board unavailable"\)/);
   assert.match(server, /globalStore\.__outlineBoardStore/, "서버 기능과 공개 읽기가 같은 캐시를 본다");
   assert.match(server, /store\.inflight\.get\(token\)/, "동시 조회를 하나로");
-  assert.match(server, /generation !== store\.generation\) return payload/, "비우기 전에 시작한 조회가 옛 자료를 다시 저장하지 않게");
+  assert.match(server, /generation !== store\.generation\) \{\s*if \(!retried\) return fetchBoard\(token, true\)/, "비우기 전에 시작한 조회는 옛 자료를 돌려주지도 저장하지도 않고 한 번 다시 읽는다");
+  assert.match(server, /hitExpired/, "기간이 끝난 개요는 5초 캐시로 나가지 않는다");
   for (const fn of ["openOutlineBoard", "extendOutlineBoard", "closeOutlineBoard"]) {
     const body = actions.slice(actions.indexOf(`export async function ${fn}(`));
     assert.match(body.slice(0, 520), /clearOutlineBoardCache\(\)/, `${fn} 은 캐시를 비운다`);
   }
+});
+
+test("열려 있던 화면도 공유 기간이 끝나는 순간 닫힌다", async () => {
+  const client = await readFile("src/app/board/[token]/board-client.tsx", "utf8");
+  assert.match(client, /openExpiresAt/);
+  assert.match(client, /setBoard\(\{ state: "expired" \}\)/);
 });
