@@ -69,3 +69,10 @@ test("한줄모아 제출도 활동 종류를 확인한다(한자·투표 제출
   const body = actions.slice(actions.indexOf("export async function submitOneLineShare("));
   assert.match(body.slice(0, 2500), /activity_type !== "one_line_share"\) return \{ error: "활동 종류가 맞지 않습니다\." \}/);
 });
+
+test("연구소 응답에 기본 보안 헤더가 붙는다", async () => {
+  const config = await readFile("next.config.ts", "utf8");
+  for (const key of ["X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Permissions-Policy"]) {
+    assert.match(config, new RegExp(key));
+  }
+});
