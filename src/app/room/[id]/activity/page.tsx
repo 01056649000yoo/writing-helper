@@ -233,6 +233,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
       }
       setActivityType(type);
 
+      // 종료된 개요짜기는 쓰기 화면을 열지 않고 내 결과(보기만)로 보낸다(2026-10-11 선생님 결정). 서버도 저장을 거절한다.
+      if (type === "outline_builder" && data.room_ended) {
+        router.replace(`/room/${roomId}/result?session=${sessionId}`);
+        return;
+      }
+
       if (type === "question_generator") {
         setQuestionGeneratorConfig(normalizeQuestionGeneratorConfig(data.activity_config));
         const existingSubmission = data.existing_submission as QuestionGeneratorSubmission | null;
@@ -336,7 +342,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string 
     return () => {
       active = false;
     };
-  }, [editMode, roomId, sessionId]);
+  }, [editMode, roomId, router, sessionId]);
 
   /*
    * 임시 저장에 담을 항목을 만든다.

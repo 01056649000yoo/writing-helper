@@ -21,6 +21,8 @@ export type IntegratedStudentEntry = {
   status?: string;
   /** 종료된 개요짜기인데 친구 개요 모음이 열려 있으면 그 판 번호 — 쓰기 없이 보기만(2026-10-11). */
   peerBoardToken?: string;
+  /** 종료된 개요짜기 — 낸 개요가 있으면 결과(보기만)로 보낸다(2026-10-11). */
+  roomEnded?: boolean;
 };
 
 async function getAuthenticatedIntegratedStudent(
@@ -82,7 +84,7 @@ export async function ensureIntegratedStudentRoomSession(
   const { data: room } = await admin
     .schema("writing_helper")
     .from("rooms")
-    .select("id, agit_class_id, is_active, expires_at")
+    .select("id, agit_class_id, is_active, expires_at, activity_type")
     .eq("id", roomId)
     .maybeSingle();
 
@@ -91,6 +93,19 @@ export async function ensureIntegratedStudentRoomSession(
     return { error: "내 학급의 활동이 아닙니다." };
   }
   const roomEnded = !room.is_active || Boolean(room.expires_at && new Date(room.expires_at) < new Date());
+  if (roomEnded && (room.activity_type ?? "outline_builder") === "outline_builder") {
+    // 종료된 개요짜기: 내가 쓴 개요가 있으면 결과(보기만)로 — 결과 화면에 친구 개요 모음 상자도 함께 보인다.
+    const { data: ownSession } = await admin
+      .schema("writing_helper")
+      .from("student_sessions")
+      .select("id, status")
+      .eq("room_id", roomId)
+      .eq("agit_student_id", student.id)
+      .maybeSingle();
+    if (ownSession) {
+      return { studentId: student.id, sessionId: ownSession.id, status: ownSession.status, roomEnded: true };
+    }
+  }
   if (roomEnded) {
     // 종료된 개요짜기라도 선생님이 친구 개요 모음을 열어 두었으면 그 판을 보여 준다(학생 목록에도 그동안 보인다, 아지트 20261393).
     const { data: board } = await admin

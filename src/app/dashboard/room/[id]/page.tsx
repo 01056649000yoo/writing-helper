@@ -6,6 +6,7 @@ import QRCodeSection from "./qr-section";
 import { RoomWorkspace } from "./room-workspace";
 import LiveStudentPanel from "./live-student-panel";
 import { OutlineBoardPanel } from "./outline-board-panel";
+import { CloseRoomButton } from "./close-room-button";
 import {
   getHanjaWritingRoomResults,
   getRoom,
@@ -14,7 +15,6 @@ import {
   getOneLineShareRoomResults,
   getQuestionGeneratorRoomResults,
   getQuestionVotingRoomResults,
-  closeRoom,
 } from "@/app/actions/room-actions";
 import { getCurrentUser } from "@/app/actions/auth-actions";
 import { getOutlineBoard } from "@/app/actions/outline-board-actions";
@@ -75,11 +75,11 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ id:
             ← {dashboardClassId ? "학급으로" : "대시보드로"}
           </Link>
           {room.is_active && (
-            <form action={async () => { "use server"; await closeRoom(id); }}>
-              <button type="submit" className="lab-button lab-button--danger">
-                활동 종료하기
-              </button>
-            </form>
+            <CloseRoomButton
+              roomId={id}
+              isOutlineBuilder={isOutlineBuilder}
+              boardOpen={outlineBoard?.state === "open"}
+            />
           )}
         </div>
 

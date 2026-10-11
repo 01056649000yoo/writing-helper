@@ -30,6 +30,25 @@ import type {
   QuestionVotingSubmission,
 } from "@/features/activities/types";
 
+// 종료·만료된 방인지(2026-10-11 선생님 결정: 종료된 개요짜기는 보기만, 고쳐 저장할 수 없다).
+function isRoomEnded(room: { is_active?: boolean | null; expires_at?: string | null } | null | undefined) {
+  if (!room) return true;
+  return room.is_active === false || Boolean(room.expires_at && new Date(room.expires_at) < new Date());
+}
+
+async function outlineRoomEnded(admin: ReturnType<typeof createSupabaseAdminClient>, sessionId: string) {
+  const { data } = await admin
+    .schema("writing_helper")
+    .from("student_sessions")
+    .select("room_id, rooms(is_active, expires_at)")
+    .eq("id", sessionId)
+    .maybeSingle();
+  const room = (data as { rooms?: { is_active?: boolean | null; expires_at?: string | null } | null } | null)?.rooms;
+  return isRoomEnded(room ?? null);
+}
+
+const OUTLINE_ENDED_MESSAGE = "활동이 끝나서 개요를 고칠 수 없어요. 결과 보기만 할 수 있어요.";
+
 // 학생 인증 (번호+이름 대조)
 export async function verifyStudent(
   roomId: string,
@@ -41,6 +60,7 @@ export async function verifyStudent(
     const entry = await ensureIntegratedStudentRoomSession(roomId);
     // 종료된 방의 친구 개요 모음은 활동 주소 화면에서 보여 준다 — 여기서는 쓸 활동이 없다.
     if (entry.peerBoardToken) return { error: "이 활동은 끝났어요. 친구 개요 모음은 활동 주소에서 볼 수 있어요." };
+    if (entry.roomEnded) return { error: "이미 종료된 활동입니다." };
     return entry;
   }
 
@@ -130,7 +150,7 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     admin.schema("writing_helper").from("student_sessions")
       .select("student_name, submission, answers, result").eq("id", sessionId).maybeSingle(),
     admin.schema("writing_helper").from("rooms")
-      .select("topic, activity_type, activity_config, is_active").eq("id", roomId).maybeSingle(),
+      .select("topic, activity_type, activity_config, is_active, expires_at").eq("id", roomId).maybeSingle(),
   ]);
 
   const activityType = roomRes.data?.activity_type ?? "outline_builder";
@@ -266,6 +286,7 @@ export async function getStudentResult(sessionId: string, roomId: string) {
     hanjaWritingConfig: null,
     hanjaWritingEntry: null,
     hanjaWritingBoard: [],
+    roomEnded: isRoomEnded(roomRes.data),
   };
 }
 
@@ -319,6 +340,7 @@ export async function saveAnswers(
   if (!await ownsIntegratedStudentSession(admin, sessionId)) {
     return { error: "내 활동만 수정할 수 있습니다." };
   }
+  if (await outlineRoomEnded(admin, sessionId)) return { error: OUTLINE_ENDED_MESSAGE };
 
   const { data: savedSession, error } = await admin
     .schema("writing_helper")
@@ -355,6 +377,7 @@ export async function requestOutline(
   if (!await ownsIntegratedStudentSession(admin, sessionId)) {
     return { error: "내 활동만 제출할 수 있습니다." };
   }
+  if (await outlineRoomEnded(admin, sessionId)) return { error: OUTLINE_ENDED_MESSAGE };
 
   if (latestAnswers && latestAnswers.length > 0) {
     const { error: updateError } = await admin
@@ -421,7 +444,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
   const { data } = await admin
     .schema("writing_helper")
     .from("rooms")
-    .select("topic, topic_description, title, question_sets, activity_type, activity_config, activity_state")
+    .select("topic, topic_description, title, question_sets, activity_type, activity_config, activity_state, is_active, expires_at")
     .eq("id", roomId)
     .maybeSingle();
   if (!data) return null;
@@ -493,6 +516,7 @@ export async function getStudentRoomQuestions(sessionId: string, roomId: string)
       : null,
     existing_hanja_writing_submission: hanjaSubmissionContents.length > 0 ? { contents: hanjaSubmissionContents } : null,
     session_status: submissionData?.status ?? "in_progress",
+    room_ended: isRoomEnded(data),
   };
 }
 

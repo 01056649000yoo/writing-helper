@@ -241,7 +241,8 @@ function BoardHeader({
           disabled={refreshing || coolingDown}
           title="1분마다 저절로 새로 고쳐요. 누르면 지금 바로 가져와요."
         >
-          {refreshing ? "가져오는 중…" : coolingDown ? "잠깐만요" : "↻ 지금 새로 고침"}
+          {/* 반영은 0.1초 안에 끝난다. 그 뒤 5초 쉬는 동안 예전 문구(잠깐만요)로 보여 아직 불러오는 것처럼 느껴졌다(2026-10-11). */}
+          {refreshing ? "가져오는 중…" : coolingDown ? (loadError ? "잠시 뒤 다시" : "✓ 방금 반영했어요") : "↻ 지금 새로 고침"}
         </button>
       </div>
     </header>

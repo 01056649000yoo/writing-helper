@@ -219,3 +219,35 @@ test("선생님 상자·방 만들기에 학생이 들어오는 길(학생 대�
   assert.match(panel, /<strong>QR 코드<\/strong>/);
   assert.match(newRoom, /아지트 학생 대시보드\(글쓰기 연구소\)/);
 });
+
+test("새로 고침 단추: 반영 뒤 쉬는 5초 동안 '방금 반영했어요'(아직 불러오는 것처럼 보이지 않게)", async () => {
+  const client = await readFile("src/app/board/[token]/board-client.tsx", "utf8");
+  assert.match(client, /coolingDown \? \(loadError \? "잠시 뒤 다시" : "✓ 방금 반영했어요"\)/);
+  assert.doesNotMatch(client, /"잠깐만요"/);
+});
+
+test("종료된 개요짜기: 서버가 저장·제출을 거절하고, 학생은 결과(보기만)로, 선생님은 확인 뒤 종료", async () => {
+  const [actions, session, roomPage, activity, result, closeButton, teacherPage] = await Promise.all([
+    readFile("src/app/actions/student-actions.ts", "utf8"),
+    readFile("src/lib/lab-student-session.ts", "utf8"),
+    readFile("src/app/room/[id]/page.tsx", "utf8"),
+    readFile("src/app/room/[id]/activity/page.tsx", "utf8"),
+    readFile("src/app/room/[id]/result/page.tsx", "utf8"),
+    readFile("src/app/dashboard/room/[id]/close-room-button.tsx", "utf8"),
+    readFile("src/app/dashboard/room/[id]/page.tsx", "utf8"),
+  ]);
+  for (const fn of ["saveAnswers", "requestOutline"]) {
+    const body = actions.slice(actions.indexOf(`export async function ${fn}(`));
+    assert.match(body.slice(0, 900), /outlineRoomEnded\(admin, sessionId\)\) return \{ error: OUTLINE_ENDED_MESSAGE \}/, `${fn} 은 종료된 방이면 거절`);
+  }
+  assert.match(actions, /room_ended: isRoomEnded\(data\)/);
+  assert.match(actions, /roomEnded: isRoomEnded\(roomRes\.data\)/);
+  assert.match(session, /roomEnded && \(room\.activity_type \?\? "outline_builder"\) === "outline_builder"[\s\S]{0,600}roomEnded: true/);
+  assert.match(roomPage, /integratedEntry\.roomEnded \? "result"/);
+  assert.match(activity, /type === "outline_builder" && data\.room_ended\)[\s\S]{0,120}router\.replace\(`\/room\/\$\{roomId\}\/result/);
+  assert.match(result, /roomEnded \? \([\s\S]{0,200}보기만 할 수 있어요/);
+  assert.match(closeButton, /개요를 더 고칠 수 없고, 보기만/);
+  assert.match(closeButton, /확인하고 종료/);
+  assert.match(teacherPage, /<CloseRoomButton/);
+  assert.doesNotMatch(teacherPage, /await closeRoom\(id\)/, "확인 없이 바로 종료하던 단추를 없앴다");
+});

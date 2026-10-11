@@ -28,6 +28,8 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session") ?? "";
   const [outlineAnswers, setOutlineAnswers] = useState<OutlineTemplateAnswer[]>([]);
+  // 종료된 개요짜기는 보기만(2026-10-11) — `개요 다시 만들기` 를 숨긴다. 서버도 저장을 거절한다.
+  const [roomEnded, setRoomEnded] = useState(false);
   const [studentName, setStudentName] = useState("");
   const [topic, setTopic] = useState("");
   const [copied, setCopied] = useState(false);
@@ -65,6 +67,7 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
       }
 
       const rawAnswers = (data as { outlineAnswers?: unknown }).outlineAnswers;
+      setRoomEnded(Boolean((data as { roomEnded?: boolean }).roomEnded));
       setOutlineAnswers(
         Array.isArray(rawAnswers)
           ? (rawAnswers as OutlineTemplateAnswer[]).filter(
@@ -667,12 +670,18 @@ export default function StudentResultPage({ params }: { params: Promise<{ id: st
           {copied ? "✅ 복사됐어요!" : "📋 개요 복사하기"}
         </button>
 
-        <Link
-          href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
-          className="block w-full rounded-2xl border-2 border-orange-200 bg-white py-4 text-center font-bold text-orange-700 hover:bg-orange-50 transition-colors"
-        >
-          ✏️ 개요 다시 만들기
-        </Link>
+        {roomEnded ? (
+          <p className="rounded-2xl border-2 border-gray-200 bg-gray-50 py-4 text-center font-bold text-gray-500">
+            🏁 활동이 끝나서 개요는 보기만 할 수 있어요
+          </p>
+        ) : (
+          <Link
+            href={`/room/${roomId}/activity?session=${sessionId}&edit=1`}
+            className="block w-full rounded-2xl border-2 border-orange-200 bg-white py-4 text-center font-bold text-orange-700 hover:bg-orange-50 transition-colors"
+          >
+            ✏️ 개요 다시 만들기
+          </Link>
+        )}
 
         <p className="text-center text-sm text-gray-400">
           이 개요를 보면서 글을 완성해봐요 ✍️

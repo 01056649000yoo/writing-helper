@@ -38,7 +38,8 @@ export default async function RoomEntryPage({
   // 아지트에서 들어온 학생은 서버에서 곧바로 내 활동·결과로 보낸다(2026-10-11).
   // 전에는 이 화면을 먼저 그린 뒤 브라우저가 다시 이동해, 화면을 두 번 받느라 느렸다.
   if (integratedEntry?.sessionId) {
-    const destination = integratedEntry.status === "done" ? "result" : "activity";
+    // 종료된 개요짜기는 쓰다 만 것도 결과(보기만)로 — 고쳐 저장할 수 없다(2026-10-11).
+    const destination = integratedEntry.status === "done" || integratedEntry.roomEnded ? "result" : "activity";
     redirect(`/room/${roomId}/${destination}?session=${integratedEntry.sessionId}`);
   }
 
