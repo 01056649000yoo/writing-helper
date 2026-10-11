@@ -186,7 +186,10 @@ export async function ownsIntegratedStudentSession(
   sessionId: string,
   roomId?: string,
 ) {
-  if (!isIntegratedLab()) return true;
+  // 통합 모드가 아니면 소유권을 확인할 방법이 없다 — 예전에는 여기서 곧바로 true 였다(2026-10-11 보안 점검).
+  // 빌드 인자(NEXT_PUBLIC_LAB_SSO_ENABLED)가 빠진 채 다시 빌드하면 조용히 "누구나 통과"가 되는 함정이라, 기본은 거절하고
+  // 독립 실행판을 일부러 쓸 때만 LAB_ALLOW_STANDALONE_OWNERSHIP=true 로 연다.
+  if (!isIntegratedLab()) return process.env.LAB_ALLOW_STANDALONE_OWNERSHIP === "true";
   if (!sessionId) return false;
 
   const student = await getAuthenticatedIntegratedStudent(admin);
@@ -195,7 +198,7 @@ export async function ownsIntegratedStudentSession(
   let query = admin
     .schema("writing_helper")
     .from("student_sessions")
-    .select("id")
+    .select("id, rooms(agit_class_id)")
     .eq("id", sessionId)
     .eq("agit_student_id", student.id);
 
@@ -204,5 +207,9 @@ export async function ownsIntegratedStudentSession(
   }
 
   const { data, error } = await query.maybeSingle();
-  return !error && Boolean(data);
+  if (error || !data) return false;
+  // 학급이 바뀐 학생이 옛 학급 세션으로 이전 반 자료를 계속 읽지 못하게, 방의 학급이 학생의 지금 학급과 같아야 한다.
+  const room = (data as { rooms?: { agit_class_id?: string | null } | Array<{ agit_class_id?: string | null }> | null }).rooms;
+  const roomClassId = Array.isArray(room) ? room[0]?.agit_class_id : room?.agit_class_id;
+  return Boolean(roomClassId) && roomClassId === student.class_id;
 }

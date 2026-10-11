@@ -53,3 +53,19 @@ test("종료된 활동에 로그인한 학생이 들어오면 로그인 안내�
   const entry = await readFile("src/app/room/[id]/room-entry-client.tsx", "utf8");
   assert.match(entry, /ended \? "활동이 끝났어요" : "학생 로그인이 필요해요"/);
 });
+
+// 2026-10-11 보안 점검(Codex 독립 검토를 코드로 확인한 항목)
+test("독립 모드에서 소유권 검사는 기본 거절이고, 학급이 바뀐 학생은 옛 학급 세션을 못 쓴다", async () => {
+  const session = await readFile("src/lib/lab-student-session.ts", "utf8");
+  const body = session.slice(session.indexOf("export async function ownsIntegratedStudentSession"));
+  assert.doesNotMatch(body, /if \(!isIntegratedLab\(\)\) return true;/);
+  assert.match(body, /LAB_ALLOW_STANDALONE_OWNERSHIP === "true"/);
+  assert.match(body, /rooms\(agit_class_id\)/);
+  assert.match(body, /roomClassId === student\.class_id/);
+});
+
+test("한줄모아 제출도 활동 종류를 확인한다(한자·투표 제출과 같게)", async () => {
+  const actions = await readFile("src/app/actions/student-actions.ts", "utf8");
+  const body = actions.slice(actions.indexOf("export async function submitOneLineShare("));
+  assert.match(body.slice(0, 2500), /activity_type !== "one_line_share"\) return \{ error: "활동 종류가 맞지 않습니다\." \}/);
+});

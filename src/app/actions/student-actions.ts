@@ -897,7 +897,7 @@ export async function submitOneLineShare(
     admin
       .schema("writing_helper")
       .from("rooms")
-      .select("is_active, activity_config")
+      .select("is_active, activity_config, activity_type")
       .eq("id", roomId)
       .maybeSingle(),
     admin
@@ -911,6 +911,8 @@ export async function submitOneLineShare(
 
   if (!sessionRes.data) return { error: "학생 세션을 찾을 수 없습니다." };
   if (!roomRes.data?.is_active) return { error: "이미 종료된 활동입니다." };
+  // 다른 제출 함수처럼 활동 종류를 확인한다 — 한자 활동의 세션·방 번호로 보내면 한자 답안이 한줄모아 모양으로 덮였다(2026-10-11 보안 점검).
+  if (roomRes.data.activity_type !== "one_line_share") return { error: "활동 종류가 맞지 않습니다." };
 
   const config = normalizeOneLineShareConfig(roomRes.data.activity_config);
   if (!config) return { error: "활동 설정을 불러오지 못했습니다." };
