@@ -10,7 +10,7 @@ import { LabGuide } from "@/features/activities/LabGuide";
 export default function LabGuidePage() {
   return (
     <main className="lab-page">
-      <div className="lab-page__content lab-page__content--medium">
+      <div className="lab-page__content">
         <LabGuide />
       </div>
     </main>

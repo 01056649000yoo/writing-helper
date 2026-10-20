@@ -851,6 +851,28 @@ button:not(:disabled),
   padding-inline: 0;
 }
 
+/* 도움말 두 열: 왼쪽은 늘 같은 것(흐름·알아 둘 것), 오른쪽은 고른 활동. 좁은 화면은 한 열로 쌓는다. */
+.lab-guide-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ui-space-8);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .lab-guide-columns {
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  }
+
+  .lab-guide-columns__side {
+    position: sticky;
+    top: var(--ui-space-4);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    padding-right: var(--ui-space-2);
+  }
+}
+
 .lab-page__content--writing {
   max-width: 1200px;
   width: min(calc(100% - 32px), 1200px);

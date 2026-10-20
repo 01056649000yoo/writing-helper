@@ -244,11 +244,13 @@ test("화면 폭은 정해진 셋 중 하나만 쓴다", () => {
     }
   }
   assert.deepEqual(offenders, [], `화면 폭을 손으로 적은 자리: ${offenders.join(" / ")}`);
-  // 도움말과 질문 카드는 같은 폭을 쓴다 — 나란히 오갈 때 글이 움직이면 안 된다.
+  // 질문 카드는 가운데 960px 이다. 도움말은 2026-10-20 에 두 열(왼쪽 흐름·알아 둘 것, 오른쪽 활동)로 바꾸며
+  // 좌우가 비지 않게 **전체 폭(기본)** 을 쓴다 — 한 열일 때 양옆이 비어 보인다는 지적이었다.
   // (`guide` 는 이 파일에서 다른 화면을 가리키므로 여기서 직접 읽는다.)
   const guidePage = readFileSync("src/app/dashboard/guide/page.tsx", "utf8");
   const settingsPage = readFileSync("src/app/dashboard/settings/page.tsx", "utf8");
-  assert.match(guidePage, /lab-page__content lab-page__content--medium/);
+  assert.match(guidePage, /className="lab-page__content">/);
+  assert.doesNotMatch(guidePage, /lab-page__content--/);
   assert.match(settingsPage, /lab-page__content lab-page__content--medium/);
 });
 
