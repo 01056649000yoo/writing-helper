@@ -797,6 +797,15 @@ button:not(:disabled),
   text-decoration: none;
 }
 
+/* 아지트로 나가는 메뉴: 안쪽 메뉴와 구분되게 점선으로 감싸고, 현재 자리 표시는 받지 않는다. */
+.lab-nav-link--exit {
+  align-self: center;
+  min-height: 36px;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+}
+
 .lab-nav-link:hover {
   color: var(--ui-primary);
   background: var(--ui-surface);

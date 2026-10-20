@@ -32,8 +32,8 @@ test("교사용 대시보드는 공통 셸과 현재 메뉴 표시를 한 번만
   assert.match(layout, /끄적끄적 아지트/);
   assert.match(layout, /글쓰기 연구소/);
   assert.match(layout, /DashboardNav/);
-  assert.match(layout, /NEXT_PUBLIC_AGIT_APP_URL/);
-  assert.match(layout, /아지트로 돌아가기/);
+  assert.match(nav, /NEXT_PUBLIC_AGIT_APP_URL/);
+  assert.match(nav, /아지트로 돌아가기/);
   assert.match(nav, /usePathname/);
   assert.match(nav, /aria-current/);
   assert.match(nav, /학급·활동/);
@@ -339,5 +339,5 @@ test("학급이 하나뿐인 선생님에게는 `학급 목록` 되돌아가기�
   assert.match(classPage, /href="\/dashboard" className="lab-breadcrumb">← 학급 목록/);
 
   // 아지트로 나가는 길은 이 변경과 무관하게 늘 열려 있어야 한다.
-  assert.match(layout, /아지트로 돌아가기/);
+  assert.match(nav, /아지트로 돌아가기/);
 });

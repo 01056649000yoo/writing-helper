@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -68,7 +69,8 @@ test("승인 실패는 연구소 전용 안내로 보내고 아지트 복귀 동
   assert.match(proxy, /"\/access-denied"/);
   assert.match(dashboardLayout, /if \(!profile\) redirect\("\/access-denied"\)/);
   assert.doesNotMatch(dashboardLayout, /redirect\(withBasePath\(/);
-  assert.match(dashboardLayout, /아지트로 돌아가기/);
+  // 아지트로 돌아가기는 2026-10-20 에 메뉴 줄(`dashboard-nav.tsx`)로 옮겼다.
+  assert.match(readFileSync("src/app/dashboard/dashboard-nav.tsx", "utf8"), /아지트로 돌아가기/);
 });
 
 test("통합 연구소 로그아웃은 아지트로 돌아가고 구 연구소는 자체 로그인으로 돌아간다", () => {
