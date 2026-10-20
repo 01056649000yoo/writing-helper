@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ACTIVITY_GUIDES, LAB_GUIDE_FLOW, LAB_GUIDE_NOTES, LAB_GUIDE_UPDATED } from "./guide";
+import { splitGuideLead } from "@/lib/guide-fold";
 
 /** `**굵게**` 와 `` `코드` `` 만 알아보는 아주 작은 표시기. 안내 문구를 HTML 로 넣지 않으려고 둔다. */
 function renderInline(text: string): ReactNode[] {
@@ -15,6 +16,27 @@ function renderInline(text: string): ReactNode[] {
     }
     return <span key={index}>{part}</span>;
   });
+}
+
+/** 긴 항목은 첫 문장만 보이고 `더 보기` 로 나머지를 연다. */
+function FoldText({ text }: { text: string }) {
+  const { lead, rest } = splitGuideLead(text);
+  const [open, setOpen] = useState(false);
+  if (!rest) return <>{renderInline(text)}</>;
+  return (
+    <>
+      {renderInline(lead)}
+      {open && <> {renderInline(rest)}</>}{" "}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="rounded-full bg-blue-50 px-2 py-0.5 text-sm font-bold text-blue-700 hover:bg-blue-100"
+      >
+        {open ? "접기" : "더 보기"}
+      </button>
+    </>
+  );
 }
 
 /**
@@ -58,7 +80,7 @@ export function LabGuide({ compact = false }: { compact?: boolean }) {
         {LAB_GUIDE_FLOW.map((step) => (
           <li key={step.title} className="lab-panel p-4">
             <p className="text-sm font-bold text-blue-700">{step.title}</p>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">{renderInline(step.body)}</p>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600"><FoldText text={step.body} /></p>
           </li>
         ))}
       </ol>
@@ -75,13 +97,14 @@ export function LabGuide({ compact = false }: { compact?: boolean }) {
       </div>
       <div className={compact ? "grid gap-3 sm:grid-cols-2" : "space-y-3"}>
         {LAB_GUIDE_NOTES.map((note) => (
-          <div key={note.title} className="lab-panel border-amber-100 bg-amber-50/40 p-5">
-            <p className="flex items-center gap-2 text-base font-bold text-amber-900">
+          <details key={note.title} className="lab-panel group border-amber-100 bg-amber-50/40 px-5 py-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-base font-bold text-amber-900">
               <span aria-hidden="true">{note.icon}</span>
-              {note.title}
-            </p>
+              <span className="flex-1">{note.title}</span>
+              <span aria-hidden="true" className="text-sm text-amber-700 transition-transform group-open:rotate-90">▶</span>
+            </summary>
             <p className="mt-2 text-sm leading-relaxed text-amber-950/80">{renderInline(note.body)}</p>
-          </div>
+          </details>
         ))}
       </div>
     </section>
@@ -130,7 +153,7 @@ export function LabGuide({ compact = false }: { compact?: boolean }) {
         {/* 결과가 어디로 가는지를 가장 크게 둔다 — 활동을 왜 하는지가 여기 있다. */}
         <div className="mt-5 rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5">
           <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">결과는 이렇게 이어집니다</p>
-          <p className="mt-2 text-base leading-relaxed text-emerald-950">{renderInline(active.resultUse)}</p>
+          <p className="mt-2 text-base leading-relaxed text-emerald-950"><FoldText key={active.id} text={active.resultUse} /></p>
         </div>
 
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
@@ -140,7 +163,7 @@ export function LabGuide({ compact = false }: { compact?: boolean }) {
               {active.whenToUse.map((item) => (
                 <li key={item} className="flex gap-2">
                   <span className="text-gray-300">·</span>
-                  <span>{renderInline(item)}</span>
+                  <span><FoldText text={item} /></span>
                 </li>
               ))}
             </ul>
@@ -152,26 +175,32 @@ export function LabGuide({ compact = false }: { compact?: boolean }) {
               {active.studentFlow.map((item, index) => (
                 <li key={item} className="flex gap-2">
                   <span className="shrink-0 font-bold text-blue-500">{index + 1}</span>
-                  <span>{renderInline(item)}</span>
+                  <span><FoldText text={item} /></span>
                 </li>
               ))}
             </ol>
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl bg-gray-50 p-5">
-          <p className="text-sm font-bold text-gray-500">선생님이 정하는 것</p>
-          <p className="mt-2 text-base leading-relaxed text-gray-700">{renderInline(active.teacherSetup)}</p>
-        </div>
+        {/* 선생님이 정하는 것·부가 기능은 길어서 접어 둔다 — 핵심(결과·학생이 하는 일)만 한 화면에 보이게. */}
+        <details key={`${active.id}-setup`} className="group mt-5 rounded-2xl bg-gray-50 px-5 py-4">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-base font-bold text-gray-700">
+            <span aria-hidden="true">⚙️</span>
+            <span className="flex-1">선생님이 정하는 것 보기</span>
+            <span aria-hidden="true" className="text-sm text-gray-500 transition-transform group-open:rotate-90">▶</span>
+          </summary>
+          <p className="mt-3 text-base leading-relaxed text-gray-700">{renderInline(active.teacherSetup)}</p>
+        </details>
 
         {active.extras?.map((extra) => (
-          <div key={extra.title} className="mt-5 rounded-2xl border-2 border-blue-100 bg-blue-50/50 p-5">
-            <p className="flex items-center gap-2 text-base font-bold text-blue-800">
+          <details key={`${active.id}-${extra.title}`} className="group mt-3 rounded-2xl border-2 border-blue-100 bg-blue-50/50 px-5 py-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-base font-bold text-blue-800">
               <span aria-hidden="true">{extra.icon}</span>
-              {extra.title}
-            </p>
-            <p className="mt-2 text-base leading-relaxed text-gray-700">{renderInline(extra.body)}</p>
-          </div>
+              <span className="flex-1">{extra.title}</span>
+              <span aria-hidden="true" className="text-sm text-blue-600 transition-transform group-open:rotate-90">▶</span>
+            </summary>
+            <p className="mt-3 text-base leading-relaxed text-gray-700">{renderInline(extra.body)}</p>
+          </details>
         ))}
       </div>
     </section>

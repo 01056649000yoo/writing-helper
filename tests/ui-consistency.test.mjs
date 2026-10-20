@@ -343,3 +343,16 @@ test("학급이 하나뿐인 선생님에게는 `학급 목록` 되돌아가기�
   // 아지트로 나가는 길은 이 변경과 무관하게 늘 열려 있어야 한다.
   assert.match(nav, /아지트로 돌아가기/);
 });
+
+test("연구소 도움말은 핵심만 먼저 보이고 긴 설명은 접는다", async () => {
+  const [labGuide, fold] = await Promise.all([
+    readFile("src/features/activities/LabGuide.tsx", "utf8"),
+    readFile("src/lib/guide-fold.ts", "utf8"),
+  ]);
+  // 선생님이 정하는 것·부가 기능·꼭 알아 둘 것은 접혀 있고, 긴 항목은 첫 문장 + 더 보기.
+  assert.match(labGuide, /선생님이 정하는 것 보기/);
+  assert.match(labGuide, /<details key=\{note\.title\}/);
+  assert.match(labGuide, /<FoldText text=\{item\} \/>/);
+  assert.match(labGuide, /더 보기/);
+  assert.match(fold, /export function splitGuideLead/);
+});
