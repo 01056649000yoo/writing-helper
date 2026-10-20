@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { withoutBasePath } from "@/lib/app-path";
 
 const LAST_CLASS_ID_KEY = "lab_last_active_class_id";
-// 아지트로 나가는 길은 메뉴 줄의 `질문 카드`와 `도움말` 사이에 둔다(2026-10-20 선생님 요청).
+// 아지트로 나가는 길은 메뉴 줄의 맨 끝, `도움말` 오른쪽에 둔다(2026-10-20 선생님 요청 — 처음엔 사이에 뒀다가 옮김).
 const AGIT_HOME_URL = process.env.NEXT_PUBLIC_AGIT_APP_URL
   ?? "https://xn--vz0ba242ncqcba79xhwx.site";
 
@@ -56,7 +56,6 @@ export function DashboardNav() {
     { href: "/dashboard/guide", label: "도움말", icon: "❓", section: "guide" as const },
   ];
 
-  const [before, after] = [primaryItems.slice(0, 2), primaryItems.slice(2)];
   const renderItem = (item: (typeof primaryItems)[number]) => {
     const active = isCurrentSection(pathname, item.section);
     return (
@@ -74,12 +73,11 @@ export function DashboardNav() {
 
   return (
     <nav className="lab-shell__nav" aria-label="연구소 주요 메뉴">
-      {before.map(renderItem)}
+      {primaryItems.map(renderItem)}
       <a className="lab-nav-link lab-nav-link--exit" href={AGIT_HOME_URL}>
         <span aria-hidden="true">↩</span>
         아지트로 돌아가기
       </a>
-      {after.map(renderItem)}
     </nav>
   );
 }
